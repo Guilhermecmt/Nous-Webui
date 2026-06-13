@@ -149,6 +149,16 @@ def _imap_connect(acc: dict) -> imaplib.IMAP4_SSL:
     return conn
 
 
+def _imap_logout(conn) -> None:
+    """Fecha a conexão IMAP sem nunca lançar (best-effort)."""
+    if conn is None:
+        return
+    try:
+        conn.logout()
+    except Exception:
+        pass
+
+
 def test_connection(acc: dict) -> tuple[bool, str]:
     """Valida credenciais IMAP. Retorna (ok, mensagem)."""
     try:
@@ -168,6 +178,7 @@ def list_recent(n: int = 20) -> list[dict]:
     acc = load_account()
     if not acc:
         return []
+    conn = None
     try:
         conn = _imap_connect(acc)
         conn.select("INBOX", readonly=True)
@@ -194,10 +205,11 @@ def list_recent(n: int = 20) -> list[dict]:
                 "category": None,
                 "summary": None,
             })
-        conn.logout()
         return msgs
     except Exception as e:
         return [{"error": str(e)}]
+    finally:
+        _imap_logout(conn)
 
 
 def get_message(uid: str) -> dict:
@@ -205,13 +217,13 @@ def get_message(uid: str) -> dict:
     acc = load_account()
     if not acc:
         return {"error": "sem conta configurada"}
+    conn = None
     try:
         conn = _imap_connect(acc)
         conn.select("INBOX", readonly=True)
         # UID FETCH: o uid recebido de list_recent é um UID estável, não um
         # número de sequência — evita abrir/responder a mensagem errada.
         _, raw = conn.uid("FETCH", uid.encode(), "(RFC822)")
-        conn.logout()
         if not raw or not raw[0]:
             return {"error": "mensagem não encontrada"}
         msg = email.message_from_bytes(raw[0][1])
@@ -226,6 +238,8 @@ def get_message(uid: str) -> dict:
         }
     except Exception as e:
         return {"error": str(e)}
+    finally:
+        _imap_logout(conn)
 
 
 def send_message(to: str, subject: str, body: str, in_reply_to: Optional[str] = None) -> tuple[bool, str]:
@@ -233,6 +247,7 @@ def send_message(to: str, subject: str, body: str, in_reply_to: Optional[str] = 
     acc = load_account()
     if not acc:
         return False, "Sem conta configurada."
+    server = None
     try:
         msg = MIMEMultipart()
         msg["From"] = acc["user"]
@@ -254,7 +269,6 @@ def send_message(to: str, subject: str, body: str, in_reply_to: Optional[str] = 
 
         server.login(acc["user"], acc["app_password"])
         server.sendmail(acc["user"], [to], msg.as_string())
-        server.quit()
         return True, "Email enviado com sucesso."
     except smtplib.SMTPAuthenticationError:
         return False, "Credenciais rejeitadas pelo servidor SMTP."
@@ -262,3 +276,14 @@ def send_message(to: str, subject: str, body: str, in_reply_to: Optional[str] = 
         return False, f"Servidor SMTP inacessível: {e}"
     except Exception as e:
         return False, str(e)
+    finally:
+        # Fecha o socket em qualquer caminho (sucesso ou erro). quit() envia
+        # QUIT e pode lançar se a conexão já estiver quebrada — close() não.
+        if server is not None:
+            try:
+                server.quit()
+            except Exception:
+                try:
+                    server.close()
+                except Exception:
+                    pass
