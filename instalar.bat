@@ -16,9 +16,10 @@ echo   - Ollama (motor dos modelos de IA)
 echo   - Python + Open WebUI (a interface)
 echo   - a identidade Nous (tema, logo, memoria)
 echo.
-echo O modelo de IA voce escolhe DEPOIS, dentro do
-echo proprio Nous - com recomendacao automatica para
-echo a sua maquina e download em 1 clique.
+echo Durante a instalacao voce pode escolher um modelo
+echo de IA por uma lista numerada (so' digitar o numero),
+echo ou apertar Enter e escolher DEPOIS dentro do Nous,
+echo com recomendacao automatica e download em 1 clique.
 echo.
 echo Pode levar varios minutos e baixar alguns GB.
 echo Se aparecer um aviso do Windows, escolha "Sim".

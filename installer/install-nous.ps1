@@ -104,6 +104,78 @@ function Find-Py311 {
     return $null
 }
 
+# VRAM dedicada (GB) via registro, p/ marcar o modelo recomendado no menu.
+# 0 = sem GPU detectada (vai recomendar modelos leves de CPU). Nunca lanca.
+function Get-VramGB {
+    try {
+        $cls = 'HKLM:\SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}'
+        $max = 0
+        Get-ChildItem $cls -ErrorAction SilentlyContinue | ForEach-Object {
+            $v = (Get-ItemProperty $_.PSPath -Name 'HardwareInformation.qwMemorySize' -ErrorAction SilentlyContinue).'HardwareInformation.qwMemorySize'
+            if ($v -and [int64]$v -gt $max) { $max = [int64]$v }
+        }
+        return [math]::Round($max / 1GB, 1)
+    } catch { return 0 }
+}
+
+# Menu numerado de modelos (le o catalog.json da Loja). O usuario digita um
+# numero em vez do nome (tags como "qwen2.5-coder:14b" sao longas e dificeis).
+# Enter sem nada = pula (mantem o padrao: escolher depois, na Loja do app).
+# Retorna a TAG escolhida, ou $null se pulou / catalogo indisponivel.
+function Select-ModelInteractive {
+    $catPath = Join-Path $REPO "monitor\catalog.json"
+    if (-not (Test-Path $catPath)) { return $null }
+    try { $models = (Get-Content $catPath -Raw | ConvertFrom-Json).models } catch { return $null }
+    if (-not $models -or $models.Count -eq 0) { return $null }
+
+    $vram = Get-VramGB
+
+    # Marca o "recomendado": melhor modelo que cabe na maquina. Com GPU, o de
+    # maior min_vram_gb que ainda <= VRAM; sem GPU, o leve mais capaz (<=4 GB dl).
+    $recIdx = -1
+    if ($vram -ge 4) {
+        $best = -1
+        for ($i = 0; $i -lt $models.Count; $i++) {
+            if ($models[$i].min_vram_gb -le $vram -and $models[$i].min_vram_gb -gt $best) {
+                $best = $models[$i].min_vram_gb; $recIdx = $i
+            }
+        }
+    } else {
+        for ($i = 0; $i -lt $models.Count; $i++) {
+            if ($models[$i].category -eq 'leve' -and $models[$i].download_gb -le 4.0) { $recIdx = $i; break }
+        }
+    }
+
+    Write-Host ""
+    if ($vram -ge 1) { Info ("GPU detectada: ~{0} GB de VRAM." -f $vram) }
+    else { Info "Sem GPU dedicada detectada: modelos leves rodam melhor (na CPU)." }
+    Write-Host "    Escolha um modelo digitando o NUMERO (ou Enter para escolher depois):" -ForegroundColor White
+    Write-Host ""
+
+    for ($i = 0; $i -lt $models.Count; $i++) {
+        $m   = $models[$i]
+        $num = ($i + 1).ToString().PadLeft(2)
+        $vis = if ($m.vision) { " [imagens]" } else { "" }
+        $tag = if ($i -eq $recIdx) { " <- recomendado p/ sua maquina" } else { "" }
+        $color = if ($i -eq $recIdx) { "Green" } else { "Gray" }
+        Write-Host ("     [{0}] {1} - {2} GB{3}{4}" -f $num, $m.name, $m.download_gb, $vis, $tag) -ForegroundColor $color
+    }
+    Write-Host ""
+
+    $defaultNum = if ($recIdx -ge 0) { ($recIdx + 1) } else { $null }
+    $promptTxt = if ($defaultNum) { "    Numero do modelo [$defaultNum = recomendado, Enter pula]: " }
+                 else            { "    Numero do modelo [Enter pula]: " }
+    Write-Host $promptTxt -ForegroundColor White -NoNewline
+    $ans = Read-Host
+
+    if ([string]::IsNullOrWhiteSpace($ans)) { return $null }
+    $ans = $ans.Trim()
+    $n = 0
+    if (-not [int]::TryParse($ans, [ref]$n)) { Info "Entrada invalida - vou pular (escolha depois na Loja)."; return $null }
+    if ($n -lt 1 -or $n -gt $models.Count) { Info "Numero fora da lista - vou pular (escolha depois na Loja)."; return $null }
+    return $models[$n - 1].tag
+}
+
 Write-Host "================ Instalador do Nous ================" -ForegroundColor Yellow
 
 # 0) Porteiro de capacidade -------------------------------------------------
@@ -204,15 +276,35 @@ if (Test-OllamaUp) { Ok "servico no ar" } else { Info "servico nao respondeu ain
 Step 2 "Modelo"
 $ollamaCmd = if ($ollamaExe) { $ollamaExe } else { "ollama" }
 $instModel = $false
+
+# Menu numerado: so' oferece se a instalacao e' interativa (nao passou -Model
+# nem -WithModel por linha de comando) e o terminal aceita entrada do usuario.
+$modelExplicit = $PSBoundParameters.ContainsKey('Model')
+if (-not $WithModel -and -not $modelExplicit -and [Environment]::UserInteractive) {
+    $chosen = Select-ModelInteractive
+    if ($chosen) { $Model = $chosen; $WithModel = $true }
+}
+
 $hasModel = [bool]((& $ollamaCmd list 2>$null) -match [regex]::Escape($Model))
 if ($WithModel) {
     if ($hasModel -and -not $Force) { Ok "$Model ja baixado" }
-    else { Info "baixando $Model (pode levar varios minutos)..."; & $ollamaCmd pull $Model; $instModel = $true; Ok "baixado" }
+    else {
+        Info "baixando $Model (pode levar varios minutos)..."
+        # Nao deixa uma falha de download (internet/Ollama) abortar a instalacao
+        # toda: o usuario ainda pode baixar pela Loja depois.
+        try {
+            & $ollamaCmd pull $Model
+            if ($LASTEXITCODE -eq 0) { $instModel = $true; Ok "baixado" }
+            else { Info "download nao concluido - voce pode baixar depois na Loja de Modelos." }
+        } catch {
+            Info "download nao concluido - voce pode baixar depois na Loja de Modelos."
+        }
+    }
 }
 elseif ($hasModel) { Ok "$Model ja presente" }
 else {
-    Info "pulado de proposito: no primeiro uso o Nous abre um assistente que"
-    Info "recomenda o modelo ideal p/ esta maquina e baixa em 1 clique (Loja de Modelos)."
+    Info "pulado: no primeiro uso o Nous abre um assistente que recomenda o"
+    Info "modelo ideal p/ esta maquina e baixa em 1 clique (Loja de Modelos)."
 }
 
 # 3) Python 3.11 ------------------------------------------------------------
