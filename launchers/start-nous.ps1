@@ -132,6 +132,16 @@ function Ensure-EmbedModel {
     } catch {}
 }
 
+# Oculta modelos de embedding (nomic-embed-text) do seletor de chat: eles
+# servem so' para busca semantica e nao conversam — se aparecem no dropdown,
+# o usuario seleciona e nao recebe resposta. Idempotente (escreve no webui.db).
+function Hide-EmbedModels {
+    $reg = Join-Path $PSScriptRoot "..\monitor\register_hidden_models.py"
+    if ((Test-Path $py) -and (Test-Path $reg)) {
+        & $py "$reg" --data-dir "$env:DATA_DIR" | Out-Null
+    }
+}
+
 # Sobe o indexador (modo watch) em segundo plano. Ele mesmo evita duplicar (lock),
 # le a pasta da config a cada ciclo e reindexa o que mudou (~20s).
 function Start-Indexer {
@@ -251,7 +261,7 @@ function Register-Cloud {
 }
 
 # Ja esta rodando? Garante funcoes nativas e abre o navegador.
-if (Test-Up) { Ensure-Branding; Register-Memory; Register-Pipe; Register-Research; Register-Arena; Register-Cloud; Register-Voice; Start-VoiceServer; Setup-Files; Setup-History; Start-MemoryAPI; Start-EmailAPI; Start-Process $url; return }
+if (Test-Up) { Ensure-Branding; Register-Memory; Register-Pipe; Register-Research; Register-Arena; Register-Cloud; Register-Voice; Start-VoiceServer; Setup-Files; Setup-History; Hide-EmbedModels; Start-MemoryAPI; Start-EmailAPI; Start-Process $url; return }
 
 # Garante o Ollama (em segundo plano)
 try { Invoke-RestMethod "http://127.0.0.1:11434/api/version" -TimeoutSec 3 | Out-Null }
@@ -277,5 +287,5 @@ if ((Test-Path $py) -and (Test-Path $monitor)) {
 # Espera ficar pronto, garante funcoes nativas e abre o navegador
 for ($i = 0; $i -lt 90; $i++) {
     Start-Sleep -Seconds 2
-    if (Test-Up) { Ensure-Branding; Register-Memory; Register-Pipe; Register-Research; Register-Arena; Register-Cloud; Register-Voice; Start-VoiceServer; Setup-Files; Setup-History; Start-MemoryAPI; Start-EmailAPI; Start-Process $url; break }
+    if (Test-Up) { Ensure-Branding; Register-Memory; Register-Pipe; Register-Research; Register-Arena; Register-Cloud; Register-Voice; Start-VoiceServer; Setup-Files; Setup-History; Hide-EmbedModels; Start-MemoryAPI; Start-EmailAPI; Start-Process $url; break }
 }
