@@ -139,7 +139,7 @@
 			'font-weight:600;font-size:12px;transition:background .15s}' +
 			'#nous-store-open:hover{background:rgba(200,150,46,.18)}' +
 			'#nous-voice-open{width:100%;margin-top:5px;padding:6px;border:1px solid rgba(200,150,46,.25);' +
-			'border-radius:8px;cursor:pointer;background:transparent;color:#b8a06a;' +
+			'border-radius:8px;cursor:pointer;background:transparent;color:#e7c069;' +
 			'font-weight:600;font-size:12px;transition:background .15s}' +
 			'#nous-voice-open:hover{background:rgba(200,150,46,.12)}' +
 			'#nous-voice-ov{position:fixed;inset:0;z-index:10001;background:rgba(0,0,0,.55);' +
@@ -163,7 +163,7 @@
 			'#nous-voice-btn:hover:not(:disabled){background:rgba(200,150,46,.38)}' +
 			'#nous-voice-btn:disabled{opacity:.4;cursor:default}' +
 			'#nous-email-open{width:100%;margin-top:5px;padding:6px;border:1px solid rgba(200,150,46,.25);' +
-			'border-radius:8px;cursor:pointer;background:transparent;color:#b8a06a;' +
+			'border-radius:8px;cursor:pointer;background:transparent;color:#e7c069;' +
 			'font-weight:600;font-size:12px;transition:background .15s}' +
 			'#nous-email-open:hover{background:rgba(200,150,46,.12)}' +
 			'#nous-email-ov{position:fixed;inset:0;z-index:10001;background:rgba(0,0,0,.55);' +
@@ -174,7 +174,8 @@
 			'background:rgba(18,18,22,.97);border:1px solid rgba(200,150,46,.4);' +
 			'border-radius:16px;box-shadow:0 16px 48px rgba(0,0,0,.55)}' +
 			'#nous-email-head{display:flex;align-items:center;gap:8px;padding:14px 16px 10px;' +
-			'border-bottom:1px solid rgba(200,150,46,.15)}' +
+			'border-bottom:1px solid rgba(200,150,46,.15);' +
+			'position:sticky;top:0;z-index:1;background:rgba(18,18,22,.97)}' +
 			'#nous-email-head span{flex:1;font-weight:700;font-size:15px;color:#e7c069}' +
 			'#nous-email-close{background:none;border:none;color:#888;cursor:pointer;font-size:19px;line-height:1}' +
 			'#nous-email-close:hover{color:#eee}' +
@@ -1008,7 +1009,6 @@
 
 	var EMAIL_URL = 'http://127.0.0.1:8995';
 	var emailEl = null, emailOpen = false;
-	var _emailView = 'loading'; // 'loading' | 'connect' | 'inbox' | 'message' | 'draft'
 	var _emailMsg = null;
 
 	function _esc2(s) {
@@ -1024,7 +1024,7 @@
 		emailEl.innerHTML =
 			'<div id="nous-email-box">' +
 			'<div id="nous-email-head"><span>✉ Assistente de Email</span>' +
-			'<button id="nous-email-close" title="Fechar">✕</button></div>' +
+			'<button id="nous-email-close" type="button" title="Fechar">✕</button></div>' +
 			'<div id="nous-email-body"><div class="nous-email-msg" style="opacity:.6">Carregando…</div></div>' +
 			'</div>';
 		document.body.appendChild(emailEl);
@@ -1074,7 +1074,7 @@
 			'<div class="nous-email-label">Senha de aplicativo <span style="opacity:.6">(não a senha principal)</span></div>' +
 			'<input id="nous-email-pwd" type="password" placeholder="xxxx xxxx xxxx xxxx">' +
 			'<div class="nous-email-hint">Gere em: Gmail → Segurança → Senhas de app.<br>Outlook → Conta → Segurança → Senha de app.</div>' +
-			'<button class="nous-email-btn" id="nous-email-conn-btn">Conectar</button>' +
+			'<button class="nous-email-btn" id="nous-email-conn-btn" type="button">Conectar</button>' +
 			'<div id="nous-email-conn-err" style="color:#f08080;font-size:11px;margin-top:6px"></div>' +
 			'</div>';
 		body.querySelector('#nous-email-conn-btn').addEventListener('click', _emailDoConnect);
@@ -1139,7 +1139,7 @@
 				(m.summary ? '<div class="nous-email-summ">' + _esc2(m.summary) + '</div>' : '') +
 				'</div>';
 		});
-		html += '<button class="nous-email-btn nous-email-btn-danger" id="nous-email-disc" style="margin-top:12px">Desconectar conta</button>';
+		html += '<button class="nous-email-btn nous-email-btn-danger" id="nous-email-disc" type="button" style="margin-top:12px">Desconectar conta</button>';
 		body.innerHTML = html;
 		body.querySelectorAll('.nous-email-row').forEach(function (row) {
 			row.addEventListener('click', function () { _emailOpenMsg(row.dataset.uid); });
@@ -1156,16 +1156,16 @@
 			.then(function (msg) {
 				_emailMsg = msg;
 				body.innerHTML =
-					'<button class="nous-email-back" id="nous-email-back">← Voltar à caixa</button>' +
+					'<button class="nous-email-back" id="nous-email-back" type="button">← Voltar à caixa</button>' +
 					'<div style="font-weight:600;margin-bottom:3px">' + _esc2(msg.subject || '') + '</div>' +
 					'<div style="font-size:11px;opacity:.7;margin-bottom:8px">De: ' + _esc2(msg.from || '') + ' · ' + _esc2(msg.date || '') + '</div>' +
 					(msg.summary ? '<div class="nous-email-msg" style="margin-bottom:10px"><b>Resumo:</b> ' + _esc2(msg.summary) + '</div>' : '') +
 					'<div style="font-size:11px;opacity:.7;max-height:180px;overflow-y:auto;margin-bottom:10px;line-height:1.5">' + _esc2((msg.body || '').slice(0, 1500)) + (msg.body && msg.body.length > 1500 ? '…' : '') + '</div>' +
-					'<button class="nous-email-btn" id="nous-email-draft-btn">✍ Rascunhar resposta</button>' +
+					'<button class="nous-email-btn" id="nous-email-draft-btn" type="button">✍ Rascunhar resposta</button>' +
 					'<div id="nous-email-draft-area" style="display:none">' +
 					'<div style="font-size:11px;opacity:.7;margin:8px 0 3px">Rascunho (edite antes de enviar):</div>' +
 					'<textarea class="nous-email-draft" id="nous-email-draft-txt"></textarea>' +
-					'<button class="nous-email-btn" id="nous-email-send-btn">Enviar resposta</button>' +
+					'<button class="nous-email-btn" id="nous-email-send-btn" type="button">Enviar resposta</button>' +
 					'<div id="nous-email-send-status" style="font-size:11px;margin-top:6px"></div>' +
 					'</div>';
 				body.querySelector('#nous-email-back').addEventListener('click', _emailLoadInbox);
