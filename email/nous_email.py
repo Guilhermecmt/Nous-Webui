@@ -171,12 +171,14 @@ def list_recent(n: int = 20) -> list[dict]:
     try:
         conn = _imap_connect(acc)
         conn.select("INBOX", readonly=True)
-        _, data = conn.search(None, "ALL")
+        # UID em vez de número de sequência: o UID é estável mesmo que outro
+        # email seja apagado/movido entre a listagem e a abertura da mensagem.
+        _, data = conn.uid("SEARCH", None, "ALL")
         uids = (data[0] or b"").split()
         uids = uids[-n:][::-1]  # os mais recentes primeiro
         msgs = []
         for uid in uids:
-            _, raw = conn.fetch(uid, "(RFC822.SIZE BODY.PEEK[HEADER.FIELDS (FROM SUBJECT DATE MESSAGE-ID)])")
+            _, raw = conn.uid("FETCH", uid, "(RFC822.SIZE BODY.PEEK[HEADER.FIELDS (FROM SUBJECT DATE MESSAGE-ID)])")
             if not raw or not raw[0]:
                 continue
             header_bytes = raw[0][1] if isinstance(raw[0], tuple) else raw[0]
@@ -206,7 +208,9 @@ def get_message(uid: str) -> dict:
     try:
         conn = _imap_connect(acc)
         conn.select("INBOX", readonly=True)
-        _, raw = conn.fetch(uid.encode(), "(RFC822)")
+        # UID FETCH: o uid recebido de list_recent é um UID estável, não um
+        # número de sequência — evita abrir/responder a mensagem errada.
+        _, raw = conn.uid("FETCH", uid.encode(), "(RFC822)")
         conn.logout()
         if not raw or not raw[0]:
             return {"error": "mensagem não encontrada"}

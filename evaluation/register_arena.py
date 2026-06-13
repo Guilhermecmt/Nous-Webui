@@ -62,14 +62,30 @@ def _resolve_db(data_dir):
 
 
 def _read_config(cx):
-    row = cx.execute("SELECT data FROM config LIMIT 1").fetchone()
-    if row:
-        return json.loads(row[0])
-    return {}
+    """Lê o dict 'data' da linha mais recente da tabela config (mesmo padrão do register_nvidia)."""
+    row = cx.execute("SELECT data FROM config ORDER BY id DESC LIMIT 1").fetchone()
+    if not row:
+        return {}
+    try:
+        data = json.loads(row[0]) if isinstance(row[0], str) else row[0]
+    except Exception:
+        return {}
+    return data if isinstance(data, dict) else {}
 
 
 def _write_config(cx, data):
-    cx.execute("UPDATE config SET data=?", (json.dumps(data, ensure_ascii=False),))
+    """Atualiza somente a linha mais recente (UPDATE sem WHERE sobrescreveria todas)."""
+    row = cx.execute("SELECT id FROM config ORDER BY id DESC LIMIT 1").fetchone()
+    payload = json.dumps(data, ensure_ascii=False)
+    if row:
+        cx.execute("UPDATE config SET data=? WHERE id=?", (payload, row[0]))
+    else:
+        import time
+        now = int(time.time())
+        cx.execute(
+            "INSERT INTO config (data, version, created_at, updated_at) VALUES (?,0,?,?)",
+            (payload, now, now),
+        )
 
 
 def _set_nested(obj, path: str, value):
