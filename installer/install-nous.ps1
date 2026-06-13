@@ -137,8 +137,58 @@ $ollamaExe = Find-Ollama
 if (($ollamaExe -or (Test-OllamaUp)) -and -not $Force) {
     Ok "ja instalado - nao vou baixar de novo$(if ($ollamaExe) { " ($ollamaExe)" })"
 } else {
-    Info "instalando via winget (silencioso)..."
-    winget install --id Ollama.Ollama -e --accept-package-agreements --accept-source-agreements --silent | Out-Null
+    $ollamaSetup = Join-Path $env:TEMP "OllamaSetup.exe"
+    $ollamaUrl   = "https://ollama.com/download/OllamaSetup.exe"
+
+    Info "baixando o Ollama (~1.3 GB)..."
+    Write-Host ""
+
+    # Download com barra de progresso nativa do PowerShell.
+    # WebClient.DownloadFile bloqueia sem progresso; usamos WebClient assíncrono
+    # com evento DownloadProgressChanged para atualizar Write-Progress.
+    $wc = New-Object System.Net.WebClient
+    $done = $false
+    $dlError = $null
+
+    $wc.add_DownloadProgressChanged({
+        param($s, $e)
+        $mb     = [math]::Round($e.BytesReceived / 1MB, 1)
+        $total  = if ($e.TotalBytesToReceive -gt 0) { [math]::Round($e.TotalBytesToReceive / 1MB, 1) } else { '?' }
+        $pct    = $e.ProgressPercentage
+        $status = if ($e.TotalBytesToReceive -gt 0) {
+            "$mb MB de $total MB"
+        } else {
+            "$mb MB baixados"
+        }
+        Write-Progress -Activity "Baixando Ollama" -Status $status -PercentComplete $pct
+    })
+
+    $wc.add_DownloadFileCompleted({
+        param($s, $e)
+        $script:done = $true
+        if ($e.Error) { $script:dlError = $e.Error.Message }
+    })
+
+    $wc.DownloadFileAsync([uri]$ollamaUrl, $ollamaSetup)
+
+    # Aguarda o download terminar (máx 30 min para internet lenta)
+    $deadline = (Get-Date).AddMinutes(30)
+    while (-not $done -and (Get-Date) -lt $deadline) { Start-Sleep -Milliseconds 500 }
+    Write-Progress -Activity "Baixando Ollama" -Completed
+
+    if ($dlError) {
+        Write-Host "    [erro] Falha no download: $dlError" -ForegroundColor Red
+        exit 1
+    }
+    if (-not (Test-Path $ollamaSetup)) {
+        Write-Host "    [erro] Arquivo nao encontrado apos o download." -ForegroundColor Red
+        exit 1
+    }
+
+    Info "instalando o Ollama (silencioso)..."
+    Start-Process -FilePath $ollamaSetup -ArgumentList "/VERYSILENT /NORESTART" -Wait -NoNewWindow
+    Remove-Item $ollamaSetup -Force -ErrorAction SilentlyContinue
+
     $ollamaExe = Find-Ollama
     $instOllama = $true
     Ok "instalado"
@@ -171,8 +221,8 @@ $instPython = $false
 $py311 = Find-Py311
 if ($py311 -and -not $Force) { Ok "ja instalado - nao vou baixar de novo ($py311)" }
 else {
-    Info "instalando via winget..."
-    winget install --id Python.Python.3.11 -e --accept-package-agreements --accept-source-agreements --silent | Out-Null
+    Info "instalando Python 3.11 (~27 MB, rapido)..."
+    winget install --id Python.Python.3.11 -e --accept-package-agreements --accept-source-agreements --silent
     $py311 = Find-Py311
     $instPython = $true
     if ($py311) { Ok "instalado" }
