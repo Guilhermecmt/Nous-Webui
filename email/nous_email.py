@@ -113,7 +113,9 @@ def _get_body(msg) -> str:
         for part in msg.walk():
             ct = part.get_content_type()
             cd = str(part.get("Content-Disposition") or "")
-            if "attachment" in cd:
+            # Ignora anexos e arquivos inline (.txt/.html com filename) — só
+            # queremos o corpo da mensagem, não um anexo de texto.
+            if "attachment" in cd or part.get_filename():
                 continue
             charset = part.get_content_charset() or "utf-8"
             try:

@@ -24,6 +24,7 @@ import sys
 import json
 import asyncio
 import subprocess
+import urllib.parse
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -260,17 +261,39 @@ async def _do_pull(tag):
 
 
 # ----------------------------------------------------------------- HTTP / CORS
-_CORS = {"Access-Control-Allow-Origin": "*",
-         "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-         "Access-Control-Allow-Headers": "Content-Type"}
+# Restrito a origens locais (mesmo padrão da Memory/Email API). O monitor expõe
+# /pull (inicia downloads) e /unload (libera a VRAM); sem esta restrição qualquer
+# site aberto no navegador poderia dispará-los via CSRF.
+
+def _origin_ok(origin):
+    if not origin:
+        return True
+    try:
+        host = urllib.parse.urlparse(origin).hostname
+    except Exception:
+        return False
+    return host in ("localhost", "127.0.0.1", "::1")
+
+
+def _cors_headers(origin):
+    return {
+        "Access-Control-Allow-Origin":  origin if (origin and _origin_ok(origin)) else "null",
+        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type",
+        "Vary": "Origin",
+    }
 
 
 @web.middleware
 async def cors_mw(request, handler):
+    origin = request.headers.get("Origin")
+    if not _origin_ok(origin):
+        return web.json_response({"error": "forbidden origin"}, status=403,
+                                 headers=_cors_headers(origin))
     if request.method == "OPTIONS":
-        return web.Response(status=204, headers=_CORS)
+        return web.Response(status=204, headers=_cors_headers(origin))
     resp = await handler(request)
-    resp.headers.update(_CORS)
+    resp.headers.update(_cors_headers(origin))
     return resp
 
 
@@ -327,6 +350,9 @@ async def h_pull(request):
     cur = _pulls.get(tag)
     if cur and cur["status"] == "baixando":
         return web.json_response({"started": False, "reason": "em andamento"})
+    if cur and cur["status"] == "pronto":
+        # Já baixado nesta sessão: não refaz o download nem apaga o estado.
+        return web.json_response({"started": False, "reason": "ja baixado"})
     _pulls[tag] = {"status": "baixando", "pct": 0.0,
                    "completed_gb": 0.0, "total_gb": 0.0, "error": None}
     _pull_tasks[tag] = asyncio.get_event_loop().create_task(_do_pull(tag))
