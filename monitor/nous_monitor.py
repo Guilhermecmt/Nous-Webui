@@ -371,6 +371,24 @@ _voice_install: dict = {"status": "inativo", "step": "", "pct": 0.0, "error": No
 _voice_task = None
 
 
+def _friendly_voice_error(stderr_text: str) -> str:
+    """Traduz o stderr tecnico do PowerShell numa mensagem para o usuario leigo.
+    O detalhe tecnico NUNCA vai para a tela — fica so' no log do servidor."""
+    m = (stderr_text or "").lower()
+    if ("could not" in m or "resolve" in m or "no such host" in m or "timed out" in m
+            or "remote name" in m or "connection" in m or "internet" in m):
+        return ("Nao consegui baixar os arquivos de voz. Verifique sua conexao "
+                "com a internet e tente de novo.")
+    if "space" in m or "disk" in m or "espaco" in m:
+        return "Sem espaco em disco suficiente para instalar a voz."
+    if "denied" in m or "unauthorized" in m or "negado" in m or "permission" in m:
+        return ("O Windows bloqueou a gravacao dos arquivos de voz. Tente rodar o "
+                "Nous novamente (e verifique o antivirus).")
+    # Qualquer outra falha (inclusive erro de script): mensagem generica e acionavel.
+    return ("Nao foi possivel ativar a voz agora. Tente de novo; se persistir, "
+            "reinicie o Nous.")
+
+
 def _voice_assets_present():
     vdir = _data_dir() / "voice"
     has_piper = (vdir / "piper.exe").is_file()
@@ -395,16 +413,24 @@ async def _do_voice_install():
         )
         stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=600)
         if proc.returncode != 0:
-            err = stderr.decode("utf-8", "ignore").strip() or "Erro desconhecido"
-            _voice_install.update(status="erro", pct=0.0, step="", error=err)
+            raw = stderr.decode("utf-8", "ignore").strip()
+            # Log tecnico SO' no servidor (para diagnostico); a tela ve so' o amigavel.
+            if raw:
+                print(f"[Nous][voz] install-voice.ps1 falhou (rc={proc.returncode}):\n{raw}",
+                      file=sys.stderr)
+            _voice_install.update(status="erro", pct=0.0, step="",
+                                  error=_friendly_voice_error(raw))
         else:
             _voice_install.update(status="pronto", pct=1.0,
                                   step="Voz ativada!", error=None)
     except asyncio.TimeoutError:
         _voice_install.update(status="erro", pct=0.0, step="",
-                              error="Tempo limite excedido. Tente novamente.")
+                              error="A instalacao da voz demorou demais. Verifique sua "
+                                    "internet e tente de novo.")
     except Exception as e:
-        _voice_install.update(status="erro", pct=0.0, step="", error=str(e))
+        print(f"[Nous][voz] erro inesperado: {e}", file=sys.stderr)
+        _voice_install.update(status="erro", pct=0.0, step="",
+                              error="Nao foi possivel ativar a voz agora. Tente de novo.")
 
 
 async def h_voice_status(request):

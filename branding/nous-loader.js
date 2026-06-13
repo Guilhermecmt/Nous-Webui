@@ -958,6 +958,19 @@
 			});
 	}
 
+	/* Rede de seguranca: o backend ja' manda mensagens amigaveis, mas se algum
+	 * erro tecnico (stack trace do PowerShell, etc.) vazar, nunca o mostramos
+	 * cru ao usuario — trocamos por uma frase generica e acionavel. */
+	function _voiceFriendlyErr(msg) {
+		var s = String(msg || '').trim();
+		if (!s) return 'Nao foi possivel ativar a voz agora. Tente de novo.';
+		var techy = /ParserError|CategoryInfo|FullyQualified|MissingEnd|Exception|at line|System\.|\+ ~|\.ps1:|Token|Unexpected/i;
+		if (s.length > 160 || techy.test(s)) {
+			return 'Nao foi possivel ativar a voz agora. Tente de novo; se persistir, reinicie o Nous.';
+		}
+		return s;
+	}
+
 	function renderVoice(data) {
 		if (!voiceOpen || !voiceEl) return;
 		var stEl  = voiceEl.querySelector('#nous-voice-status');
@@ -988,7 +1001,7 @@
 			voiceTimer = setTimeout(voiceRefresh, 1500);
 		} else if (inst.status === 'erro') {
 			if (stEl) stEl.innerHTML =
-				'<span style="color:#e08080">' + _esc(inst.error || 'Erro desconhecido.') + '</span>';
+				'<span style="color:#e08080">' + _esc(_voiceFriendlyErr(inst.error)) + '</span>';
 			if (btn) { btn.textContent = 'Tentar de novo'; btn.disabled = false; }
 		} else {
 			if (stEl) stEl.textContent = '';
