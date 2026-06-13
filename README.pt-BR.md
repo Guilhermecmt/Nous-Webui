@@ -9,7 +9,7 @@
 Chat · Visão · Geração de imagem · Busca na web — 100% no seu PC.  
 Sem nuvem. Sem mensalidade. Suas conversas nunca saem da sua máquina.
 
-[![version](https://img.shields.io/badge/version-2.4.0-c8962e)](CHANGELOG.md)
+[![version](https://img.shields.io/badge/version-2.5.0-c8962e)](CHANGELOG.md)
 [![license](https://img.shields.io/badge/license-MIT-black)](LICENSE)
 [![platform](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6)](#requisitos)
 [![local](https://img.shields.io/badge/100%25-local%20%26%20privado-2ea44f)](#por-que-o-nous)
@@ -36,6 +36,7 @@ O que você ganha em relação a um chat de IA comum:
 - **Busca na web** opcional via DuckDuckGo, sem chave de API.
 - **Pesquisa Profunda.** Selecione "Pesquisa Profunda (Nous)" no dropdown — o Nous planeja, busca a web em múltiplas etapas, lê as páginas e entrega um relatório markdown com citações numeradas e lista de fontes clicáveis. 100% local.
 - **Comparação cega de modelos.** Selecione "Comparar Modelos (Nous)" e faça uma pergunta — duas respostas anônimas aparecem lado a lado. Você vota antes de ver os nomes.
+- **Assistente de email (opcional).** Conecte sua caixa de entrada e o Nous faz triagem, resume e rascunha respostas — tudo na sua máquina. Seus emails só chegam ao modelo Ollama local, nunca à nuvem. Envio sempre exige confirmação.
 - **Painel de recursos.** VRAM em tempo real, modelos carregados e um botão para liberar a placa de vídeo na hora.
 - **Sem janelas de terminal.** Abre por um atalho, roda em segundo plano, fecha pelo "Parar Nous".
 
@@ -119,6 +120,19 @@ powershell -ExecutionPolicy Bypass -File images\install-comfyui.ps1
 ```
 
 Instala o ComfyUI, o PyTorch certo para a sua GPU e os modelos Flux.1 Schnell (~12 GB). Depois, selecione **Gerador de Imagem Local** no seletor de modelos e peça: *"crie uma logo dourada de uma coruja"*. A imagem aparece na conversa.
+
+### Assistente de Email — IA local para sua caixa de entrada (opcional)
+
+Conecte seu email (Gmail, Outlook, Yahoo) via `conectar-email.bat` ou pelo botão **✉ Assistente de Email** no card Recursos. O Nous vai:
+
+- **Triar** cada email: Importante / Pode esperar / Promoção / Spam + resumo de 1 linha.
+- **Resumir** a mensagem completa quando você abre.
+- **Rascunhar uma resposta** em PT-BR educado, pronta para editar.
+- **Enviar** somente após você revisar e confirmar — nunca envia automaticamente.
+
+> **Privacidade:** seus emails são processados apenas pelo **modelo Ollama local**. Nenhum conteúdo sai da máquina, mesmo com Nuvem NVIDIA ativa. As credenciais ficam em `NousData/.email_account.json` (fora do git). Use uma **senha de aplicativo**, não a senha principal — revogável a qualquer momento.
+
+---
 
 ### Pesquisa Profunda — pesquisa multi-etapas com fontes
 
@@ -224,6 +238,7 @@ Nous WebUI/
 ├─ installer/   instalador de 1 clique + script do Inno Setup
 ├─ search/      busca na web + Pipe de Pesquisa Profunda (SearXNG + Ollama)
 ├─ evaluation/  Comparar Modelos: registro do Arena (comparação cega A/B)
+├─ email/       Assistente de Email: cliente IMAP/SMTP + API REST (porta 8995)
 ├─ tools/       análise de capacidade, backup, reset de senha, health check
 └─ docs/        roadmap, screenshots
 ```

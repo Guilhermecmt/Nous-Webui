@@ -161,7 +161,51 @@
 			'#nous-voice-btn{width:100%;padding:8px;border:0;border-radius:9px;cursor:pointer;' +
 			'background:rgba(200,150,46,.22);color:#e7c069;font-weight:700;font-size:13px;transition:background .15s}' +
 			'#nous-voice-btn:hover:not(:disabled){background:rgba(200,150,46,.38)}' +
-			'#nous-voice-btn:disabled{opacity:.4;cursor:default}';
+			'#nous-voice-btn:disabled{opacity:.4;cursor:default}' +
+			'#nous-email-open{width:100%;margin-top:5px;padding:6px;border:1px solid rgba(200,150,46,.25);' +
+			'border-radius:8px;cursor:pointer;background:transparent;color:#b8a06a;' +
+			'font-weight:600;font-size:12px;transition:background .15s}' +
+			'#nous-email-open:hover{background:rgba(200,150,46,.12)}' +
+			'#nous-email-ov{position:fixed;inset:0;z-index:10001;background:rgba(0,0,0,.55);' +
+			'display:flex;align-items:center;justify-content:center;backdrop-filter:blur(3px)}' +
+			'#nous-email-ov.nous-hidden{display:none}' +
+			'#nous-email-box{width:460px;max-width:95vw;max-height:85vh;overflow-y:auto;' +
+			'font-family:Inter,system-ui,sans-serif;font-size:13px;color:#eee;' +
+			'background:rgba(18,18,22,.97);border:1px solid rgba(200,150,46,.4);' +
+			'border-radius:16px;box-shadow:0 16px 48px rgba(0,0,0,.55)}' +
+			'#nous-email-head{display:flex;align-items:center;gap:8px;padding:14px 16px 10px;' +
+			'border-bottom:1px solid rgba(200,150,46,.15)}' +
+			'#nous-email-head span{flex:1;font-weight:700;font-size:15px;color:#e7c069}' +
+			'#nous-email-close{background:none;border:none;color:#888;cursor:pointer;font-size:19px;line-height:1}' +
+			'#nous-email-close:hover{color:#eee}' +
+			'#nous-email-body{padding:14px 16px}' +
+			'.nous-email-form input{width:100%;box-sizing:border-box;padding:7px 10px;margin:5px 0 10px;' +
+			'background:rgba(255,255,255,.07);border:1px solid rgba(200,150,46,.3);' +
+			'border-radius:8px;color:#eee;font-size:12px;outline:none}' +
+			'.nous-email-form input:focus{border-color:#c8962e}' +
+			'.nous-email-label{font-size:11px;opacity:.7;margin-bottom:2px}' +
+			'.nous-email-hint{font-size:11px;opacity:.6;line-height:1.5;margin-bottom:12px}' +
+			'.nous-email-btn{width:100%;padding:8px;border:0;border-radius:9px;cursor:pointer;margin-top:6px;' +
+			'background:rgba(200,150,46,.22);color:#e7c069;font-weight:700;font-size:13px;transition:background .15s}' +
+			'.nous-email-btn:hover:not(:disabled){background:rgba(200,150,46,.38)}' +
+			'.nous-email-btn:disabled{opacity:.4;cursor:default}' +
+			'.nous-email-btn-danger{background:rgba(200,60,60,.18);color:#f08080}' +
+			'.nous-email-btn-danger:hover:not(:disabled){background:rgba(200,60,60,.32)}' +
+			'.nous-email-msg{font-size:12px;margin:8px 0;padding:7px 10px;border-radius:7px;' +
+			'background:rgba(255,255,255,.06);line-height:1.5}' +
+			'.nous-email-row{padding:9px 0;border-bottom:1px solid rgba(255,255,255,.06);cursor:pointer}' +
+			'.nous-email-row:hover{background:rgba(200,150,46,.06);border-radius:6px}' +
+			'.nous-email-from{font-weight:600;font-size:12px}' +
+			'.nous-email-subj{font-size:12px;margin:2px 0}' +
+			'.nous-email-cat{display:inline-block;font-size:10px;padding:1px 6px;border-radius:10px;' +
+			'background:rgba(200,150,46,.2);color:#e7c069;margin-right:5px}' +
+			'.nous-email-summ{font-size:11px;opacity:.7;margin-top:2px}' +
+			'.nous-email-back{background:none;border:none;color:#c8962e;cursor:pointer;font-size:12px;' +
+			'padding:0 0 10px;display:block}' +
+			'.nous-email-back:hover{text-decoration:underline}' +
+			'.nous-email-draft{width:100%;box-sizing:border-box;min-height:120px;padding:8px;' +
+			'background:rgba(255,255,255,.06);border:1px solid rgba(200,150,46,.25);' +
+			'border-radius:8px;color:#eee;font-size:12px;resize:vertical;margin:8px 0}';
 		var st = document.createElement('style');
 		st.id = 'nous-monitor-style';
 		st.textContent = css;
@@ -184,7 +228,8 @@
 			'<div id="nous-mon-models"></div>' +
 			'<button id="nous-mon-stop" type="button" disabled>Parar modelos</button>' +
 			'<button id="nous-store-open" type="button">Baixar modelos</button>' +
-			'<button id="nous-voice-open" type="button">🎙 Ativar voz em PT-BR</button></div>';
+			'<button id="nous-voice-open" type="button">🎙 Ativar voz em PT-BR</button>' +
+			'<button id="nous-email-open" type="button">✉ Assistente de Email</button></div>';
 		document.body.appendChild(monEl);
 		monModels = monEl.querySelector('#nous-mon-models');
 		monBtn = monEl.querySelector('#nous-mon-stop');
@@ -207,6 +252,7 @@
 		});
 		monEl.querySelector('#nous-store-open').addEventListener('click', openStore);
 		monEl.querySelector('#nous-voice-open').addEventListener('click', openVoice);
+		monEl.querySelector('#nous-email-open').addEventListener('click', openEmail);
 		monEl.classList.toggle('nous-collapsed', monCollapsed);
 	}
 
@@ -956,6 +1002,238 @@
 		fetch(MON_URL + '/voice/install', { method: 'POST' })
 			.catch(function () {})
 			.then(function () { setTimeout(voiceRefresh, 800); });
+	}
+
+	/* ========================== Painel Email ================================ */
+
+	var EMAIL_URL = 'http://127.0.0.1:8995';
+	var emailEl = null, emailOpen = false;
+	var _emailView = 'loading'; // 'loading' | 'connect' | 'inbox' | 'message' | 'draft'
+	var _emailMsg = null;
+
+	function _esc2(s) {
+		return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+	}
+
+	function buildEmail() {
+		if (emailEl && document.body && document.body.contains(emailEl)) return;
+		if (!document.body) return;
+		emailEl = document.createElement('div');
+		emailEl.id = 'nous-email-ov';
+		emailEl.classList.add('nous-hidden');
+		emailEl.innerHTML =
+			'<div id="nous-email-box">' +
+			'<div id="nous-email-head"><span>✉ Assistente de Email</span>' +
+			'<button id="nous-email-close" title="Fechar">✕</button></div>' +
+			'<div id="nous-email-body"><div class="nous-email-msg" style="opacity:.6">Carregando…</div></div>' +
+			'</div>';
+		document.body.appendChild(emailEl);
+		emailEl.addEventListener('click', function (e) { if (e.target === emailEl) closeEmail(); });
+		emailEl.querySelector('#nous-email-close').addEventListener('click', closeEmail);
+	}
+
+	function openEmail() {
+		buildEmail();
+		if (!emailEl) return;
+		emailOpen = true;
+		emailEl.classList.remove('nous-hidden');
+		_emailRefreshStatus();
+	}
+
+	function closeEmail() {
+		emailOpen = false;
+		if (emailEl) emailEl.classList.add('nous-hidden');
+	}
+
+	function _emailBody() {
+		return emailEl ? emailEl.querySelector('#nous-email-body') : null;
+	}
+
+	function _emailRefreshStatus() {
+		var body = _emailBody();
+		if (!body) return;
+		body.innerHTML = '<div class="nous-email-msg" style="opacity:.6">Verificando conta…</div>';
+		fetch(EMAIL_URL + '/status', { cache: 'no-store' })
+			.then(function (r) { return r.json(); })
+			.then(function (d) {
+				if (d.connected) { _emailLoadInbox(); }
+				else { _emailShowConnect(); }
+			})
+			.catch(function () { _emailShowConnect(); });
+	}
+
+	function _emailShowConnect() {
+		var body = _emailBody();
+		if (!body) return;
+		body.innerHTML =
+			'<p class="nous-email-hint">Conecte sua conta de email para triagem, resumos e rascunhos.<br>' +
+			'Tudo é processado pelo modelo local — seus emails nunca saem da máquina.</p>' +
+			'<div class="nous-email-form">' +
+			'<div class="nous-email-label">Endereço de email</div>' +
+			'<input id="nous-email-addr" type="email" placeholder="voce@gmail.com">' +
+			'<div class="nous-email-label">Senha de aplicativo <span style="opacity:.6">(não a senha principal)</span></div>' +
+			'<input id="nous-email-pwd" type="password" placeholder="xxxx xxxx xxxx xxxx">' +
+			'<div class="nous-email-hint">Gere em: Gmail → Segurança → Senhas de app.<br>Outlook → Conta → Segurança → Senha de app.</div>' +
+			'<button class="nous-email-btn" id="nous-email-conn-btn">Conectar</button>' +
+			'<div id="nous-email-conn-err" style="color:#f08080;font-size:11px;margin-top:6px"></div>' +
+			'</div>';
+		body.querySelector('#nous-email-conn-btn').addEventListener('click', _emailDoConnect);
+	}
+
+	function _emailDoConnect() {
+		var addr = (emailEl.querySelector('#nous-email-addr') || {}).value || '';
+		var pwd  = (emailEl.querySelector('#nous-email-pwd')  || {}).value || '';
+		var errEl = emailEl.querySelector('#nous-email-conn-err');
+		var btn  = emailEl.querySelector('#nous-email-conn-btn');
+		if (!addr || !pwd) { if (errEl) errEl.textContent = 'Preencha email e senha.'; return; }
+		if (btn) { btn.disabled = true; btn.textContent = 'Conectando…'; }
+		fetch(EMAIL_URL + '/connect', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ user: addr, app_password: pwd }),
+		})
+		.then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+		.then(function (res) {
+			if (res.ok) { _emailLoadInbox(); }
+			else {
+				if (errEl) errEl.textContent = res.d.error || 'Falha na conexão.';
+				if (btn) { btn.disabled = false; btn.textContent = 'Conectar'; }
+			}
+		})
+		.catch(function () {
+			if (errEl) errEl.textContent = 'Serviço indisponível. Reinicie o Nous.';
+			if (btn) { btn.disabled = false; btn.textContent = 'Conectar'; }
+		});
+	}
+
+	function _emailLoadInbox() {
+		var body = _emailBody();
+		if (!body) return;
+		body.innerHTML = '<div class="nous-email-msg" style="opacity:.6">Carregando caixa de entrada e triagem…<br><span style="font-size:11px;opacity:.7">A IA local classifica cada email. Aguarde.</span></div>';
+		fetch(EMAIL_URL + '/inbox', { cache: 'no-store' })
+			.then(function (r) { return r.json(); })
+			.then(_emailRenderInbox)
+			.catch(function (e) {
+				var body = _emailBody();
+				if (body) body.innerHTML = '<div class="nous-email-msg" style="color:#f08080">Erro ao carregar inbox.</div>';
+			});
+	}
+
+	function _emailRenderInbox(msgs) {
+		var body = _emailBody();
+		if (!body) return;
+		if (!Array.isArray(msgs) || msgs.length === 0) {
+			body.innerHTML = '<div class="nous-email-msg" style="opacity:.7">Caixa de entrada vazia.</div>' +
+				'<button class="nous-email-btn nous-email-btn-danger" id="nous-email-disc">Desconectar conta</button>';
+			body.querySelector('#nous-email-disc').addEventListener('click', _emailDisconnect);
+			return;
+		}
+		var html = '<div style="font-size:11px;opacity:.6;margin-bottom:8px">Últimas ' + msgs.length + ' mensagens — clique para abrir</div>';
+		msgs.forEach(function (m) {
+			if (m.error) return;
+			html +=
+				'<div class="nous-email-row" data-uid="' + _esc2(m.uid) + '">' +
+				'<div class="nous-email-from">' + _esc2(m.from || '') + '</div>' +
+				'<div class="nous-email-subj">' + _esc2(m.subject || '') + '</div>' +
+				(m.category ? '<span class="nous-email-cat">' + _esc2(m.category) + '</span>' : '') +
+				(m.summary ? '<div class="nous-email-summ">' + _esc2(m.summary) + '</div>' : '') +
+				'</div>';
+		});
+		html += '<button class="nous-email-btn nous-email-btn-danger" id="nous-email-disc" style="margin-top:12px">Desconectar conta</button>';
+		body.innerHTML = html;
+		body.querySelectorAll('.nous-email-row').forEach(function (row) {
+			row.addEventListener('click', function () { _emailOpenMsg(row.dataset.uid); });
+		});
+		body.querySelector('#nous-email-disc').addEventListener('click', _emailDisconnect);
+	}
+
+	function _emailOpenMsg(uid) {
+		var body = _emailBody();
+		if (!body) return;
+		body.innerHTML = '<div class="nous-email-msg" style="opacity:.6">Carregando email e resumo…</div>';
+		fetch(EMAIL_URL + '/message?uid=' + encodeURIComponent(uid), { cache: 'no-store' })
+			.then(function (r) { return r.json(); })
+			.then(function (msg) {
+				_emailMsg = msg;
+				body.innerHTML =
+					'<button class="nous-email-back" id="nous-email-back">← Voltar à caixa</button>' +
+					'<div style="font-weight:600;margin-bottom:3px">' + _esc2(msg.subject || '') + '</div>' +
+					'<div style="font-size:11px;opacity:.7;margin-bottom:8px">De: ' + _esc2(msg.from || '') + ' · ' + _esc2(msg.date || '') + '</div>' +
+					(msg.summary ? '<div class="nous-email-msg" style="margin-bottom:10px"><b>Resumo:</b> ' + _esc2(msg.summary) + '</div>' : '') +
+					'<div style="font-size:11px;opacity:.7;max-height:180px;overflow-y:auto;margin-bottom:10px;line-height:1.5">' + _esc2((msg.body || '').slice(0, 1500)) + (msg.body && msg.body.length > 1500 ? '…' : '') + '</div>' +
+					'<button class="nous-email-btn" id="nous-email-draft-btn">✍ Rascunhar resposta</button>' +
+					'<div id="nous-email-draft-area" style="display:none">' +
+					'<div style="font-size:11px;opacity:.7;margin:8px 0 3px">Rascunho (edite antes de enviar):</div>' +
+					'<textarea class="nous-email-draft" id="nous-email-draft-txt"></textarea>' +
+					'<button class="nous-email-btn" id="nous-email-send-btn">Enviar resposta</button>' +
+					'<div id="nous-email-send-status" style="font-size:11px;margin-top:6px"></div>' +
+					'</div>';
+				body.querySelector('#nous-email-back').addEventListener('click', _emailLoadInbox);
+				body.querySelector('#nous-email-draft-btn').addEventListener('click', function () { _emailLoadDraft(uid); });
+			})
+			.catch(function () {
+				if (body) body.innerHTML = '<div class="nous-email-msg" style="color:#f08080">Erro ao carregar mensagem.</div>';
+			});
+	}
+
+	function _emailLoadDraft(uid) {
+		var btn = emailEl.querySelector('#nous-email-draft-btn');
+		if (btn) { btn.disabled = true; btn.textContent = 'Gerando rascunho…'; }
+		fetch(EMAIL_URL + '/draft?uid=' + encodeURIComponent(uid), { method: 'POST' })
+			.then(function (r) { return r.json(); })
+			.then(function (d) {
+				var area = emailEl.querySelector('#nous-email-draft-area');
+				var txt  = emailEl.querySelector('#nous-email-draft-txt');
+				if (area) area.style.display = 'block';
+				if (txt)  txt.value = d.draft || '';
+				if (btn) { btn.style.display = 'none'; }
+				var sendBtn = emailEl.querySelector('#nous-email-send-btn');
+				if (sendBtn) sendBtn.addEventListener('click', function () { _emailDoSend(uid); });
+			})
+			.catch(function () {
+				if (btn) { btn.disabled = false; btn.textContent = '✍ Rascunhar resposta'; }
+			});
+	}
+
+	function _emailDoSend(uid) {
+		var txt    = emailEl.querySelector('#nous-email-draft-txt');
+		var status = emailEl.querySelector('#nous-email-send-status');
+		var btn    = emailEl.querySelector('#nous-email-send-btn');
+		var draft  = txt ? txt.value.trim() : '';
+		if (!draft) { if (status) status.textContent = 'Escreva algo antes de enviar.'; return; }
+		if (!confirm('Enviar esta resposta por email?')) return;
+		if (btn) { btn.disabled = true; btn.textContent = 'Enviando…'; }
+		var msg = _emailMsg || {};
+		fetch(EMAIL_URL + '/send', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				to: (msg.from || '').replace(/.*<(.+)>/, '$1') || msg.from,
+				subject: 'Re: ' + (msg.subject || ''),
+				body: draft,
+				in_reply_to: msg.message_id || null,
+			}),
+		})
+		.then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+		.then(function (res) {
+			if (res.ok) {
+				if (status) { status.textContent = '✓ Email enviado!'; status.style.color = '#5fd693'; }
+				if (btn) { btn.disabled = true; btn.textContent = 'Enviado'; }
+			} else {
+				if (status) { status.textContent = res.d.error || 'Falha ao enviar.'; }
+				if (btn) { btn.disabled = false; btn.textContent = 'Enviar resposta'; }
+			}
+		})
+		.catch(function () {
+			if (status) status.textContent = 'Erro de rede.';
+			if (btn) { btn.disabled = false; btn.textContent = 'Enviar resposta'; }
+		});
+	}
+
+	function _emailDisconnect() {
+		if (!confirm('Desconectar a conta de email?')) return;
+		fetch(EMAIL_URL + '/disconnect', { method: 'POST' }).catch(function () {});
+		setTimeout(_emailShowConnect, 400);
 	}
 
 	/* ====================== Assistente de primeiro uso ======================

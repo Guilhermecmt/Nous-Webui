@@ -9,7 +9,7 @@
 Chat · Vision · Image generation · Web search — 100% on your PC.  
 No cloud. No subscription. Your conversations never leave your machine.
 
-[![version](https://img.shields.io/badge/version-2.4.0-c8962e)](CHANGELOG.md)
+[![version](https://img.shields.io/badge/version-2.5.0-c8962e)](CHANGELOG.md)
 [![license](https://img.shields.io/badge/license-MIT-black)](LICENSE)
 [![platform](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6)](#requirements)
 [![local](https://img.shields.io/badge/100%25-local%20%26%20private-2ea44f)](#why-nous)
@@ -36,6 +36,7 @@ What you get over an ordinary AI chat:
 - **Optional web search** via DuckDuckGo, no API key.
 - **Deep Research.** Select "Pesquisa Profunda (Nous)" in the model dropdown — Nous plans, searches the web in multiple steps, downloads the relevant pages and writes a full report with numbered citations and a source list. 100% local.
 - **Blind model comparison.** Select "Comparar Modelos (Nous)" and send any question — two anonymous answers appear side by side. Vote for the best before the names are revealed.
+- **Email assistant (optional).** Connect your inbox and Nous triage, summarizes and drafts replies — all on your machine. Your emails only reach the local Ollama model, never the cloud. Sending always requires explicit confirmation.
 - **Resource panel.** Live VRAM, loaded models, and a one-click button to free your GPU.
 - **No terminal windows.** Opens from a shortcut, runs in the background, stops with "Parar Nous".
 
@@ -119,6 +120,19 @@ powershell -ExecutionPolicy Bypass -File images\install-comfyui.ps1
 ```
 
 Installs ComfyUI, the right PyTorch for your GPU and the Flux.1 Schnell models (~12 GB). Then select **Gerador de Imagem Local** in the model selector and ask: *"create a golden owl logo"*. The image appears in the conversation.
+
+### Email assistant — local AI for your inbox (optional)
+
+Connect your email (Gmail, Outlook, Yahoo) via `conectar-email.bat` or the **✉ Assistente de Email** button in the Recursos panel. Nous will:
+
+- **Triage** each email: Importante / Pode esperar / Promoção / Spam + 1-line summary.
+- **Summarize** the full message when you open it.
+- **Draft a reply** in polished PT-BR, ready for you to edit.
+- **Send** only after you review and confirm — no auto-sending ever.
+
+> **Privacy:** your emails are processed only by the **local Ollama model**. No email content ever leaves your machine, even if you have NVIDIA Cloud active. Credentials are stored in `NousData/.email_account.json` (never committed to git). Use an **app password**, not your main password — revocable at any time.
+
+---
 
 ### Deep Research — multi-step web research with sources
 
@@ -224,6 +238,7 @@ Nous WebUI/
 ├─ installer/   one-click installer + Inno Setup script
 ├─ search/      web search + Deep Research Pipe (SearXNG + Ollama)
 ├─ evaluation/  Comparar Modelos: Arena register (blind A/B model comparison)
+├─ email/       Email assistant: IMAP/SMTP client + REST API (port 8995)
 ├─ tools/       capability check, backup, password reset, health check
 └─ docs/        roadmap, screenshots
 ```

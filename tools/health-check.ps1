@@ -36,7 +36,7 @@ function Note($name, $msg) { Write-Host ("  [i]     {0} -> {1}" -f $name, $msg) 
 
 Write-Host "=== Nous - Verificacao de Saude ===`n" -ForegroundColor Cyan
 
-Check "Ollama instalado" ($ollamaExe -ne $null) "ollama nao encontrado (PATH nem locais comuns)"
+Check "Ollama instalado" ($null -ne $ollamaExe) "ollama nao encontrado (PATH nem locais comuns)"
 
 $apiUp = $false
 try { Invoke-RestMethod "http://127.0.0.1:11434/api/version" -TimeoutSec 3 | Out-Null; $apiUp = $true } catch {}
@@ -113,6 +113,20 @@ if ($hasVoice) {
     else          { Note "Voz" "ativa mas servidor TTS nao esta no ar (sera iniciado no proximo boot)" }
 } else {
     Note "Voz" "inativa (use 'Ativar voz em PT-BR' no painel Recursos ou ativar-voz.bat)"
+}
+
+# Email assistant (informativo — nunca falha o health-check)
+$emailAcct = Join-Path $dataDir ".email_account.json"
+if (Test-Path $emailAcct) {
+    $emailUp = $false
+    try {
+        $emailResp = Invoke-RestMethod "http://127.0.0.1:8995/status" -TimeoutSec 3 -ErrorAction Stop
+        $emailUp = $true
+        Note "Email" "conectado ($($emailResp.user)) — serviço ativo (8995)"
+    } catch {}
+    if (-not $emailUp) { Note "Email" "conta configurada, mas serviço 8995 não responde (iniciará no próximo boot)" }
+} else {
+    Note "Email" "não configurado (use conectar-email.bat para ativar)"
 }
 
 Write-Host ""

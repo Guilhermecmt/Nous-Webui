@@ -227,6 +227,18 @@ function Register-Arena {
     }
 }
 
+# --- Email assistant (v2.5): serviço REST local na porta 8995 ---
+
+# Sobe o serviço de email (8995) apenas se a conta estiver configurada.
+function Start-EmailAPI {
+    $acct = Join-Path $env:DATA_DIR ".email_account.json"
+    $api  = Join-Path $PSScriptRoot "..\email\nous_email_api.py"
+    if ((Test-Path $py) -and (Test-Path $api) -and (Test-Path $acct)) {
+        try { Invoke-RestMethod "http://127.0.0.1:8995/health" -TimeoutSec 2 | Out-Null }
+        catch { Start-Process -FilePath $py -ArgumentList "`"$api`"" -WindowStyle Hidden }
+    }
+}
+
 # --- Nuvem NVIDIA NIM (v2.1): conexao opt-in registrada/removida a cada boot ---
 
 # Garante a conexao NVIDIA NIM no banco (se a chave existir) ou a remove.
@@ -239,7 +251,7 @@ function Register-Cloud {
 }
 
 # Ja esta rodando? Garante funcoes nativas e abre o navegador.
-if (Test-Up) { Ensure-Branding; Register-Memory; Register-Pipe; Register-Research; Register-Arena; Register-Cloud; Register-Voice; Start-VoiceServer; Setup-Files; Setup-History; Start-MemoryAPI; Start-Process $url; return }
+if (Test-Up) { Ensure-Branding; Register-Memory; Register-Pipe; Register-Research; Register-Arena; Register-Cloud; Register-Voice; Start-VoiceServer; Setup-Files; Setup-History; Start-MemoryAPI; Start-EmailAPI; Start-Process $url; return }
 
 # Garante o Ollama (em segundo plano)
 try { Invoke-RestMethod "http://127.0.0.1:11434/api/version" -TimeoutSec 3 | Out-Null }
@@ -265,5 +277,5 @@ if ((Test-Path $py) -and (Test-Path $monitor)) {
 # Espera ficar pronto, garante funcoes nativas e abre o navegador
 for ($i = 0; $i -lt 90; $i++) {
     Start-Sleep -Seconds 2
-    if (Test-Up) { Ensure-Branding; Register-Memory; Register-Pipe; Register-Research; Register-Arena; Register-Cloud; Register-Voice; Start-VoiceServer; Setup-Files; Setup-History; Start-MemoryAPI; Start-Process $url; break }
+    if (Test-Up) { Ensure-Branding; Register-Memory; Register-Pipe; Register-Research; Register-Arena; Register-Cloud; Register-Voice; Start-VoiceServer; Setup-Files; Setup-History; Start-MemoryAPI; Start-EmailAPI; Start-Process $url; break }
 }

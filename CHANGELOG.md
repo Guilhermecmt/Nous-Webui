@@ -1,5 +1,35 @@
 # Changelog
 
+## [2.5.0] - 2026-06-13
+### Adicionado
+- **Assistente de Email (Nous Email)** — triagem, resumo e rascunho de resposta
+  com IA local, 100% privado. O conteúdo dos emails nunca sai da máquina.
+  - `email/nous_email.py`: cliente IMAP/SMTP (stdlib pura). Detecção automática
+    de servidores para Gmail, Outlook e Yahoo. `list_recent`, `get_message`,
+    `send_message`. Nunca envia sem chamada explícita.
+  - `email/nous_email_api.py`: micro-serviço REST local (porta 8995). CORS
+    restrito a localhost (mesmo padrão da Memory API — sem CSRF local). Rotas:
+    `/status`, `/connect`, `/disconnect`, `/inbox` (triagem LLM local),
+    `/message` (resumo LLM local), `/draft` (rascunho LLM local), `/send`
+    (somente após confirmação). Cache de triagem em memória (1h TTL).
+    Forçado a usar modelo local — recusa ids com `/` (nuvem).
+  - `email/conectar-email.ps1`: diálogo gráfico sem terminal. Instrução passo-a-
+    passo para senha de app (Gmail/Outlook). Detecção automática de IMAP/SMTP
+    pelo domínio. Valida login antes de salvar.
+  - `email/desconectar-email.ps1`: remove `.email_account.json` com confirmação.
+  - `conectar-email.bat` / `desconectar-email.bat` na raiz: clique duplo.
+  - Painel **✉ Assistente de Email** no card Recursos (`nous-loader.js`):
+    tela de conexão (email + senha de app), caixa de entrada com categoria e
+    resumo de 1 linha por email, visualização com resumo completo, rascunho
+    editável e botão Enviar com `confirm()` obrigatório.
+  - Credenciais em `NousData/.email_account.json` (fora do git, permissões
+    restritas ao dono; nunca logadas; removíveis com `desconectar-email.bat`).
+### Mudado
+- `launchers/start-nous.ps1`: `Start-EmailAPI` sobe a 8995 nos dois pontos de
+  boot, apenas se `.email_account.json` existir.
+- `tools/health-check.ps1`: item informativo "Email: conectado / não configurado".
+  Corrigido lint PSPossibleIncorrectComparisonWithNull na linha 39.
+
 ## [2.4.0] - 2026-06-13
 ### Adicionado
 - **Pesquisa Profunda (Nous)** — selecione no dropdown de modelos e faça uma

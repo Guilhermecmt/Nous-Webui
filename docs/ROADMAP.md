@@ -36,6 +36,12 @@ sem conhecimento tecnico, com tudo acontecendo em segundo plano.
 - Ativacao/desativacao por clique duplo; memoria pessoal protegida (nao vai
   para a nuvem por padrao).
 
+### v2.5 — Assistente de Email
+- Triagem (importante / pode esperar / promoção / spam), resumo e rascunho de
+  resposta via IMAP local. 100% local — conteúdo dos emails só vai ao Ollama
+  local, nunca à nuvem. Envio sempre exige confirmação explícita do usuário.
+  Ativação opt-in via `conectar-email.bat` ou painel Recursos.
+
 ### v2.4 — Pesquisa Profunda + Comparar Modelos
 - **Pesquisa Profunda (Nous)**: Pipe no dropdown que pesquisa a web em múltiplas
   etapas via SearXNG local (sem Docker necessário para uso — já sobe no monitor)
@@ -62,7 +68,7 @@ sem conhecimento tecnico, com tudo acontecendo em segundo plano.
 
 ## Proximo
 
-### Email assistant (v2.5)
+### Bandeja do sistema (System Tray)
 - Triagem, resumo e rascunho de email via IMAP/SMTP com Ollama local.
   Processamento 100% local; envio sempre exige confirmação.
 
