@@ -63,12 +63,15 @@ $name = (Get-CimInstance Win32_VideoController | Sort-Object AdapterRAM -Descend
 [pscustomobject]@{ded_used=[int64]$ded;shr_used=[int64]$shr;ded_total=[int64]$total;shr_total=[int64]($ram/2);ram_total=[int64]$ram;gpu_name=[string]$name} | ConvertTo-Json -Compress
 """
 
-_gpu_cache = {"t": 0.0, "data": None}
+_gpu_cache = {"t": 0.0, "data": None, "fetched": False}
 
 
 async def _read_gpu():
     now = asyncio.get_event_loop().time()
-    if _gpu_cache["data"] and (now - _gpu_cache["t"]) < _GPU_TTL:
+    # Guard pelo timestamp, NÃO pela presença de dados: uma leitura que falhou
+    # (data=None) também respeita o TTL, senão o powershell.exe seria disparado
+    # a cada poll enquanto a GPU estivesse temporariamente ilegível.
+    if _gpu_cache["fetched"] and (now - _gpu_cache["t"]) < _GPU_TTL:
         return _gpu_cache["data"]
     try:
         proc = await asyncio.create_subprocess_exec(
@@ -78,7 +81,7 @@ async def _read_gpu():
         data = json.loads(out.decode("utf-8", "ignore").strip())
     except Exception:
         data = None
-    _gpu_cache.update(t=now, data=data)
+    _gpu_cache.update(t=now, data=data, fetched=True)
     return data
 
 
