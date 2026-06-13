@@ -16,6 +16,7 @@ CORS apenas de origem local (mesmo padrão da Memory API).
 Nenhum dado de email vai para modelos de nuvem — forçado aqui.
 """
 import os
+import re
 import json
 import time
 import urllib.parse
@@ -82,7 +83,7 @@ def _triage(subject: str, sender: str, snippet: str) -> tuple[str, str]:
     )
     raw = _llm(prompt, timeout=30)
     try:
-        m = __import__("re").search(r"\{.*?\}", raw, __import__("re").DOTALL)
+        m = re.search(r"\{[^{}]+\}", raw, re.DOTALL)
         if m:
             data = json.loads(m.group())
             return data.get("categoria", "Não classificado"), data.get("resumo", "")
@@ -296,6 +297,8 @@ async def h_send(request):
     text = (body.get("body") or "").strip()
     if not to or not subject or not text:
         return web.json_response({"error": "to, subject e body são obrigatórios"}, status=400)
+    if "@" not in to:
+        return web.json_response({"error": "Endereço de destino inválido."}, status=400)
 
     import asyncio
     loop = asyncio.get_event_loop()

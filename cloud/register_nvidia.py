@@ -94,9 +94,11 @@ def read_config(cx):
     if not row:
         return {}
     raw = row[0]
-    if isinstance(raw, str):
-        return json.loads(raw)
-    return raw  # sqlite3 ja parseia JSON em versoes recentes
+    try:
+        data = json.loads(raw) if isinstance(raw, str) else raw
+    except Exception:
+        return {}
+    return data if isinstance(data, dict) else {}
 
 
 def write_config(cx, data):

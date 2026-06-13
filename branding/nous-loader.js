@@ -1208,7 +1208,7 @@
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({
-				to: (msg.from || '').replace(/.*<(.+)>/, '$1') || msg.from,
+				to: (function(f){ var m = (f||'').match(/<([^>]+)>/); return m ? m[1] : (f||'').trim(); })(msg.from),
 				subject: 'Re: ' + (msg.subject || ''),
 				body: draft,
 				in_reply_to: msg.message_id || null,
@@ -1463,10 +1463,11 @@
 			.then(function(data) {
 				var models = data.models || [];
 				models.forEach(function(m) {
-					if (m.name && m.size) _capModels[m.name] = m.size;
+					if (!m.name || !m.size) return;
+					_capModels[m.name] = m.size;
 					/* Ollama retorna nome com tag; normaliza sem tag para match parcial */
 					var base = m.name.split(':')[0];
-					if (base && m.size) _capModels[base] = m.size;
+					if (base) _capModels[base] = m.size;
 				});
 			}).catch(function() {});
 	}
