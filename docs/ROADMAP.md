@@ -36,6 +36,15 @@ sem conhecimento tecnico, com tudo acontecendo em segundo plano.
 - Ativacao/desativacao por clique duplo; memoria pessoal protegida (nao vai
   para a nuvem por padrao).
 
+### v2.4 — Pesquisa Profunda + Comparar Modelos
+- **Pesquisa Profunda (Nous)**: Pipe no dropdown que pesquisa a web em múltiplas
+  etapas via SearXNG local (sem Docker necessário para uso — já sobe no monitor)
+  e entrega um relatório markdown com citações `[n]` e lista de fontes.
+  100% local (SearXNG + Ollama).
+- **Comparar Modelos (Nous)**: teste cego A/B via Arena nativo do Open WebUI,
+  reembrulhado com nome amigável e modelos locais. Sem construir split-chat no
+  Svelte — decisão validada na v2.0.0 e resolvida pelo Arena.
+
 ### v2.3 — Conversa por voz 100% local em PT-BR
 - Falar com o Nous e ouvir a resposta em português, sem internet, rodando até
   em CPU. STT Whisper local (pt) + TTS Piper (voz pt_BR) num servidor
@@ -52,12 +61,6 @@ sem conhecimento tecnico, com tudo acontecendo em segundo plano.
 - Versao do Open WebUI pinada (testada) em novas instalacoes.
 
 ## Proximo
-
-### Pesquisa Profunda + Comparar Modelos (v2.4)
-- Deep Research: Pipe no dropdown que pesquisa a web em múltiplas etapas e
-  entrega um relatório com citações de fonte.
-- Comparar Modelos: teste cego (blind) entre dois modelos para a mesma pergunta,
-  reusando o Arena do Open WebUI.
 
 ### Email assistant (v2.5)
 - Triagem, resumo e rascunho de email via IMAP/SMTP com Ollama local.

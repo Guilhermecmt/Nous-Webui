@@ -9,7 +9,7 @@
 Chat · Vision · Image generation · Web search — 100% on your PC.  
 No cloud. No subscription. Your conversations never leave your machine.
 
-[![version](https://img.shields.io/badge/version-2.3.0-c8962e)](CHANGELOG.md)
+[![version](https://img.shields.io/badge/version-2.4.0-c8962e)](CHANGELOG.md)
 [![license](https://img.shields.io/badge/license-MIT-black)](LICENSE)
 [![platform](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6)](#requirements)
 [![local](https://img.shields.io/badge/100%25-local%20%26%20private-2ea44f)](#why-nous)
@@ -34,6 +34,8 @@ What you get over an ordinary AI chat:
 - **Built-in Model Store.** Nous analyzes your hardware, recommends the ideal model and downloads it in one click — inside the app, with a progress bar.
 - **Vision and images.** Drop a screenshot and ask about it; type *"create an image of…"* and it appears in the chat (ComfyUI + Flux, optional).
 - **Optional web search** via DuckDuckGo, no API key.
+- **Deep Research.** Select "Pesquisa Profunda (Nous)" in the model dropdown — Nous plans, searches the web in multiple steps, downloads the relevant pages and writes a full report with numbered citations and a source list. 100% local.
+- **Blind model comparison.** Select "Comparar Modelos (Nous)" and send any question — two anonymous answers appear side by side. Vote for the best before the names are revealed.
 - **Resource panel.** Live VRAM, loaded models, and a one-click button to free your GPU.
 - **No terminal windows.** Opens from a shortcut, runs in the background, stops with "Parar Nous".
 
@@ -117,6 +119,23 @@ powershell -ExecutionPolicy Bypass -File images\install-comfyui.ps1
 ```
 
 Installs ComfyUI, the right PyTorch for your GPU and the Flux.1 Schnell models (~12 GB). Then select **Gerador de Imagem Local** in the model selector and ask: *"create a golden owl logo"*. The image appears in the conversation.
+
+### Deep Research — multi-step web research with sources
+
+Select **"Pesquisa Profunda (Nous)"** in the model dropdown and ask any research question. Nous:
+
+1. Plans 2–4 sub-questions to cover the topic fully.
+2. Searches the web (SearXNG, running locally) for each sub-question.
+3. Downloads the most relevant pages and reads them.
+4. Writes a structured markdown report with inline citations `[n]` and a **Fontes** (Sources) section with clickable URLs.
+
+All computation happens on your machine. No API key, no cloud. Requires the SearXNG container (runs automatically when Docker is available).
+
+### Blind model comparison — Compare Models
+
+Select **"Comparar Modelos (Nous)"** in the model dropdown and send your question. Two anonymous answers (A and B) appear side by side — you vote for the better one before the model names are revealed. Powered by Open WebUI's native Arena feature; requires at least two chat models installed.
+
+---
 
 ### Voice conversation in Portuguese (optional)
 
@@ -203,7 +222,8 @@ Nous WebUI/
 ├─ monitor/     resource panel + Model Store (local service, port 8990)
 ├─ launchers/   background start/stop + .exe build
 ├─ installer/   one-click installer + Inno Setup script
-├─ search/      web search (DuckDuckGo)
+├─ search/      web search + Deep Research Pipe (SearXNG + Ollama)
+├─ evaluation/  Comparar Modelos: Arena register (blind A/B model comparison)
 ├─ tools/       capability check, backup, password reset, health check
 └─ docs/        roadmap, screenshots
 ```

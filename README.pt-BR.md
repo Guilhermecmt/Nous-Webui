@@ -9,7 +9,7 @@
 Chat · Visão · Geração de imagem · Busca na web — 100% no seu PC.  
 Sem nuvem. Sem mensalidade. Suas conversas nunca saem da sua máquina.
 
-[![version](https://img.shields.io/badge/version-2.3.0-c8962e)](CHANGELOG.md)
+[![version](https://img.shields.io/badge/version-2.4.0-c8962e)](CHANGELOG.md)
 [![license](https://img.shields.io/badge/license-MIT-black)](LICENSE)
 [![platform](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6)](#requisitos)
 [![local](https://img.shields.io/badge/100%25-local%20%26%20privado-2ea44f)](#por-que-o-nous)
@@ -34,6 +34,8 @@ O que você ganha em relação a um chat de IA comum:
 - **Loja de Modelos integrada.** O Nous analisa seu hardware, recomenda o modelo ideal e baixa tudo com um clique — dentro do próprio site, com barra de progresso.
 - **Visão e imagem.** Solte um print e pergunte sobre ele; peça *"crie uma imagem de…"* e ela aparece na conversa (ComfyUI + Flux, opcional).
 - **Busca na web** opcional via DuckDuckGo, sem chave de API.
+- **Pesquisa Profunda.** Selecione "Pesquisa Profunda (Nous)" no dropdown — o Nous planeja, busca a web em múltiplas etapas, lê as páginas e entrega um relatório markdown com citações numeradas e lista de fontes clicáveis. 100% local.
+- **Comparação cega de modelos.** Selecione "Comparar Modelos (Nous)" e faça uma pergunta — duas respostas anônimas aparecem lado a lado. Você vota antes de ver os nomes.
 - **Painel de recursos.** VRAM em tempo real, modelos carregados e um botão para liberar a placa de vídeo na hora.
 - **Sem janelas de terminal.** Abre por um atalho, roda em segundo plano, fecha pelo "Parar Nous".
 
@@ -117,6 +119,23 @@ powershell -ExecutionPolicy Bypass -File images\install-comfyui.ps1
 ```
 
 Instala o ComfyUI, o PyTorch certo para a sua GPU e os modelos Flux.1 Schnell (~12 GB). Depois, selecione **Gerador de Imagem Local** no seletor de modelos e peça: *"crie uma logo dourada de uma coruja"*. A imagem aparece na conversa.
+
+### Pesquisa Profunda — pesquisa multi-etapas com fontes
+
+Selecione **"Pesquisa Profunda (Nous)"** no dropdown de modelos e faça qualquer pergunta de pesquisa. O Nous:
+
+1. Planeja 2–4 sub-perguntas para cobrir o tema completamente.
+2. Busca a web (SearXNG local) para cada sub-pergunta.
+3. Baixa e lê as páginas mais relevantes.
+4. Escreve um relatório em markdown com citações `[n]` e uma seção **Fontes** com URLs clicáveis.
+
+Tudo roda na sua máquina. Sem chave de API, sem nuvem. Requer o container SearXNG (sobe automaticamente quando o Docker está disponível).
+
+### Comparar Modelos — teste cego A/B
+
+Selecione **"Comparar Modelos (Nous)"** no dropdown e envie sua pergunta. Duas respostas anônimas (A e B) aparecem lado a lado — você vota na melhor antes de revelar os nomes dos modelos. Requer pelo menos dois modelos de chat instalados.
+
+---
 
 ### Conversa por voz em português (opcional)
 
@@ -203,7 +222,8 @@ Nous WebUI/
 ├─ monitor/     painel de recursos + Loja de Modelos (serviço local, porta 8990)
 ├─ launchers/   iniciar/parar em segundo plano + build do .exe
 ├─ installer/   instalador de 1 clique + script do Inno Setup
-├─ search/      busca na web (DuckDuckGo)
+├─ search/      busca na web + Pipe de Pesquisa Profunda (SearXNG + Ollama)
+├─ evaluation/  Comparar Modelos: registro do Arena (comparação cega A/B)
 ├─ tools/       análise de capacidade, backup, reset de senha, health check
 └─ docs/        roadmap, screenshots
 ```

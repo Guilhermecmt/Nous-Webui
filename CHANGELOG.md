@@ -1,5 +1,30 @@
 # Changelog
 
+## [2.4.0] - 2026-06-13
+### Adicionado
+- **Pesquisa Profunda (Nous)** — selecione no dropdown de modelos e faça uma
+  pergunta; o Nous pesquisa a web em múltiplas etapas e entrega um relatório em
+  markdown com citações `[n]` e lista de fontes. 100% local (SearXNG + Ollama),
+  sem API paga. Status em tempo real durante a pesquisa.
+  - `search/nous_search/deep_research.py`: laço Python puro — planejar
+    sub-perguntas com o LLM, buscar com `search_web()`, refinar se necessário,
+    baixar páginas com `fetch_page()`, sintetizar com Ollama.
+  - `search/nous_research_pipe.py`: Pipe do Open WebUI que expõe o `deep_research`
+    no dropdown. Auto-desativado se o SearXNG estiver fora do ar.
+  - `search/register_research_pipe.py`: registro idempotente no `webui.db` a cada
+    boot; ativo = SearXNG respondendo (auto-cura quando o container subir).
+- **Comparar Modelos (Nous)** — teste cego A/B entre dois modelos locais.
+  Selecione "Comparar Modelos (Nous)" no dropdown, faça uma pergunta e veja as
+  duas respostas anônimas lado a lado; vote no melhor antes de revelar os nomes.
+  Reusa o Arena nativo do Open WebUI.
+  - `evaluation/register_arena.py`: liga o Arena no `webui.db` apontando para os
+    dois primeiros modelos de chat instalados. Só ativa com ≥ 2 modelos; auto-cura
+    quando o 2º modelo for baixado.
+### Mudado
+- `launchers/start-nous.ps1`: funções `Register-Research` e `Register-Arena`
+  adicionadas aos dois pontos de boot. `ENABLE_EVALUATION_ARENA_MODELS` removido
+  do env (gerenciado agora pelo `register_arena.py` diretamente no banco).
+
 ## [2.3.0] - 2026-06-13
 ### Adicionado
 - **Conversa por voz 100% local em PT-BR** — fale com o Nous e ouça a resposta

@@ -27,10 +27,8 @@ $env:RAG_WEB_SEARCH_ENGINE   = "duckduckgo"
 # embedding) - sem isto, o Gemma responde "nao tenho acesso em tempo real".
 $env:BYPASS_WEB_SEARCH_EMBEDDING_AND_RETRIEVAL = "True"
 $env:PORT                = "8080"
-# Tira o "Arena Model" (confunde usuarios). DEFAULT_MODELS so' e' definido se
-# o instalador gravou um modelo escolhido; caso contrario o Open WebUI deixa o
-# usuario escolher livremente sem pre-selecao forcada.
-$env:ENABLE_EVALUATION_ARENA_MODELS = "False"
+# Arena é gerenciado pelo register_arena.py (register via DB no boot).
+# DEFAULT_MODELS só é definido se o instalador gravou um modelo escolhido.
 $manifestPath = Join-Path $env:DATA_DIR "install-manifest.json"
 if (Test-Path $manifestPath) {
     try {
@@ -209,6 +207,26 @@ function Register-Voice {
     }
 }
 
+# --- Pesquisa Profunda (v2.4): Pipe registrado no banco, ativo só com SearXNG ---
+
+# Registra o Pipe 'Pesquisa Profunda (Nous)' no banco. Ativo se SearXNG responder.
+function Register-Research {
+    $reg = Join-Path $PSScriptRoot "..\search\register_research_pipe.py"
+    if ((Test-Path $py) -and (Test-Path $reg)) {
+        & $py "$reg" --data-dir "$env:DATA_DIR" | Out-Null
+    }
+}
+
+# --- Comparar Modelos (v2.4): Arena do Open WebUI reembrulhado ---
+
+# Liga o Arena com modelos locais se >= 2 modelos de chat estiverem instalados.
+function Register-Arena {
+    $reg = Join-Path $PSScriptRoot "..\evaluation\register_arena.py"
+    if ((Test-Path $py) -and (Test-Path $reg)) {
+        & $py "$reg" --data-dir "$env:DATA_DIR" | Out-Null
+    }
+}
+
 # --- Nuvem NVIDIA NIM (v2.1): conexao opt-in registrada/removida a cada boot ---
 
 # Garante a conexao NVIDIA NIM no banco (se a chave existir) ou a remove.
@@ -221,7 +239,7 @@ function Register-Cloud {
 }
 
 # Ja esta rodando? Garante funcoes nativas e abre o navegador.
-if (Test-Up) { Ensure-Branding; Register-Memory; Register-Pipe; Register-Cloud; Register-Voice; Start-VoiceServer; Setup-Files; Setup-History; Start-MemoryAPI; Start-Process $url; return }
+if (Test-Up) { Ensure-Branding; Register-Memory; Register-Pipe; Register-Research; Register-Arena; Register-Cloud; Register-Voice; Start-VoiceServer; Setup-Files; Setup-History; Start-MemoryAPI; Start-Process $url; return }
 
 # Garante o Ollama (em segundo plano)
 try { Invoke-RestMethod "http://127.0.0.1:11434/api/version" -TimeoutSec 3 | Out-Null }
@@ -247,5 +265,5 @@ if ((Test-Path $py) -and (Test-Path $monitor)) {
 # Espera ficar pronto, garante funcoes nativas e abre o navegador
 for ($i = 0; $i -lt 90; $i++) {
     Start-Sleep -Seconds 2
-    if (Test-Up) { Ensure-Branding; Register-Memory; Register-Pipe; Register-Cloud; Register-Voice; Start-VoiceServer; Setup-Files; Setup-History; Start-MemoryAPI; Start-Process $url; break }
+    if (Test-Up) { Ensure-Branding; Register-Memory; Register-Pipe; Register-Research; Register-Arena; Register-Cloud; Register-Voice; Start-VoiceServer; Setup-Files; Setup-History; Start-MemoryAPI; Start-Process $url; break }
 }
