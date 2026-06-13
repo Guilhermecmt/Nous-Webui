@@ -20,9 +20,12 @@ Modelos: lidos do proprio Ollama (/api/ps), com contagem regressiva de descarga.
 Nao usa dependencia nova: aiohttp ja vem no venv do Open WebUI.
 """
 import os
+import sys
 import json
 import asyncio
+import subprocess
 from datetime import datetime, timezone
+from pathlib import Path
 
 import aiohttp
 from aiohttp import web
@@ -31,6 +34,17 @@ OLLAMA = "http://127.0.0.1:11434"
 PORT = 8990
 GB = 1073741824
 CATALOG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "catalog.json")
+
+# --------------------------------------------------------------------------
+# Dados persistentes do NousData (DATA_DIR ou ~/NousData)
+# --------------------------------------------------------------------------
+
+def _data_dir():
+    for env in ("DATA_DIR", "NOUS_DATA_DIR"):
+        v = os.environ.get(env)
+        if v:
+            return Path(v)
+    return Path.home() / "NousData"
 _GPU_TTL = 2.5  # s de cache p/ nao chamar o powershell a cada poll
 
 # PowerShell que devolve a memoria da GPU (usada + total) em bytes, como JSON.
@@ -321,6 +335,67 @@ async def h_pull_status(request):
     return web.json_response(_pulls.get(tag) or {"status": "nenhum"})
 
 
+# ------------------------------------------------- Voz local (v2.3)
+
+# Estado do download de assets de voz (singleton, igual ao _pulls dos modelos)
+_voice_install: dict = {"status": "inativo", "step": "", "pct": 0.0, "error": None}
+_voice_task = None
+
+
+def _voice_assets_present():
+    vdir = _data_dir() / "voice"
+    has_piper = (vdir / "piper.exe").is_file()
+    has_onnx  = bool(list(vdir.glob("pt_BR-*.onnx")))
+    return has_piper and has_onnx
+
+
+async def _do_voice_install():
+    global _voice_install
+    script = Path(__file__).parent.parent / "voice" / "install-voice.ps1"
+    py     = Path(sys.executable)
+    data_dir = _data_dir()
+
+    _voice_install.update(status="instalando", pct=0.1,
+                          step="Baixando Piper e voz pt_BR...", error=None)
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "powershell.exe", "-ExecutionPolicy", "Bypass", "-File", str(script),
+            "-DataDir", str(data_dir),
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=600)
+        if proc.returncode != 0:
+            err = stderr.decode("utf-8", "ignore").strip() or "Erro desconhecido"
+            _voice_install.update(status="erro", pct=0.0, step="", error=err)
+        else:
+            _voice_install.update(status="pronto", pct=1.0,
+                                  step="Voz ativada!", error=None)
+    except asyncio.TimeoutError:
+        _voice_install.update(status="erro", pct=0.0, step="",
+                              error="Tempo limite excedido. Tente novamente.")
+    except Exception as e:
+        _voice_install.update(status="erro", pct=0.0, step="", error=str(e))
+
+
+async def h_voice_status(request):
+    present = _voice_assets_present()
+    return web.json_response({
+        "ativo": present,
+        "install": _voice_install,
+    })
+
+
+async def h_voice_install(request):
+    global _voice_task
+    if _voice_assets_present():
+        return web.json_response({"started": False, "reason": "ja instalado"})
+    if _voice_install.get("status") == "instalando":
+        return web.json_response({"started": False, "reason": "em andamento"})
+    _voice_task = asyncio.get_event_loop().create_task(_do_voice_install())
+    return web.json_response({"started": True})
+
+
 def build_app():
     app = web.Application(middlewares=[cors_mw])
     app.add_routes([web.get("/stats", h_stats),
@@ -329,7 +404,9 @@ def build_app():
                     web.get("/hardware", h_hardware),
                     web.get("/catalog", h_catalog),
                     web.post("/pull", h_pull),
-                    web.get("/pull/status", h_pull_status)])
+                    web.get("/pull/status", h_pull_status),
+                    web.get("/voice/status", h_voice_status),
+                    web.post("/voice/install", h_voice_install)])
     return app
 
 

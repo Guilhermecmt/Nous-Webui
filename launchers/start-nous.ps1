@@ -46,6 +46,9 @@ if (Test-Path $manifestPath) {
 # historico SEMPRE usam o Ollama local, mesmo que o chat use um modelo de nuvem.
 $env:ENABLE_OPENAI_API = "True"
 
+# Forca o idioma do Whisper para portugues (env-only na 0.9.6).
+$env:WHISPER_LANGUAGE = "pt"
+
 # Chave secreta ESTAVEL: sem ela, o open-webui gera uma nova a cada inicio e
 # desloga voce. Guardamos uma chave local (em NousData, fora do git) e a reusamos.
 $keyFile = Join-Path $env:DATA_DIR ".webui_secret_key"
@@ -185,6 +188,27 @@ function Start-MemoryAPI {
     }
 }
 
+# --- Voz local em PT-BR (v2.3): Piper TTS + Whisper STT ---
+
+# Sobe o servidor TTS local (porta 8994) se os assets de voz existirem.
+# Idempotente: o servidor recusa subir se a porta ja esta ocupada.
+function Start-VoiceServer {
+    $srv = Join-Path $PSScriptRoot "..\voice\nous_tts_server.py"
+    $vdir = Join-Path $env:DATA_DIR "voice"
+    if ((Test-Path $py) -and (Test-Path $srv) -and (Test-Path (Join-Path $vdir "piper.exe"))) {
+        try { Invoke-RestMethod "http://127.0.0.1:8994/health" -TimeoutSec 2 | Out-Null }
+        catch { Start-Process -FilePath $py -ArgumentList "`"$srv`" --data-dir `"$env:DATA_DIR`"" -WindowStyle Hidden }
+    }
+}
+
+# Configura STT/TTS no banco (so' age se os assets existirem; remove se ausentes).
+function Register-Voice {
+    $reg = Join-Path $PSScriptRoot "..\voice\register_voice.py"
+    if ((Test-Path $py) -and (Test-Path $reg)) {
+        & $py "$reg" --data-dir "$env:DATA_DIR" | Out-Null
+    }
+}
+
 # --- Nuvem NVIDIA NIM (v2.1): conexao opt-in registrada/removida a cada boot ---
 
 # Garante a conexao NVIDIA NIM no banco (se a chave existir) ou a remove.
@@ -197,7 +221,7 @@ function Register-Cloud {
 }
 
 # Ja esta rodando? Garante funcoes nativas e abre o navegador.
-if (Test-Up) { Ensure-Branding; Register-Memory; Register-Pipe; Register-Cloud; Setup-Files; Setup-History; Start-MemoryAPI; Start-Process $url; return }
+if (Test-Up) { Ensure-Branding; Register-Memory; Register-Pipe; Register-Cloud; Register-Voice; Start-VoiceServer; Setup-Files; Setup-History; Start-MemoryAPI; Start-Process $url; return }
 
 # Garante o Ollama (em segundo plano)
 try { Invoke-RestMethod "http://127.0.0.1:11434/api/version" -TimeoutSec 3 | Out-Null }
@@ -223,5 +247,5 @@ if ((Test-Path $py) -and (Test-Path $monitor)) {
 # Espera ficar pronto, garante funcoes nativas e abre o navegador
 for ($i = 0; $i -lt 90; $i++) {
     Start-Sleep -Seconds 2
-    if (Test-Up) { Ensure-Branding; Register-Memory; Register-Pipe; Register-Cloud; Setup-Files; Setup-History; Start-MemoryAPI; Start-Process $url; break }
+    if (Test-Up) { Ensure-Branding; Register-Memory; Register-Pipe; Register-Cloud; Register-Voice; Start-VoiceServer; Setup-Files; Setup-History; Start-MemoryAPI; Start-Process $url; break }
 }

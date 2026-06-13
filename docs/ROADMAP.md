@@ -36,6 +36,12 @@ sem conhecimento tecnico, com tudo acontecendo em segundo plano.
 - Ativacao/desativacao por clique duplo; memoria pessoal protegida (nao vai
   para a nuvem por padrao).
 
+### v2.3 — Conversa por voz 100% local em PT-BR
+- Falar com o Nous e ouvir a resposta em português, sem internet, rodando até
+  em CPU. STT Whisper local (pt) + TTS Piper (voz pt_BR) num servidor
+  OpenAI-compatível local (porta 8994). Ativação opt-in com 1 clique no painel
+  Recursos. Maior diferencial inédito de mercado na categoria.
+
 ### v2.2 — Loja de Modelos + primeiro uso guiado
 - Loja de Modelos dentro do site: catalogo curado com recomendacao automatica
   para o hardware da maquina, download em 1 clique com progresso real.
@@ -46,6 +52,16 @@ sem conhecimento tecnico, com tudo acontecendo em segundo plano.
 - Versao do Open WebUI pinada (testada) em novas instalacoes.
 
 ## Proximo
+
+### Pesquisa Profunda + Comparar Modelos (v2.4)
+- Deep Research: Pipe no dropdown que pesquisa a web em múltiplas etapas e
+  entrega um relatório com citações de fonte.
+- Comparar Modelos: teste cego (blind) entre dois modelos para a mesma pergunta,
+  reusando o Arena do Open WebUI.
+
+### Email assistant (v2.5)
+- Triagem, resumo e rascunho de email via IMAP/SMTP com Ollama local.
+  Processamento 100% local; envio sempre exige confirmação.
 
 ### Bandeja do sistema (System Tray)
 - Icone na bandeja: Iniciar/Parar, abrir, status (rodando/parado, GPU/CPU),

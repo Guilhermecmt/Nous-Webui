@@ -9,7 +9,7 @@
 Chat · Vision · Image generation · Web search — 100% on your PC.  
 No cloud. No subscription. Your conversations never leave your machine.
 
-[![version](https://img.shields.io/badge/version-2.2.0-c8962e)](CHANGELOG.md)
+[![version](https://img.shields.io/badge/version-2.3.0-c8962e)](CHANGELOG.md)
 [![license](https://img.shields.io/badge/license-MIT-black)](LICENSE)
 [![platform](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6)](#requirements)
 [![local](https://img.shields.io/badge/100%25-local%20%26%20private-2ea44f)](#why-nous)
@@ -118,6 +118,22 @@ powershell -ExecutionPolicy Bypass -File images\install-comfyui.ps1
 
 Installs ComfyUI, the right PyTorch for your GPU and the Flux.1 Schnell models (~12 GB). Then select **Gerador de Imagem Local** in the model selector and ask: *"create a golden owl logo"*. The image appears in the conversation.
 
+### Voice conversation in Portuguese (optional)
+
+Nous can listen and speak — entirely on your machine, no internet, no cloud API.
+
+```
+Double-click  ativar-voz.bat
+```
+
+Or open the **Recursos** panel → click **"🎙 Ativar voz em PT-BR"**. The panel downloads the Piper TTS engine (~30 MB) and the Brazilian Portuguese voice model (~60 MB). The Whisper speech-recognition model (~150 MB) downloads automatically on first use.
+
+Once activated: click the **phone icon** in the chat header to enter hands-free voice mode — speak, Nous transcribes, replies, and reads the answer aloud in PT-BR.
+
+> **100% local.** Audio and transcripts never leave your machine. Voice works even when using a cloud model in the chat — only the text goes to the cloud, not your voice.
+
+---
+
 ### Nous Cloud — optional frontier models
 
 Nous is local by default. To try state-of-the-art models (DeepSeek R1, Llama 3.3 70B, Kimi K2…) without a powerful GPU, connect it to NVIDIA's free hosted API:
@@ -178,6 +194,7 @@ Double-click **`desinstalar.bat`**:
 ```
 Nous WebUI/
 ├─ branding/    identity: logo, White & Gold theme, loader.js (panels), applier
+├─ voice/       Voice in PT-BR: Piper TTS server + STT/TTS registration
 ├─ cloud/       Nous Cloud: opt-in NVIDIA NIM API registration
 ├─ files/       local file RAG: indexer + hybrid search
 ├─ history/     conversation-history RAG

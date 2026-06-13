@@ -102,6 +102,19 @@ if (Test-Path $nvKeyFile) {
     Note "Nuvem NVIDIA" "inativa (use ativar-nuvem.bat para ativar)"
 }
 
+# Voz local (informativo — nunca falha o health-check)
+$voiceDir = Join-Path $dataDir "voice"
+$piperExe = Join-Path $voiceDir "piper.exe"
+$hasVoice = (Test-Path $piperExe) -and (Get-ChildItem $voiceDir -Filter "pt_BR-*.onnx" -ErrorAction SilentlyContinue | Select-Object -First 1)
+if ($hasVoice) {
+    $ttsSrv = $false
+    try { $ttsSrv = (Invoke-RestMethod "http://127.0.0.1:8994/health" -TimeoutSec 3 -ErrorAction Stop).status -eq 'ok' } catch {}
+    if ($ttsSrv) { Note "Voz" "ativa e servidor TTS respondendo (8994)" }
+    else          { Note "Voz" "ativa mas servidor TTS nao esta no ar (sera iniciado no proximo boot)" }
+} else {
+    Note "Voz" "inativa (use 'Ativar voz em PT-BR' no painel Recursos ou ativar-voz.bat)"
+}
+
 Write-Host ""
 if ($script:fail -eq 0) { Write-Host "TUDO CERTO - instalacao integra." -ForegroundColor Green; exit 0 }
 else { Write-Host "$($script:fail) problema(s) encontrado(s)." -ForegroundColor Red; exit 1 }

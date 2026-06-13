@@ -1,5 +1,35 @@
 # Changelog
 
+## [2.3.0] - 2026-06-13
+### Adicionado
+- **Conversa por voz 100% local em PT-BR** — fale com o Nous e ouça a resposta
+  em português, sem internet, rodando até em CPU. O maior diferencial inédito
+  identificado na análise competitiva: nem o Odysseus (só STT, inglês) nem os
+  concorrentes entregam voz conversacional em PT-BR para leigos.
+  - `voice/nous_tts_server.py`: servidor TTS local (porta 8994) compatível com
+    a API OpenAI `/v1/audio/speech`, chamando o **Piper TTS** por baixo com voz
+    `pt_BR-faber-medium`. Permite ao Open WebUI usar TTS local sem nenhuma
+    mudança de frontend — engine configurada como "openai" com base_url local.
+  - `voice/register_voice.py`: configura STT (Whisper local, idioma `pt`,
+    modelo `medium` em GPU ou `small` em CPU) e TTS (Piper via servidor 8994)
+    no `webui.db` a cada boot, idempotente. Só age se os assets existirem.
+    Remove a config ao desinstalar.
+  - `voice/install-voice.ps1`: baixa o binário do Piper para Windows e a voz
+    `pt_BR-faber-medium` (~60 MB) para `NousData\voice\`, sem login, com
+    espelhos abertos. Idempotente; `-Force` rebaixa.
+  - `ativar-voz.bat` na raiz: clique duplo ativa tudo (baixa + registra).
+  - Botão **"🎙 Ativar voz em PT-BR"** no card Recursos (abaixo de "Baixar
+    modelos"), com painel de instalação com barra de progresso. Após ativar,
+    muda para "🎙 Voz ativada" em verde.
+  - Novas rotas no monitor (8990): `GET /voice/status` e `POST /voice/install`.
+### Mudado
+- `launchers/start-nous.ps1`: `WHISPER_LANGUAGE=pt` definido a cada boot;
+  funções `Start-VoiceServer` e `Register-Voice` chamadas nos dois pontos de
+  boot (junto de `Register-Memory`, `Register-Cloud`, etc.).
+- `tools/health-check.ps1`: novo item informativo "Voz: ativa / inativa" com
+  checagem do servidor TTS na porta 8994; nunca falha o health-check.
+
+
 Todas as mudancas notaveis do Nous. Formato baseado em
 [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e
 [Versionamento Semantico](https://semver.org/lang/pt-BR/).

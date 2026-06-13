@@ -137,7 +137,31 @@
 			'#nous-store-open{width:100%;margin-top:5px;padding:6px;border:1px solid rgba(200,150,46,.4);' +
 			'border-radius:8px;cursor:pointer;background:transparent;color:#e7c069;' +
 			'font-weight:600;font-size:12px;transition:background .15s}' +
-			'#nous-store-open:hover{background:rgba(200,150,46,.18)}';
+			'#nous-store-open:hover{background:rgba(200,150,46,.18)}' +
+			'#nous-voice-open{width:100%;margin-top:5px;padding:6px;border:1px solid rgba(200,150,46,.25);' +
+			'border-radius:8px;cursor:pointer;background:transparent;color:#b8a06a;' +
+			'font-weight:600;font-size:12px;transition:background .15s}' +
+			'#nous-voice-open:hover{background:rgba(200,150,46,.12)}' +
+			'#nous-voice-ov{position:fixed;inset:0;z-index:10001;background:rgba(0,0,0,.55);' +
+			'display:flex;align-items:center;justify-content:center;backdrop-filter:blur(3px)}' +
+			'#nous-voice-ov.nous-hidden{display:none}' +
+			'#nous-voice-box{width:400px;max-width:92vw;font-family:Inter,system-ui,sans-serif;' +
+			'font-size:13px;color:#eee;background:rgba(18,18,22,.97);' +
+			'border:1px solid rgba(200,150,46,.4);border-radius:16px;' +
+			'box-shadow:0 16px 48px rgba(0,0,0,.55);overflow:hidden}' +
+			'#nous-voice-head{display:flex;align-items:center;gap:8px;padding:14px 16px 10px}' +
+			'#nous-voice-head span{flex:1;font-weight:700;font-size:15px;color:#e7c069}' +
+			'#nous-voice-close{background:none;border:none;color:#888;cursor:pointer;font-size:19px;line-height:1}' +
+			'#nous-voice-close:hover{color:#eee}' +
+			'#nous-voice-body{padding:0 16px 16px}' +
+			'#nous-voice-desc{font-size:12px;line-height:1.55;opacity:.8;margin-bottom:12px}' +
+			'#nous-voice-status{font-size:12px;margin-bottom:10px}' +
+			'.nous-voice-prog{display:flex;flex-direction:column;gap:5px}' +
+			'.nous-voice-ptxt{font-size:11px;opacity:.75}' +
+			'#nous-voice-btn{width:100%;padding:8px;border:0;border-radius:9px;cursor:pointer;' +
+			'background:rgba(200,150,46,.22);color:#e7c069;font-weight:700;font-size:13px;transition:background .15s}' +
+			'#nous-voice-btn:hover:not(:disabled){background:rgba(200,150,46,.38)}' +
+			'#nous-voice-btn:disabled{opacity:.4;cursor:default}';
 		var st = document.createElement('style');
 		st.id = 'nous-monitor-style';
 		st.textContent = css;
@@ -159,7 +183,8 @@
 			'<div class="nous-mon-track"><div class="nous-mon-fill nous-mon-fill2" data-k="shr"></div></div>' +
 			'<div id="nous-mon-models"></div>' +
 			'<button id="nous-mon-stop" type="button" disabled>Parar modelos</button>' +
-			'<button id="nous-store-open" type="button">Baixar modelos</button></div>';
+			'<button id="nous-store-open" type="button">Baixar modelos</button>' +
+			'<button id="nous-voice-open" type="button">🎙 Ativar voz em PT-BR</button></div>';
 		document.body.appendChild(monEl);
 		monModels = monEl.querySelector('#nous-mon-models');
 		monBtn = monEl.querySelector('#nous-mon-stop');
@@ -181,6 +206,7 @@
 				.then(function () { setTimeout(refreshMonitor, 700); });
 		});
 		monEl.querySelector('#nous-store-open').addEventListener('click', openStore);
+		monEl.querySelector('#nous-voice-open').addEventListener('click', openVoice);
 		monEl.classList.toggle('nous-collapsed', monCollapsed);
 	}
 
@@ -826,6 +852,110 @@
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ model: tag })
 		}).catch(function () {}).then(function () { setTimeout(storeRefresh, 400); });
+	}
+
+	/* ====================== Painel de Voz local (v2.3) ======================
+	 * Botao "Ativar voz em PT-BR" no card Recursos abre este painel.
+	 * Se a voz ja esta instalada: mostra status e instrucao de uso.
+	 * Se nao esta: botao "Ativar" dispara o download via /voice/install.
+	 * ======================================================================= */
+	var voiceEl = null, voiceOpen = false, voiceTimer = null;
+
+	function buildVoice() {
+		if (voiceEl && document.body && document.body.contains(voiceEl)) return;
+		if (!document.body) return;
+		voiceEl = document.createElement('div');
+		voiceEl.id = 'nous-voice-ov';
+		voiceEl.classList.add('nous-hidden');
+		voiceEl.innerHTML =
+			'<div id="nous-voice-box">' +
+			'<div id="nous-voice-head"><span>🎙 Conversa por Voz</span>' +
+			'<button id="nous-voice-close" type="button" aria-label="Fechar">&#x2715;</button></div>' +
+			'<div id="nous-voice-body">' +
+			'<div id="nous-voice-desc">Fale com o Nous e ouça a resposta — tudo em português, 100% local, sem internet.<br><br>' +
+			'O download inclui o motor de voz Piper (~30 MB) e o modelo de voz pt_BR (~60 MB). ' +
+			'O modelo Whisper para entender o que você fala (~150 MB) é baixado automaticamente na primeira vez que usar.</div>' +
+			'<div id="nous-voice-status"></div>' +
+			'<button id="nous-voice-btn" type="button">Ativar conversa por voz</button>' +
+			'</div></div>';
+		document.body.appendChild(voiceEl);
+		voiceEl.addEventListener('click', function (e) {
+			if (e.target === voiceEl) closeVoice();
+		});
+		voiceEl.querySelector('#nous-voice-close').addEventListener('click', closeVoice);
+		voiceEl.querySelector('#nous-voice-btn').addEventListener('click', doVoiceInstall);
+	}
+
+	function openVoice() {
+		buildVoice();
+		if (!voiceEl) return;
+		voiceOpen = true;
+		voiceEl.classList.remove('nous-hidden');
+		voiceRefresh();
+	}
+
+	function closeVoice() {
+		voiceOpen = false;
+		if (voiceEl) voiceEl.classList.add('nous-hidden');
+		if (voiceTimer) { clearTimeout(voiceTimer); voiceTimer = null; }
+	}
+
+	function voiceRefresh() {
+		if (!voiceOpen || !voiceEl) return;
+		fetch(MON_URL + '/voice/status', { cache: 'no-store' })
+			.then(function (r) { return r.json(); })
+			.then(renderVoice)
+			.catch(function () {
+				var st = voiceEl.querySelector('#nous-voice-status');
+				if (st) st.textContent = 'Monitor offline — abra o Nous pelo atalho.';
+			});
+	}
+
+	function renderVoice(data) {
+		if (!voiceOpen || !voiceEl) return;
+		var stEl  = voiceEl.querySelector('#nous-voice-status');
+		var btn   = voiceEl.querySelector('#nous-voice-btn');
+		var inst  = data.install || {};
+
+		// Atualizar o botao do card Recursos
+		var cardBtn = document.getElementById('nous-voice-open');
+
+		if (data.ativo) {
+			if (stEl) stEl.innerHTML =
+				'<span style="color:#5fd693;font-weight:600">✓ Voz ativada!</span><br><br>' +
+				'<span style="opacity:.8">Recarregue a página e toque no ícone de <b>telefone</b> no chat para conversar por voz.</span>';
+			if (btn) { btn.textContent = 'Voz já ativada'; btn.disabled = true; }
+			if (cardBtn) { cardBtn.textContent = '🎙 Voz ativada'; cardBtn.style.color = '#5fd693'; }
+			return;
+		}
+
+		if (cardBtn) { cardBtn.textContent = '🎙 Ativar voz em PT-BR'; cardBtn.style.color = ''; }
+
+		if (inst.status === 'instalando') {
+			var pct = Math.round((inst.pct || 0) * 100);
+			if (stEl) stEl.innerHTML =
+				'<div class="nous-voice-prog">' +
+				'<div class="nous-mon-track"><div class="nous-mon-fill" style="width:' + pct + '%"></div></div>' +
+				'<span class="nous-voice-ptxt">' + _esc(inst.step || 'Baixando...') + ' ' + pct + '%</span></div>';
+			if (btn) { btn.textContent = 'Instalando...'; btn.disabled = true; }
+			voiceTimer = setTimeout(voiceRefresh, 1500);
+		} else if (inst.status === 'erro') {
+			if (stEl) stEl.innerHTML =
+				'<span style="color:#e08080">' + _esc(inst.error || 'Erro desconhecido.') + '</span>';
+			if (btn) { btn.textContent = 'Tentar de novo'; btn.disabled = false; }
+		} else {
+			if (stEl) stEl.textContent = '';
+			if (btn) { btn.textContent = 'Ativar conversa por voz'; btn.disabled = false; }
+		}
+	}
+
+	function doVoiceInstall() {
+		if (!voiceEl) return;
+		var btn = voiceEl.querySelector('#nous-voice-btn');
+		if (btn) { btn.disabled = true; btn.textContent = 'Iniciando...'; }
+		fetch(MON_URL + '/voice/install', { method: 'POST' })
+			.catch(function () {})
+			.then(function () { setTimeout(voiceRefresh, 800); });
 	}
 
 	/* ====================== Assistente de primeiro uso ======================

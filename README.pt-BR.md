@@ -9,7 +9,7 @@
 Chat · Visão · Geração de imagem · Busca na web — 100% no seu PC.  
 Sem nuvem. Sem mensalidade. Suas conversas nunca saem da sua máquina.
 
-[![version](https://img.shields.io/badge/version-2.2.0-c8962e)](CHANGELOG.md)
+[![version](https://img.shields.io/badge/version-2.3.0-c8962e)](CHANGELOG.md)
 [![license](https://img.shields.io/badge/license-MIT-black)](LICENSE)
 [![platform](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6)](#requisitos)
 [![local](https://img.shields.io/badge/100%25-local%20%26%20privado-2ea44f)](#por-que-o-nous)
@@ -118,6 +118,22 @@ powershell -ExecutionPolicy Bypass -File images\install-comfyui.ps1
 
 Instala o ComfyUI, o PyTorch certo para a sua GPU e os modelos Flux.1 Schnell (~12 GB). Depois, selecione **Gerador de Imagem Local** no seletor de modelos e peça: *"crie uma logo dourada de uma coruja"*. A imagem aparece na conversa.
 
+### Conversa por voz em português (opcional)
+
+O Nous pode ouvir e falar — tudo na sua máquina, sem internet, sem API de nuvem.
+
+```
+Clique duplo em  ativar-voz.bat
+```
+
+Ou abra o painel **Recursos** → clique em **"🎙 Ativar voz em PT-BR"**. O painel baixa o motor de voz Piper (~30 MB) e o modelo de voz brasileiro (~60 MB). O modelo Whisper de reconhecimento de fala (~150 MB) é baixado automaticamente no primeiro uso.
+
+Depois de ativar: clique no **ícone de telefone** no cabeçalho do chat para entrar no modo voz *hands-free* — fale, o Nous transcreve, responde e lê a resposta em voz alta em PT-BR.
+
+> **100% local.** Áudio e transcrições nunca saem da sua máquina. A voz funciona mesmo usando um modelo de nuvem no chat — só o texto vai para a nuvem, nunca sua voz.
+
+---
+
 ### Nous Nuvem — modelos de fronteira opcionais
 
 O Nous é local por padrão. Se quiser experimentar modelos de ponta (DeepSeek R1, Llama 3.3 70B, Kimi K2…) sem GPU potente, conecte-o à API gratuita da NVIDIA:
@@ -178,6 +194,7 @@ Clique duplo em **`desinstalar.bat`**:
 ```
 Nous WebUI/
 ├─ branding/    identidade: logo, tema Branco & Ouro, loader.js (painéis), aplicador
+├─ voice/       Voz em PT-BR: servidor Piper TTS + registro STT/TTS
 ├─ cloud/       Nous Nuvem: registro opt-in da API NVIDIA NIM
 ├─ files/       RAG de arquivos locais: indexador + busca híbrida
 ├─ history/     RAG do histórico de conversas
