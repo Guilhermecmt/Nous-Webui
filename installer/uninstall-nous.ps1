@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
   Nous - Desinstalador. Remove o que o instalador colocou, com seguranca.
 .DESCRIPTION

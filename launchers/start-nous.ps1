@@ -1,4 +1,4 @@
-<#
+﻿<#
   Nous WebUI - Iniciar (em segundo plano, sem janela de terminal).
   Sobe o Ollama (se preciso) + o servidor Nous OCULTO e abre o navegador.
   Compile para .exe com build-exe.ps1 (-noConsole) para nao mostrar janela.

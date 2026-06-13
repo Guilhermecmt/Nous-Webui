@@ -1,4 +1,4 @@
-<#
+﻿<#
   Nous — Desconectar Email
   Remove a conta de email configurada (apaga .email_account.json).
 #>

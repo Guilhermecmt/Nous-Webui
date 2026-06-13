@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
   Nous WebUI - Instalador idempotente (1 comando faz tudo).
 .DESCRIPTION

@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
   Nous WebUI - Verificacao inteligente pos-instalacao.
 .DESCRIPTION

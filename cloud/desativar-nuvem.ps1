@@ -1,4 +1,4 @@
-<#
+﻿<#
   Nous — Desativar Nuvem NVIDIA
   Remove a chave e limpa a conexao da NVIDIA do banco do Open WebUI.
   Tudo grafico, sem janela de terminal.

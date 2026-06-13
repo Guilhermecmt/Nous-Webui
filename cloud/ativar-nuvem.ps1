@@ -1,4 +1,4 @@
-<#
+﻿<#
   Nous — Ativar Nuvem NVIDIA
   Solicita a chave NVIDIA NIM, valida, salva e registra a conexao
   no banco do Open WebUI. Tudo grafico, sem janela de terminal.

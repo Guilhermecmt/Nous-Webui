@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
   Baixa o Piper TTS (binario Windows) e a voz pt_BR para NousData\voice\.
   Tambem configura o STT/TTS no banco do Open WebUI.
@@ -73,7 +73,7 @@ if (-not (Test-Path $PIPER_EXE) -or $Force) {
     Download-File $PIPER_ZIP_URL $PIPER_ZIP "Piper TTS (binario Windows)"
     Write-Host "  Extraindo Piper..."
     Expand-Archive -Path $PIPER_ZIP -DestinationPath $voiceDir -Force
-    # O zip desempacota em piper\ — mover os arquivos para voiceDir
+    # O zip desempacota em piper\ - mover os arquivos para voiceDir
     $piperSubdir = Join-Path $voiceDir "piper"
     if (Test-Path $piperSubdir) {
         Get-ChildItem $piperSubdir | Move-Item -Destination $voiceDir -Force
@@ -101,7 +101,7 @@ $reg = Join-Path $PSScriptRoot "register_voice.py"
 if ((Test-Path $py) -and (Test-Path $reg)) {
     & $py $reg --data-dir $DataDir --voice $VoiceName
     if ($LASTEXITCODE -ne 0) {
-        Write-Warning "register_voice.py saiu com erro $LASTEXITCODE (nao e fatal — tente reiniciar o Nous)."
+        Write-Warning "register_voice.py saiu com erro $LASTEXITCODE (nao e fatal - tente reiniciar o Nous)."
     } else {
         Write-Host "  [ok] Configuracao de voz registrada."
     }

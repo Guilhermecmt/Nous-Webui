@@ -1,4 +1,4 @@
-<#
+﻿<#
   Nous — Conectar Email
   Solicita email e senha de app, detecta servidores IMAP/SMTP automaticamente,
   valida o login e salva as credenciais via API local (porta 8995).
