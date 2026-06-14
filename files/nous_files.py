@@ -104,7 +104,7 @@ class Filter:
         ENABLED: bool = Field(default=True, description="Liga/desliga o acesso aos arquivos.")
         FOLDER: str = Field(default="", description="Pasta a indexar (ex.: seu vault do Obsidian). Vazio = pasta padrao 'Nous' em Documentos.")
         TOP_K: int = Field(default=4, description="Quantos trechos injetar por pergunta.")
-        MIN_SIM: float = Field(default=0.65, description="Similaridade minima (0-1) para considerar relevante.")
+        MIN_SIM: float = Field(default=0.70, description="Similaridade minima (0-1) para considerar relevante. O nomic-embed-text da ~0.68 para quase qualquer texto PT-PT; abaixo de 0.70 entram notas irrelevantes em perguntas que nada tem a ver com seus arquivos.")
         MAX_CONTEXT_CHARS: int = Field(default=4000, description="Limite total de texto injetado.")
         RRF_K: int = Field(default=60, description="Constante do Reciprocal Rank Fusion.")
         EMBED_MODEL: str = Field(default="nomic-embed-text", description="Modelo de embeddings (Ollama).")
