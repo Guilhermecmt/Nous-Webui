@@ -125,12 +125,15 @@ def _set_ctx(cx, model_id, owner, now):
 # = menor chance de estourar o num_ctx e deixar a resposta vazia. 3 cobre bem
 # a maioria das perguntas. Ajustavel por NOUS_WEB_RESULTS.
 WEB_RESULTS = int(os.environ.get("NOUS_WEB_RESULTS", "3"))
+WEB_ENGINE = os.environ.get("WEB_SEARCH_ENGINE", "duckduckgo")
 
 
-def _set_web_results(cx):
-    """Grava rag.web.search.result_count no config do Open WebUI.
-    Necessario porque ENABLE_PERSISTENT_CONFIG=True faz o Open WebUI ler do DB
-    e ignorar a env var WEB_SEARCH_RESULT_COUNT do start-nous.ps1."""
+def _set_web_search(cx):
+    """Garante a config COMPLETA de busca web no DB: enable=True, engine e
+    result_count. Necessario porque ENABLE_PERSISTENT_CONFIG=True faz o Open
+    WebUI ler do DB e ignorar as env vars do start-nous.ps1 apos o 1o boot.
+    Sem enable/engine gravados, a busca web nao roda de forma confiavel
+    (recupera 0 fontes ou cai no RAG de historico)."""
     if not _table_exists(cx, "config"):
         return False
     row = cx.execute("SELECT id, data FROM config ORDER BY id DESC LIMIT 1").fetchone()
@@ -158,9 +161,16 @@ def _set_web_results(cx):
             d = d.setdefault(k, {})
         d[keys[-1]] = val
 
-    if _getn(data, "rag.web.search.result_count") == WEB_RESULTS:
-        return False  # ja' adequado
-    _setn(data, "rag.web.search.result_count", WEB_RESULTS)
+    desired = {
+        "rag.web.search.enable": True,
+        "rag.web.search.engine": WEB_ENGINE,
+        "rag.web.search.result_count": WEB_RESULTS,
+    }
+    # so' escreve se algo estiver diferente (idempotente)
+    if all(_getn(data, k) == v for k, v in desired.items()):
+        return False
+    for k, v in desired.items():
+        _setn(data, k, v)
     cx.execute("UPDATE config SET data=? WHERE id=?",
                (json.dumps(data, ensure_ascii=False), cid))
     return True
@@ -193,7 +203,7 @@ def main():
             if _set_ctx(cx, mid, owner, now):
                 changed.append(mid)
 
-        web_changed = _set_web_results(cx)
+        web_changed = _set_web_search(cx)
         cx.commit()
 
         if changed:
@@ -201,7 +211,7 @@ def main():
         else:
             print(f"[Nous] num_ctx já adequado (>= {NUM_CTX}) em todos os modelos.")
         if web_changed:
-            print(f"[Nous] busca web: result_count={WEB_RESULTS} (menos contexto, evita resposta vazia).")
+            print(f"[Nous] busca web configurada: enable=True, engine={WEB_ENGINE}, result_count={WEB_RESULTS}.")
     finally:
         cx.close()
 
