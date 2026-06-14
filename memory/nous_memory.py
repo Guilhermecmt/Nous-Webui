@@ -257,7 +257,10 @@ class Filter:
             "prompt": prompt,
             "stream": False,
             "options": {"temperature": 0},
-            "keep_alive": "30s",
+            # 5m para nao descarregar o modelo logo apos a extracao de memoria
+            # (em geral e' o mesmo modelo da conversa; descarregar anularia o
+            # keep_alive da conversa e forcaria um recarregamento lento).
+            "keep_alive": "5m",
         }
         url = self.valves.OLLAMA_BASE.rstrip("/") + "/api/generate"
         async with aiohttp.ClientSession() as s:

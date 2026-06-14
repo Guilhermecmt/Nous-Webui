@@ -15,9 +15,11 @@ $url  = "http://localhost:8080"
 $env:WEBUI_NAME          = "Nous"
 $env:DATA_DIR            = Join-Path $env:USERPROFILE "NousData"
 $env:OLLAMA_BASE_URL     = "http://127.0.0.1:11434"
-# Modelo sai da VRAM 30s apos a ultima mensagem (era 5 min). O Pipe ja envia
-# keep_alive por requisicao; isto cobre tambem clientes diretos do Ollama.
-$env:OLLAMA_KEEP_ALIVE   = "30s"
+# Modelo fica na VRAM por 5 min apos a ultima mensagem. Era 30s, mas recarregar
+# um modelo de ~8 GB custa ~100s; com 30s, qualquer pausa para ler/digitar fazia
+# o modelo sair e a proxima resposta demorar muito. 5 min cobre conversas
+# normais sem recarregar e ainda libera a VRAM sozinho quando voce para.
+$env:OLLAMA_KEEP_ALIVE   = "5m"
 $env:ENABLE_WEB_SEARCH   = "True"
 $env:WEB_SEARCH_ENGINE   = "duckduckgo"
 $env:WEB_SEARCH_RESULT_COUNT = "5"
