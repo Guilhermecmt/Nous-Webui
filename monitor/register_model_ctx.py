@@ -121,6 +121,51 @@ def _set_ctx(cx, model_id, owner, now):
     return True
 
 
+# Quantas paginas a busca web injeta no prompt. Menos paginas = menos contexto
+# = menor chance de estourar o num_ctx e deixar a resposta vazia. 3 cobre bem
+# a maioria das perguntas. Ajustavel por NOUS_WEB_RESULTS.
+WEB_RESULTS = int(os.environ.get("NOUS_WEB_RESULTS", "3"))
+
+
+def _set_web_results(cx):
+    """Grava rag.web.search.result_count no config do Open WebUI.
+    Necessario porque ENABLE_PERSISTENT_CONFIG=True faz o Open WebUI ler do DB
+    e ignorar a env var WEB_SEARCH_RESULT_COUNT do start-nous.ps1."""
+    if not _table_exists(cx, "config"):
+        return False
+    row = cx.execute("SELECT id, data FROM config ORDER BY id DESC LIMIT 1").fetchone()
+    if not row:
+        return False
+    cid, raw = row[0], row[1]
+    try:
+        data = json.loads(raw) if isinstance(raw, str) else raw
+    except Exception:
+        return False
+    if not isinstance(data, dict):
+        return False
+
+    def _getn(d, path):
+        for k in path.split("."):
+            if isinstance(d, dict) and k in d:
+                d = d[k]
+            else:
+                return None
+        return d
+
+    def _setn(d, path, val):
+        keys = path.split(".")
+        for k in keys[:-1]:
+            d = d.setdefault(k, {})
+        d[keys[-1]] = val
+
+    if _getn(data, "rag.web.search.result_count") == WEB_RESULTS:
+        return False  # ja' adequado
+    _setn(data, "rag.web.search.result_count", WEB_RESULTS)
+    cx.execute("UPDATE config SET data=? WHERE id=?",
+               (json.dumps(data, ensure_ascii=False), cid))
+    return True
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--data-dir", default=None)
@@ -147,11 +192,16 @@ def main():
         for mid in models:
             if _set_ctx(cx, mid, owner, now):
                 changed.append(mid)
+
+        web_changed = _set_web_results(cx)
         cx.commit()
+
         if changed:
             print(f"[Nous] num_ctx={NUM_CTX} aplicado a: {changed}")
         else:
             print(f"[Nous] num_ctx já adequado (>= {NUM_CTX}) em todos os modelos.")
+        if web_changed:
+            print(f"[Nous] busca web: result_count={WEB_RESULTS} (menos contexto, evita resposta vazia).")
     finally:
         cx.close()
 
