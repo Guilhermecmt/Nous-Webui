@@ -80,8 +80,10 @@ def _write_config(cx, data):
     if row:
         cx.execute("UPDATE config SET data=? WHERE id=?", (payload, row[0]))
     else:
-        import time
-        now = int(time.time())
+        # Colunas DATETIME do Open WebUI esperam string ISO, NAO epoch inteiro
+        # (gravar int faz o servidor crashar no boot com fromisoformat).
+        import datetime
+        now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         cx.execute(
             "INSERT INTO config (data, version, created_at, updated_at) VALUES (?,0,?,?)",
             (payload, now, now),

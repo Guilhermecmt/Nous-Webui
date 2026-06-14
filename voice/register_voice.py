@@ -26,6 +26,7 @@ import os
 import sys
 import json
 import time
+import datetime
 import sqlite3
 import argparse
 from pathlib import Path
@@ -121,7 +122,9 @@ def read_config(cx):
 
 def write_config(cx, data):
     row = cx.execute("SELECT id FROM config ORDER BY id DESC LIMIT 1").fetchone()
-    now = int(time.time())
+    # Colunas DATETIME do Open WebUI esperam string ISO, NAO epoch inteiro
+    # (gravar int faz o servidor crashar no boot com fromisoformat).
+    now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     payload = json.dumps(data, ensure_ascii=False)
     if row:
         cx.execute(

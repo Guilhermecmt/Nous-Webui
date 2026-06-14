@@ -20,6 +20,7 @@ import os
 import sys
 import json
 import time
+import datetime
 import sqlite3
 import argparse
 
@@ -103,7 +104,10 @@ def read_config(cx):
 
 def write_config(cx, data):
     row = cx.execute("SELECT id FROM config ORDER BY id DESC LIMIT 1").fetchone()
-    now = int(time.time())
+    # A tabela 'config' do Open WebUI usa colunas DATETIME (string ISO), NAO
+    # epoch inteiro. Gravar int aqui faz o servidor crashar no boot com
+    # "fromisoformat: argument must be str". Por isso usamos datetime string.
+    now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     payload = json.dumps(data, ensure_ascii=False)
     if row:
         cx.execute(
