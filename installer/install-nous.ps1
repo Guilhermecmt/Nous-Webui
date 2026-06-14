@@ -8,7 +8,7 @@
   4) Instala o Python 3.11                 - pula se ja existir
   5) Cria o ambiente + Open WebUI          - pula se ja existir
   6) Aplica a identidade Nous
-  7) Cria pasta de dados + atalho + .exe oculto
+  7) Cria pasta de dados + atalho (via .vbs, sem janela)
   8) Verificacao final de saude
 
   Idempotente: rodar de novo nao quebra nada. Use -Force para reinstalar.
@@ -32,7 +32,6 @@ $venv      = Join-Path $env:USERPROFILE "open-webui"
 $dataDir   = Join-Path $env:USERPROFILE "NousData"
 $ollamaExe = Join-Path $env:LOCALAPPDATA "Programs\Ollama\ollama.exe"
 $ollamaApp = Join-Path $env:LOCALAPPDATA "Programs\Ollama\ollama app.exe"
-$nousExe   = Join-Path $REPO "launchers\Nous.exe"
 
 # Versao do Open WebUI TESTADA com o Nous. Upgrades sao conscientes: valide a
 # versao nova primeiro e depois suba este pin (a identidade Nous se reaplica
@@ -61,11 +60,10 @@ function Test-OllamaUp {
     try { Invoke-RestMethod "http://127.0.0.1:11434/api/version" -TimeoutSec 3 | Out-Null; return $true }
     catch { return $false }
 }
-# Cria/atualiza o atalho "Nous.lnk" em $folder. Aponta p/ Nous.exe se existir,
-# senao p/ wscript + nous-hidden.vbs (mesmo efeito, sem janela). NUNCA lanca
-# excecao: antivirus / "Acesso controlado a pastas" do Defender podem bloquear
-# a gravacao na area de trabalho — tratamos e seguimos. Retorna $true se o
-# atalho existe ao final.
+# Cria/atualiza o atalho "Nous.lnk" em $folder, sempre via wscript + nous-hidden.vbs
+# (abre sem janela e le o start-nous.ps1 ao vivo). NUNCA lanca excecao: antivirus /
+# "Acesso controlado a pastas" do Defender podem bloquear a gravacao na area de
+# trabalho — tratamos e seguimos. Retorna $true se o atalho existe ao final.
 function New-NousShortcut([string]$folder) {
     try {
         if (-not $folder) { return $false }
@@ -73,15 +71,12 @@ function New-NousShortcut([string]$folder) {
         $lnkPath = Join-Path $folder "Nous.lnk"
         $ws  = New-Object -ComObject WScript.Shell
         $lnk = $ws.CreateShortcut($lnkPath)
-        if (Test-Path $nousExe) {
-            $lnk.TargetPath = $nousExe
-            $lnk.WorkingDirectory = (Split-Path $nousExe)
-        } else {
-            $vbs = Join-Path $REPO "launchers\nous-hidden.vbs"
-            $lnk.TargetPath = "wscript.exe"
-            $lnk.Arguments  = "`"$vbs`""
-            $lnk.WorkingDirectory = (Join-Path $REPO "launchers")
-        }
+        # SEMPRE via .vbs: ele le o start-nous.ps1 ao vivo (sem janela), entao o
+        # atalho nunca fica preso numa versao congelada como acontecia com o .exe.
+        $vbs = Join-Path $REPO "launchers\nous-hidden.vbs"
+        $lnk.TargetPath = "wscript.exe"
+        $lnk.Arguments  = "`"$vbs`""
+        $lnk.WorkingDirectory = (Join-Path $REPO "launchers")
         $ico = Join-Path $REPO "branding\assets\nous.ico"
         if (Test-Path $ico) { $lnk.IconLocation = "$ico,0" }
         $lnk.Save()
@@ -345,12 +340,18 @@ if ($LASTEXITCODE -ne 0) {
 Step 6 "Dados, atalho e launcher"
 New-Item -ItemType Directory -Force -Path $dataDir | Out-Null
 Ok "pasta de dados: $dataDir"
-# (opcional) gera os .exe bonitos via ps2exe; se faltar o modulo, seguimos
-# com o atalho via .vbs (funciona igual, sem janela de console).
-try { & (Join-Path $REPO "launchers\build-exe.ps1") | Out-Null; Ok "launchers .exe gerados" }
-catch { Info "sem ps2exe: vou usar o atalho via .vbs (abre igual, sem janela)" }
+# NAO geramos mais o Nous.exe via ps2exe: o ps2exe EMBUTE o start-nous.ps1
+# dentro do .exe na compilacao, entao o atalho rodava uma copia CONGELADA do
+# codigo — qualquer atualizacao dos .ps1 nao chegava ao usuario ("versao
+# desatualizada"). O atalho usa o nous-hidden.vbs, que le o start-nous.ps1
+# AO VIVO (abre sem janela igual ao .exe). Remove .exe antigo se existir.
+foreach ($oldExe in "Nous.exe", "Parar Nous.exe") {
+    $ep = Join-Path $REPO "launchers\$oldExe"
+    if (Test-Path $ep) { Remove-Item $ep -Force -ErrorAction SilentlyContinue }
+}
+Ok "launcher via .vbs (sempre a versao atual, sem codigo congelado)"
 
-# Recria os atalhos (agora apontando p/ Nous.exe, se foi gerado) e VERIFICA.
+# Recria os atalhos (apontando p/ o .vbs, que le sempre o start-nous.ps1 atual) e VERIFICA.
 $desktopOk = New-NousShortcut ([Environment]::GetFolderPath("Desktop"))
 if (-not $desktopOk) {
     # instalacao elevada (outra conta) ou Desktop bloqueado: area de trabalho publica
