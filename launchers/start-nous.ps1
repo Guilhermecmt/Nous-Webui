@@ -275,6 +275,13 @@ function Register-Cloud {
 # Ja esta rodando? Garante funcoes nativas e abre o navegador.
 if (Test-Up) { Ensure-Branding; Register-Memory; Register-Pipe; Register-Research; Register-Arena; Register-Cloud; Register-Voice; Start-VoiceServer; Setup-Files; Setup-History; Hide-EmbedModels; Set-ModelCtx; Start-MemoryAPI; Start-EmailAPI; Start-Process $url; return }
 
+# O servidor NAO esta no ar: abre JA a tela de carregamento (o usuario ve o logo
+# do Nous e uma barra de progresso na hora). Ela mesma checa o servidor e abre o
+# Nous sozinha quando estiver pronto. Sem isto, o navegador so' abriria 1-2 min
+# depois — tempo em que a pessoa acha que travou e clica varias vezes.
+$loading = Join-Path $PSScriptRoot "loading.html"
+if (Test-Path $loading) { Start-Process $loading }
+
 # Garante o Ollama (em segundo plano)
 try { Invoke-RestMethod "http://127.0.0.1:11434/api/version" -TimeoutSec 3 | Out-Null }
 catch {
@@ -296,8 +303,10 @@ if ((Test-Path $py) -and (Test-Path $monitor)) {
     catch { Start-Process -FilePath $py -ArgumentList "`"$monitor`"" -WindowStyle Hidden }
 }
 
-# Espera ficar pronto, garante funcoes nativas e abre o navegador
+# Espera ficar pronto e garante as funcoes nativas. NAO abre o navegador aqui:
+# a tela de carregamento (loading.html), aberta la' em cima, detecta o servidor
+# no ar e redireciona sozinha para o Nous.
 for ($i = 0; $i -lt 90; $i++) {
     Start-Sleep -Seconds 2
-    if (Test-Up) { Ensure-Branding; Register-Memory; Register-Pipe; Register-Research; Register-Arena; Register-Cloud; Register-Voice; Start-VoiceServer; Setup-Files; Setup-History; Hide-EmbedModels; Set-ModelCtx; Start-MemoryAPI; Start-EmailAPI; Start-Process $url; break }
+    if (Test-Up) { Ensure-Branding; Register-Memory; Register-Pipe; Register-Research; Register-Arena; Register-Cloud; Register-Voice; Start-VoiceServer; Setup-Files; Setup-History; Hide-EmbedModels; Set-ModelCtx; Start-MemoryAPI; Start-EmailAPI; break }
 }

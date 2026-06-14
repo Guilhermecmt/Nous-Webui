@@ -147,10 +147,16 @@ def register(cx, voice_name, has_gpu):
     cfg = read_config(cx)
     audio = cfg.setdefault("audio", {})
 
-    # STT — Whisper local em portugues
+    # STT — Whisper local em portugues.
+    # Usamos "base" por padrao: o Open WebUI baixa o modelo de forma PREGUICOSA
+    # na primeira transcricao. "medium" (~1.5 GB) costuma falhar/demorar nesse
+    # download e resulta em "Transcription failed"; "base" (~140 MB) baixa rapido,
+    # ja vem no cache da maioria das instalacoes e e' suficiente para comandos de
+    # voz em PT-BR. Quem quiser mais qualidade pode setar NOUS_WHISPER_MODEL=small
+    # (ou medium) — mas precisa aguardar o download na 1a vez.
     stt = audio.setdefault("stt", {})
     stt["engine"] = "whisper"
-    stt["whisper_model"] = "medium" if has_gpu else "small"
+    stt["whisper_model"] = os.environ.get("NOUS_WHISPER_MODEL", "base")
     # WHISPER_LANGUAGE nao esta no JSON de config (e' env-only na 0.9.6),
     # mas guardamos aqui para referencia; o launcher pode setar WHISPER_LANGUAGE=pt
     stt["language"] = "pt"
@@ -166,8 +172,7 @@ def register(cx, voice_name, has_gpu):
 
     cfg["audio"] = audio
     write_config(cx, cfg)
-    model = "medium (GPU)" if has_gpu else "small (CPU)"
-    print(f"[NousVoz] STT Whisper {model} + TTS Piper {voice_name} registrados.")
+    print(f"[NousVoz] STT Whisper {stt['whisper_model']} + TTS Piper {voice_name} registrados.")
 
 
 def remove(cx):

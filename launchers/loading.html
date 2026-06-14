@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nous — iniciando…</title>
+<style>
+  :root { --gold:#c8962e; --gold-soft:#e7c069; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  html, body { height:100%; }
+  body {
+    background:#0d0d0f;
+    color:#eee;
+    font-family:Inter, system-ui, -apple-system, Segoe UI, sans-serif;
+    display:flex; align-items:center; justify-content:center;
+    text-align:center; padding:24px;
+    overflow:hidden;
+  }
+  .wrap { max-width:440px; width:100%; }
+  .logo {
+    width:96px; height:96px; margin:0 auto 22px;
+    animation:breathe 2.6s ease-in-out infinite;
+  }
+  @keyframes breathe {
+    0%,100% { transform:scale(1); opacity:.92; }
+    50%     { transform:scale(1.06); opacity:1; }
+  }
+  h1 {
+    font-size:22px; font-weight:700; letter-spacing:.16em;
+    color:var(--gold-soft); margin-bottom:10px;
+  }
+  .msg { font-size:14px; line-height:1.6; opacity:.8; margin-bottom:26px; }
+  .bar {
+    height:6px; border-radius:4px; background:rgba(255,255,255,.08);
+    overflow:hidden; position:relative;
+  }
+  .fill {
+    position:absolute; top:0; left:-40%; width:40%; height:100%;
+    background:linear-gradient(90deg, transparent, var(--gold), var(--gold-soft), var(--gold), transparent);
+    animation:slide 1.5s ease-in-out infinite;
+  }
+  @keyframes slide {
+    0%   { left:-40%; }
+    100% { left:100%; }
+  }
+  .hint { font-size:12px; opacity:.5; margin-top:22px; line-height:1.6; }
+  .dot { display:inline-block; width:7px; height:7px; border-radius:50%;
+         background:var(--gold); margin-right:7px; vertical-align:middle;
+         animation:pulse 1.4s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{opacity:.3;} 50%{opacity:1;} }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <img class="logo" src="../branding/assets/nous_logo.png"
+         onerror="this.style.display='none'" alt="Nous">
+    <h1>N O U S</h1>
+    <div class="msg" id="msg">
+      <span class="dot"></span>Preparando sua IA particular…
+    </div>
+    <div class="bar"><div class="fill"></div></div>
+    <div class="hint" id="hint">
+      Na primeira vez após ligar o computador, isto pode levar de 1 a 2 minutos.<br>
+      Pode deixar esta janela aberta — ela abre o Nous sozinha quando estiver pronto.
+    </div>
+    <div class="hint" id="manual" style="display:none;margin-top:14px">
+      Demorando? <a href="http://localhost:8080" style="color:var(--gold-soft);font-weight:600">Clique aqui para abrir o Nous</a>
+    </div>
+  </div>
+
+<script>
+  (function () {
+    var TARGET = 'http://localhost:8080';
+    var started = Date.now();
+    var tries = 0;
+
+    function elapsed() { return Math.floor((Date.now() - started) / 1000); }
+
+    function poll() {
+      tries++;
+      // no-cors: uma conexao bem-sucedida resolve (resposta opaca); servidor
+      // fora do ar rejeita. Basta detectar que o servidor aceitou a conexao.
+      fetch(TARGET + '/health', { mode: 'no-cors', cache: 'no-store' })
+        .then(function () {
+          document.getElementById('msg').innerHTML = '✓ Pronto! Abrindo o Nous…';
+          setTimeout(function () { location.href = TARGET; }, 600);
+        })
+        .catch(function () {
+          // ainda subindo — atualiza a mensagem conforme o tempo passa
+          var s = elapsed();
+          var msg = document.getElementById('msg');
+          if (s > 90) {
+            msg.innerHTML = '<span class="dot"></span>Quase lá — finalizando a inicialização…';
+          } else if (s > 30) {
+            msg.innerHTML = '<span class="dot"></span>Carregando os componentes do Nous…';
+          }
+          // rede de seguranca: se o redirect automatico nao disparar em algum
+          // navegador, mostra um link manual depois de 20s.
+          if (s > 20) {
+            var man = document.getElementById('manual');
+            if (man) man.style.display = 'block';
+          }
+          setTimeout(poll, 1500);
+        });
+    }
+    poll();
+  })();
+</script>
+</body>
+</html>
