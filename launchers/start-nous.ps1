@@ -221,6 +221,25 @@ function Start-VoiceServer {
     }
 }
 
+# --- Geracao de imagem (ComfyUI + Flux): sobe o motor se estiver instalado ---
+
+# Inicia o ComfyUI (porta 8188) em segundo plano SE estiver instalado. Ocioso
+# ele quase nao usa recursos (os modelos so' carregam na 1a geracao). Com ele no
+# ar, o register_pipe_auto ativa o 'Gerador de Imagem Local' no seletor do chat.
+# Suporta os dois locais: ComfyUI e o fork ComfyUI-Zluda (GPUs AMD).
+function Start-ComfyUI {
+    $cu = @(
+        (Join-Path $env:USERPROFILE "ComfyUI"),
+        (Join-Path $env:USERPROFILE "ComfyUI-Zluda")
+    ) | Where-Object { Test-Path (Join-Path $_ "venv\Scripts\python.exe") } | Select-Object -First 1
+    if (-not $cu) { return }
+    if (Get-NetTCPConnection -LocalPort 8188 -State Listen -ErrorAction SilentlyContinue) { return }
+    $cpy  = Join-Path $cu "venv\Scripts\python.exe"
+    $main = Join-Path $cu "main.py"
+    $env:PYTHONUTF8 = "1"; $env:PYTHONIOENCODING = "utf-8"
+    Start-Process -FilePath $cpy -ArgumentList "`"$main`"", "--port", "8188" -WorkingDirectory $cu -WindowStyle Hidden
+}
+
 # Configura STT/TTS no banco (so' age se os assets existirem; remove se ausentes).
 function Register-Voice {
     $reg = Join-Path $PSScriptRoot "..\voice\register_voice.py"
@@ -273,7 +292,7 @@ function Register-Cloud {
 }
 
 # Ja esta rodando? Garante funcoes nativas e abre o navegador.
-if (Test-Up) { Ensure-Branding; Register-Memory; Register-Pipe; Register-Research; Register-Arena; Register-Cloud; Register-Voice; Start-VoiceServer; Setup-Files; Setup-History; Hide-EmbedModels; Set-ModelCtx; Start-MemoryAPI; Start-EmailAPI; Start-Process $url; return }
+if (Test-Up) { Ensure-Branding; Register-Memory; Register-Pipe; Register-Research; Register-Arena; Register-Cloud; Register-Voice; Start-VoiceServer; Start-ComfyUI; Setup-Files; Setup-History; Hide-EmbedModels; Set-ModelCtx; Start-MemoryAPI; Start-EmailAPI; Start-Process $url; return }
 
 # O servidor NAO esta no ar: abre JA a tela de carregamento (o usuario ve o logo
 # do Nous e uma barra de progresso na hora). Ela mesma checa o servidor e abre o
@@ -308,5 +327,5 @@ if ((Test-Path $py) -and (Test-Path $monitor)) {
 # no ar e redireciona sozinha para o Nous.
 for ($i = 0; $i -lt 90; $i++) {
     Start-Sleep -Seconds 2
-    if (Test-Up) { Ensure-Branding; Register-Memory; Register-Pipe; Register-Research; Register-Arena; Register-Cloud; Register-Voice; Start-VoiceServer; Setup-Files; Setup-History; Hide-EmbedModels; Set-ModelCtx; Start-MemoryAPI; Start-EmailAPI; break }
+    if (Test-Up) { Ensure-Branding; Register-Memory; Register-Pipe; Register-Research; Register-Arena; Register-Cloud; Register-Voice; Start-VoiceServer; Start-ComfyUI; Setup-Files; Setup-History; Hide-EmbedModels; Set-ModelCtx; Start-MemoryAPI; Start-EmailAPI; break }
 }

@@ -26,8 +26,14 @@ DESC = (
 
 
 def comfy_installed():
-    """ComfyUI instalado? (padrao: %USERPROFILE%\\ComfyUI\\main.py)."""
-    return os.path.isfile(os.path.join(os.path.expanduser("~"), "ComfyUI", "main.py"))
+    """ComfyUI instalado? Checa os dois locais padrao: ComfyUI e o fork
+    ComfyUI-Zluda (usado em GPUs AMD). Antes so' olhava ~/ComfyUI, entao o
+    Pipe ficava inativo/escondido em maquinas com o ComfyUI-Zluda."""
+    home = os.path.expanduser("~")
+    for d in ("ComfyUI", "ComfyUI-Zluda"):
+        if os.path.isfile(os.path.join(home, d, "main.py")):
+            return True
+    return False
 
 
 def resolve_db(data_dir):
