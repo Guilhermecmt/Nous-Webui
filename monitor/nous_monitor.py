@@ -25,6 +25,8 @@ import json
 import asyncio
 import subprocess
 import urllib.parse
+import sqlite3
+import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -126,7 +128,83 @@ async def _unload(model=None):
                     pass
             except Exception:
                 pass
+    # Para o ComfyUI (porta 8188) matando o processo Python que o sustenta.
+    # O /interrupt do ComfyUI aborta a geração em curso mas não libera a VRAM;
+    # apenas encerrar o processo libera completamente.
+    await _stop_comfyui()
     return targets
+
+
+async def _start_comfyui() -> bool:
+    """Sobe o ComfyUI (porta 8188) se ainda não estiver no ar. Retorna True se ok."""
+    # Já está no ar?
+    try:
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=4)) as s:
+            async with s.get("http://localhost:8188/system_stats") as r:
+                if r.status < 500:
+                    return True
+    except Exception:
+        pass
+
+    # Localiza o ComfyUI
+    home = Path.home()
+    cu = None
+    for d in ("ComfyUI", "ComfyUI-Zluda"):
+        candidate = home / d
+        if (candidate / "venv" / "Scripts" / "python.exe").exists():
+            cu = candidate
+            break
+    if not cu:
+        return False
+
+    cpy  = str(cu / "venv" / "Scripts" / "python.exe")
+    main = str(cu / "main.py")
+    env  = {**os.environ, "PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8"}
+    try:
+        await asyncio.create_subprocess_exec(
+            cpy, main, "--port", "8188",
+            cwd=str(cu),
+            env=env,
+            stdout=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.DEVNULL,
+            creationflags=0x08000000,  # CREATE_NO_WINDOW
+        )
+    except Exception:
+        return False
+
+    # Aguarda até 90 s
+    deadline = asyncio.get_event_loop().time() + 90
+    chk = aiohttp.ClientTimeout(total=4)
+    while asyncio.get_event_loop().time() < deadline:
+        await asyncio.sleep(3)
+        try:
+            async with aiohttp.ClientSession(timeout=chk) as s:
+                async with s.get("http://localhost:8188/system_stats") as r:
+                    if r.status < 500:
+                        return True
+        except Exception:
+            pass
+    return False
+
+
+async def h_comfyui_start(request):
+    ok = await _start_comfyui()
+    return web.json_response({"ok": ok})
+
+
+async def _stop_comfyui():
+    """Encerra o processo Python do ComfyUI (porta 8188) liberando a VRAM."""
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "powershell.exe", "-NoProfile", "-NonInteractive", "-Command",
+            "Get-NetTCPConnection -LocalPort 8188 -State Listen -ErrorAction SilentlyContinue"
+            " | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }",
+            stdout=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.DEVNULL,
+        )
+        await asyncio.wait_for(proc.communicate(), timeout=8)
+    except Exception:
+        pass
 
 
 # ------------------------------------------------- Loja de Modelos (v2.2)
@@ -451,6 +529,145 @@ async def h_voice_install(request):
     return web.json_response({"started": True})
 
 
+# ------------------------------------------------- Galeria de Imagens (v2.3)
+
+def _webui_db():
+    dd = _data_dir()
+    p = dd / "webui.db"
+    return str(p) if p.is_file() else None
+
+
+def _gallery_images():
+    """Retorna lista de dicts com metadados de imagens geradas pelo Flux."""
+    db_path = _webui_db()
+    if not db_path:
+        return []
+    try:
+        cx = sqlite3.connect(db_path, timeout=10)
+        cx.row_factory = sqlite3.Row
+        rows = cx.execute(
+            "SELECT id, filename, meta, path, created_at FROM file "
+            "WHERE filename LIKE '%generated-image%' OR filename LIKE '%image.png' "
+            "ORDER BY created_at DESC"
+        ).fetchall()
+        cx.close()
+    except Exception:
+        return []
+    images = []
+    for r in rows:
+        try:
+            meta = json.loads(r["meta"] or "{}")
+        except Exception:
+            meta = {}
+        # Filtra apenas imagens geradas pelo pipe (content_type image/png)
+        if meta.get("content_type") not in ("image/png", "image/jpeg", "image/webp"):
+            continue
+        path = r["path"] or ""
+        exists = os.path.isfile(path) if path else False
+        images.append({
+            "id": r["id"],
+            "filename": r["filename"],
+            "path": path,
+            "exists": exists,
+            "size": meta.get("size", 0),
+            "chat_id": (meta.get("data") or {}).get("chat_id"),
+            "created_at": r["created_at"],
+        })
+    return images
+
+
+async def h_gallery(request):
+    images = await asyncio.get_event_loop().run_in_executor(None, _gallery_images)
+    # Não expõe o path completo ao frontend por segurança
+    safe = [{k: v for k, v in img.items() if k != "path"} for img in images]
+    return web.json_response({"images": safe})
+
+
+async def h_gallery_image(request):
+    """Serve os bytes da imagem para exibição na galeria (miniatura inline)."""
+    img_id = request.match_info.get("id", "")
+    if not img_id:
+        return web.Response(status=400)
+    images = await asyncio.get_event_loop().run_in_executor(None, _gallery_images)
+    match = next((img for img in images if img["id"] == img_id), None)
+    if not match:
+        return web.Response(status=404)
+    path = match.get("path", "")
+    if not path or not os.path.isfile(path):
+        return web.Response(status=404)
+    try:
+        data = Path(path).read_bytes()
+        return web.Response(body=data, content_type="image/png",
+                            headers={"Cache-Control": "max-age=3600"})
+    except Exception:
+        return web.Response(status=500)
+
+
+def _move_to_recycle(path: str) -> bool:
+    """Move arquivo para o lixeiro do Windows via PowerShell."""
+    try:
+        script = (
+            "Add-Type -AssemblyName Microsoft.VisualBasic; "
+            f"[Microsoft.VisualBasic.FileIO.FileSystem]::DeleteFile("
+            f"'{path}',"
+            f"'OnlyErrorDialogs','SendToRecycleBin')"
+        )
+        result = subprocess.run(
+            ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", script],
+            timeout=10, capture_output=True
+        )
+        return result.returncode == 0
+    except Exception:
+        return False
+
+
+def _delete_image(img_id: str, permanent: bool) -> dict:
+    db_path = _webui_db()
+    if not db_path:
+        return {"ok": False, "error": "banco nao encontrado"}
+
+    try:
+        cx = sqlite3.connect(db_path, timeout=10)
+        row = cx.execute("SELECT path FROM file WHERE id=?", (img_id,)).fetchone()
+        if not row:
+            cx.close()
+            return {"ok": False, "error": "imagem nao encontrada"}
+        file_path = row[0] or ""
+        cx.execute("DELETE FROM file WHERE id=?", (img_id,))
+        cx.commit()
+        cx.close()
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+    file_deleted = False
+    if file_path and os.path.isfile(file_path):
+        if permanent:
+            try:
+                os.remove(file_path)
+                file_deleted = True
+            except Exception:
+                pass
+        else:
+            file_deleted = _move_to_recycle(file_path)
+
+    return {"ok": True, "file_deleted": file_deleted,
+            "permanent": permanent, "id": img_id}
+
+
+async def h_gallery_delete(request):
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    img_id = (body.get("id") or "").strip()
+    permanent = bool(body.get("permanent", False))
+    if not img_id:
+        return web.json_response({"ok": False, "error": "id ausente"}, status=400)
+    result = await asyncio.get_event_loop().run_in_executor(
+        None, _delete_image, img_id, permanent)
+    return web.json_response(result)
+
+
 def build_app():
     app = web.Application(middlewares=[cors_mw])
     app.add_routes([web.get("/stats", h_stats),
@@ -461,7 +678,11 @@ def build_app():
                     web.post("/pull", h_pull),
                     web.get("/pull/status", h_pull_status),
                     web.get("/voice/status", h_voice_status),
-                    web.post("/voice/install", h_voice_install)])
+                    web.post("/voice/install", h_voice_install),
+                    web.post("/comfyui/start", h_comfyui_start),
+                    web.get("/gallery", h_gallery),
+                    web.get("/gallery/image/{id}", h_gallery_image),
+                    web.post("/gallery/delete", h_gallery_delete)])
     return app
 
 

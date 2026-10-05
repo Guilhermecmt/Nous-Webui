@@ -49,6 +49,9 @@ $env:ENABLE_OPENAI_API = "True"
 # Forca o idioma do Whisper para portugues (env-only na 0.9.6).
 $env:WHISPER_LANGUAGE = "pt"
 
+# Desativa perguntas de acompanhamento automaticas (Autocomplete/Follow-up).
+$env:ENABLE_AUTOCOMPLETE_GENERATION = "False"
+
 # Chave secreta ESTAVEL: sem ela, o open-webui gera uma nova a cada inicio e
 # desloga voce. Guardamos uma chave local (em NousData, fora do git) e a reusamos.
 $keyFile = Join-Path $env:DATA_DIR ".webui_secret_key"
