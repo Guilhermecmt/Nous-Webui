@@ -31,6 +31,12 @@ sem conhecimento tecnico, com tudo acontecendo em segundo plano.
   historico, painel "O que o Nous sabe" + personas, link criar conta, badges
   de capacidade VRAM por modelo, citacoes de fonte.
 
+### v2.6 — Correcoes para o primeiro acesso
+- Instalador que nao trava nem mente ("Pronto!" so' quando deu certo), app em
+  `%LOCALAPPDATA%\Programs\Nous`, entrada em Aplicativos instalados.
+- Primeira tela sem o changelog em ingles do Open WebUI; servidor so' local;
+  monitor protegido contra paginas de fora. Lint + CI no PowerShell 5.1.
+
 ### v2.1 — Nous Nuvem
 - Acesso *opt-in* a modelos de fronteira via NVIDIA NIM API (gratuito, sem GPU).
 - Ativacao/desativacao por clique duplo; memoria pessoal protegida (nao vai
@@ -68,9 +74,18 @@ sem conhecimento tecnico, com tudo acontecendo em segundo plano.
 
 ## Proximo
 
-### Bandeja do sistema (System Tray)
-- Triagem, resumo e rascunho de email via IMAP/SMTP com Ollama local.
-  Processamento 100% local; envio sempre exige confirmação.
+### Atualizar o Open WebUI (0.9.6 -> 0.11.x)
+- A 0.11 refez a interface: adaptar o `nous-loader.js` (ancorar em ids
+  estaveis, nao em textos traduzidos), revalidar filtros/pipes e subir o pin.
+- Atualizar o catalogo da Loja (qwen3.5/3.6/3.8, gemma4:26b/31b) com um campo
+  de ranking explicito em vez de usar o tamanho como medida de qualidade.
+- Ollama 0.35+: decidir sobre o onboarding proprio do app e o OLLAMA_NO_CLOUD.
+
+### Tour "Primeiros passos" para quem nunca usou IA
+- Boas-vindas em linguagem simples; licoes curtas durante o download do modelo
+  (o que e' um modelo, a IA pode errar, como pedir bem); primeira conversa
+  guiada com cartoes de tarefas do dia a dia; foto/documento; tour da tela;
+  botao "?" para rever. Progresso salvo por usuario.
 
 ### Bandeja do sistema (System Tray)
 - Icone na bandeja: Iniciar/Parar, abrir, status (rodando/parado, GPU/CPU),

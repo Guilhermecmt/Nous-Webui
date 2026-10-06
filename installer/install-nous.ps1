@@ -2,16 +2,19 @@
 .SYNOPSIS
   Nous WebUI - Instalador idempotente (1 comando faz tudo).
 .DESCRIPTION
-  1) Analisa a capacidade da maquina (aborta se INCAPAZ)
+  0) Analisa a capacidade da maquina (aborta se INCAPAZ)
+  1) Copia o app para %LOCALAPPDATA%\Programs\Nous (sai da pasta Downloads)
   2) Instala o Ollama (silencioso)         - pula se ja existir
-  3) Baixa o modelo (gemma4:12b)           - pula se ja existir
+  3) Modelo: menu numerado (Enter pula) ou -WithModel
   4) Instala o Python 3.11                 - pula se ja existir
   5) Cria o ambiente + Open WebUI          - pula se ja existir
   6) Aplica a identidade Nous
-  7) Cria pasta de dados + atalho (via .vbs, sem janela)
+  7) Cria pasta de dados + atalhos (via .vbs, sem janela)
   8) Verificacao final de saude
 
   Idempotente: rodar de novo nao quebra nada. Use -Force para reinstalar.
+  Sai com codigo 1 se algo essencial falhar (o instalar.bat mostra o erro em
+  vez de dizer "Pronto!").
 .PARAMETER Force
   Reinstala/atualiza componentes mesmo que ja existam.
 .PARAMETER Model
@@ -23,11 +26,14 @@ param(
     [switch]$WithImages,               # instalar tambem o motor de imagem (ComfyUI + Flux)
     [string]$Model = "gemma4:12b",
     [string]$AdminEmail,               # se a conta ja existir, registra o Pipe de imagem
-    [string]$AdminPassword
+    [string]$AdminPassword,
+    [switch]$NoUninstallEntry          # o Nous-Setup.exe (Inno) ja registra a propria entrada
 )
 $ErrorActionPreference = "Stop"
 
-$REPO      = Split-Path $PSScriptRoot -Parent
+$SRC       = Split-Path $PSScriptRoot -Parent             # de onde o instalador foi aberto
+$APP       = Join-Path $env:LOCALAPPDATA "Programs\Nous"  # onde o Nous passa a morar
+$REPO      = $SRC                                         # vira $APP apos o passo 1
 $venv      = Join-Path $env:USERPROFILE "open-webui"
 $dataDir   = Join-Path $env:USERPROFILE "NousData"
 $ollamaExe = Join-Path $env:LOCALAPPDATA "Programs\Ollama\ollama.exe"
@@ -42,6 +48,26 @@ $OPENWEBUI_PIN = "0.9.6"
 function Step($n, $t) { Write-Host "`n[$n] $t" -ForegroundColor Cyan }
 function Ok($t)       { Write-Host "    [ok] $t" -ForegroundColor Green }
 function Info($t)     { Write-Host "    $t" -ForegroundColor DarkGray }
+function Fail($t) {
+    Write-Host "`n    [erro] $t" -ForegroundColor Red
+    Write-Host "    Nada do que ja' estava no computador foi apagado. Corrija o item acima" -ForegroundColor Yellow
+    Write-Host "    (geralmente: conexao com a internet) e rode o instalar.bat de novo." -ForegroundColor Yellow
+    exit 1
+}
+# Comandos externos (winget, pip, venv) nao lancam excecao quando falham: so'
+# deixam $LASTEXITCODE diferente de zero. Sem esta checagem o instalador dizia
+# "[ok] instalado" e o instalar.bat terminava em "Pronto!".
+function Assert-Exit([string]$what) {
+    if ($LASTEXITCODE -ne 0) { Fail "$what falhou (codigo $LASTEXITCODE)." }
+}
+# Pela API, nunca por "ollama list": com o servico parado o CLI abre o app do
+# Ollama, que herda o pipe de saida, e o instalador congelava ali para sempre.
+function Test-ModelInstalled([string]$tag) {
+    try {
+        $tags = Invoke-RestMethod "http://127.0.0.1:11434/api/tags" -TimeoutSec 5
+        return [bool]($tags.models | Where-Object { $_.name -eq $tag -or $_.name -eq "${tag}:latest" })
+    } catch { return $false }
+}
 
 # --- Deteccao robusta: NAO rebaixar o que ja existe, mesmo instalado por
 #     outro metodo/local (PATH, locais comuns, serviço no ar). ---
@@ -64,16 +90,16 @@ function Test-OllamaUp {
 # (abre sem janela e le o start-nous.ps1 ao vivo). NUNCA lanca excecao: antivirus /
 # "Acesso controlado a pastas" do Defender podem bloquear a gravacao na area de
 # trabalho — tratamos e seguimos. Retorna $true se o atalho existe ao final.
-function New-NousShortcut([string]$folder) {
+function New-NousShortcut([string]$folder, [string]$name = "Nous", [string]$vbsName = "nous-hidden.vbs") {
     try {
         if (-not $folder) { return $false }
         if (-not (Test-Path $folder)) { return $false }
-        $lnkPath = Join-Path $folder "Nous.lnk"
+        $lnkPath = Join-Path $folder "$name.lnk"
         $ws  = New-Object -ComObject WScript.Shell
         $lnk = $ws.CreateShortcut($lnkPath)
         # SEMPRE via .vbs: ele le o start-nous.ps1 ao vivo (sem janela), entao o
         # atalho nunca fica preso numa versao congelada como acontecia com o .exe.
-        $vbs = Join-Path $REPO "launchers\nous-hidden.vbs"
+        $vbs = Join-Path $REPO "launchers\$vbsName"
         $lnk.TargetPath = "wscript.exe"
         $lnk.Arguments  = "`"$vbs`""
         $lnk.WorkingDirectory = (Join-Path $REPO "launchers")
@@ -190,6 +216,22 @@ if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
     exit 1
 }
 
+# 0.6) App no lugar definitivo ----------------------------------------------
+# Antes o Nous rodava de onde o ZIP foi descompactado (quase sempre Downloads):
+# limpar essa pasta quebrava o atalho, e rodar de dentro do ZIP nem funcionava.
+Step "0.6" "Copiando o Nous para $APP"
+if ($SRC.TrimEnd('\') -ne $APP.TrimEnd('\')) {
+    New-Item -ItemType Directory -Force -Path $APP | Out-Null
+    # /E sem /MIR: nunca apaga o que ja existe la' (backups em bkp\, etc.)
+    robocopy $SRC $APP /E /XD .git dist /XF *.log Nous.exe "Parar Nous.exe" /NFL /NDL /NJH /NJS /NP | Out-Null
+    if ($LASTEXITCODE -ge 8) { Fail "nao consegui copiar os arquivos do Nous para $APP." }
+    $global:LASTEXITCODE = 0
+    Ok "app copiado - a pasta que voce baixou pode ser apagada depois"
+} else {
+    Ok "ja esta no lugar"
+}
+$REPO = $APP
+
 # 0.7) Atalho ANTES de tudo --------------------------------------------------
 # Se algo falhar no meio da instalacao, o usuario ja' tem como abrir o Nous.
 # O Menu Iniciar nao e' bloqueado pelo "Acesso controlado a pastas" do Defender,
@@ -257,13 +299,14 @@ if (($ollamaExe -or (Test-OllamaUp)) -and -not $Force) {
     Remove-Item $ollamaSetup -Force -ErrorAction SilentlyContinue
 
     $ollamaExe = Find-Ollama
+    if (-not $ollamaExe) { Fail "a instalacao do Ollama nao terminou." }
     $instOllama = $true
     Ok "instalado"
 }
 if (-not (Test-OllamaUp)) {
     if (Test-Path $ollamaApp)   { Start-Process $ollamaApp -WindowStyle Hidden }
     elseif ($ollamaExe)         { Start-Process $ollamaExe -ArgumentList "serve" -WindowStyle Hidden }
-    Start-Sleep -Seconds 5
+    for ($i = 0; $i -lt 15 -and -not (Test-OllamaUp); $i++) { Start-Sleep -Seconds 1 }
 }
 if (Test-OllamaUp) { Ok "servico no ar" } else { Info "servico nao respondeu ainda (confira o Ollama)" }
 
@@ -280,7 +323,7 @@ if (-not $WithModel -and -not $modelExplicit -and [Environment]::UserInteractive
     if ($chosen) { $Model = $chosen; $WithModel = $true }
 }
 
-$hasModel = [bool]((& $ollamaCmd list 2>$null) -match [regex]::Escape($Model))
+$hasModel = Test-ModelInstalled $Model
 if ($WithModel) {
     if ($hasModel -and -not $Force) { Ok "$Model ja baixado" }
     else {
@@ -311,20 +354,25 @@ else {
     Info "instalando Python 3.11 (~27 MB, rapido)..."
     winget install --id Python.Python.3.11 -e --accept-package-agreements --accept-source-agreements --silent
     $py311 = Find-Py311
+    if (-not $py311) { Fail "Python 3.11 nao encontrado apos a instalacao (codigo $LASTEXITCODE)." }
     $instPython = $true
-    if ($py311) { Ok "instalado" }
-    else { Write-Host "    [erro] Python 3.11 nao encontrado apos a instalacao." -ForegroundColor Red; exit 1 }
+    Ok "instalado"
 }
 
 # 4) Ambiente + Open WebUI --------------------------------------------------
 Step 4 "Ambiente Python + Open WebUI"
 $vpy = Join-Path $venv "Scripts\python.exe"
-if (-not (Test-Path $vpy)) { Info "criando ambiente isolado..."; & $py311 -m venv $venv }
+if (-not (Test-Path $vpy)) {
+    Info "criando ambiente isolado..."
+    & $py311 -m venv $venv
+    Assert-Exit "a criacao do ambiente Python"
+}
 if ((Test-Path (Join-Path $venv "Scripts\open-webui.exe")) -and -not $Force) { Ok "Open WebUI ja instalado" }
 else {
     Info "instalando o Open WebUI $OPENWEBUI_PIN (varios minutos, baixa varios GB)..."
     & $vpy -m pip install --upgrade pip --quiet
     & $vpy -m pip install "open-webui==$OPENWEBUI_PIN"
+    Assert-Exit "a instalacao do Open WebUI"
     Ok "instalado (versao testada com o Nous)"
 }
 
@@ -358,32 +406,60 @@ if (-not $desktopOk) {
     $desktopOk = New-NousShortcut ([Environment]::GetFolderPath("CommonDesktopDirectory"))
 }
 $startOk = New-NousShortcut ([Environment]::GetFolderPath("Programs"))
+$null = New-NousShortcut ([Environment]::GetFolderPath("Programs")) "Parar Nous" "parar-nous.vbs"
 if ($desktopOk) { Ok "atalho 'Nous' na area de trabalho" }
-if ($startOk)   { Ok "atalho 'Nous' no Menu Iniciar (tecla Windows > digite Nous)" }
+if ($startOk)   { Ok "atalhos 'Nous' e 'Parar Nous' no Menu Iniciar (tecla Windows > digite Nous)" }
 if (-not $desktopOk) {
     Write-Host "    [aviso] nao consegui criar o atalho na area de trabalho" -ForegroundColor Yellow
     Write-Host "            (o antivirus ou o 'Acesso controlado a pastas' pode ter bloqueado)." -ForegroundColor Yellow
-    if ($startOk) { Write-Host "            Use o Menu Iniciar (tecla Windows > Nous) ou o iniciar.bat." -ForegroundColor Yellow }
-    else          { Write-Host "            Abra o Nous com clique duplo em iniciar.bat, na pasta do Nous." -ForegroundColor Yellow }
+    if ($startOk) { Write-Host "            Use o Menu Iniciar (tecla Windows > Nous)." -ForegroundColor Yellow }
+    else          { Write-Host "            Abra o Nous com clique duplo em iniciar.bat, em $APP." -ForegroundColor Yellow }
 }
+
+# Entrada em Configuracoes > Aplicativos instalados: o leigo desinstala o Nous
+# como qualquer programa, sem precisar achar o desinstalar.bat.
+if (-not $NoUninstallEntry) { try {
+    $unKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\Nous"
+    New-Item -Path $unKey -Force | Out-Null
+    $ver = (Get-Content (Join-Path $REPO "VERSION") -Raw -ErrorAction SilentlyContinue)
+    $props = [ordered]@{
+        DisplayName     = "Nous"
+        DisplayVersion  = $(if ($ver) { $ver.Trim() } else { "" })
+        Publisher       = "Nous"
+        InstallLocation = $APP
+        DisplayIcon     = (Join-Path $APP "branding\assets\nous.ico")
+        UninstallString = "cmd.exe /c `"`"$(Join-Path $APP 'desinstalar.bat')`"`""
+    }
+    foreach ($k in $props.Keys) { Set-ItemProperty -Path $unKey -Name $k -Value $props[$k] }
+    Set-ItemProperty -Path $unKey -Name NoModify -Value 1 -Type DWord
+    Set-ItemProperty -Path $unKey -Name NoRepair -Value 1 -Type DWord
+    Ok "Nous aparece em Configuracoes > Aplicativos (para desinstalar)"
+} catch { Info "nao consegui registrar em Aplicativos instalados (segue sem)" } }
 
 # 6.5) Manifesto de instalacao ---------------------------------------------
 # Registra o que o Nous REALMENTE instalou, para o desinstalador remover so'
-# isso e nunca mexer num Ollama/Python que ja' existia antes.
+# isso e nunca mexer num Ollama/Python que ja' existia antes. Numa reinstalacao
+# o Ollama/Python ja' "existem" - por isso as marcas antigas sao preservadas
+# (OR), senao o "Remover tudo" deixava de remove-los. O modelo so' e' gravado
+# se foi de fato escolhido/baixado (o launcher o usa como modelo padrao).
+$manPath = Join-Path $dataDir "install-manifest.json"
+$old = $null
+if (Test-Path $manPath) { try { $old = Get-Content $manPath -Raw | ConvertFrom-Json } catch {} }
 $manifest = [ordered]@{
     installed_at   = (Get-Date).ToString("s")
+    app            = $APP
     venv           = $venv
-    ollama_by_nous = [bool]$instOllama
-    python_by_nous = [bool]$instPython
-    model          = $Model
-    model_by_nous  = [bool]$instModel
+    ollama_by_nous = [bool]($instOllama -or ($old -and $old.ollama_by_nous))
+    python_by_nous = [bool]($instPython -or ($old -and $old.python_by_nous))
+    model          = $(if ($WithModel -and ($instModel -or $hasModel)) { $Model } elseif ($old) { $old.model } else { $null })
+    model_by_nous  = [bool]($instModel -or ($old -and $old.model_by_nous))
 }
-[IO.File]::WriteAllText((Join-Path $dataDir "install-manifest.json"), ($manifest | ConvertTo-Json))
+[IO.File]::WriteAllText($manPath, ($manifest | ConvertTo-Json))
 Ok "manifesto de instalacao salvo (ajuda o desinstalador)"
 
 # 7) Verificacao ------------------------------------------------------------
 Step 7 "Verificacao final de saude"
-& (Join-Path $REPO "tools\health-check.ps1") -Model $Model
+& (Join-Path $REPO "tools\health-check.ps1") -Model $manifest.model
 
 # 8) Motor de imagem (opcional) --------------------------------------------
 # Nao-fatal: se a parte pesada/GPU-especifica falhar, o nucleo continua OK.
@@ -427,3 +503,4 @@ if (-not $WithImages) {
     Write-Host ""
     Write-Host " Para gerar imagens localmente depois: install-nous.ps1 -WithImages" -ForegroundColor DarkGray
 }
+exit 0

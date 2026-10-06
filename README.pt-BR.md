@@ -9,7 +9,7 @@
 Chat · Visão · Geração de imagem · Busca na web — 100% no seu PC.  
 Sem nuvem. Sem mensalidade. Suas conversas nunca saem da sua máquina.
 
-[![version](https://img.shields.io/badge/version-2.5.0-c8962e)](CHANGELOG.md)
+[![version](https://img.shields.io/badge/version-2.6.0-c8962e)](CHANGELOG.md)
 [![license](https://img.shields.io/badge/license-MIT-black)](LICENSE)
 [![platform](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6)](#requisitos)
 [![local](https://img.shields.io/badge/100%25-local%20%26%20privado-2ea44f)](#por-que-o-nous)
@@ -69,6 +69,8 @@ O que você ganha em relação a um chat de IA comum:
 2. Abra a pasta e dê **clique duplo em `instalar.bat`**. Se o Windows mostrar um aviso de segurança, escolha **"Mais informações → Executar assim mesmo"**.
 
 O instalador verifica seu hardware, instala o Ollama, o Python e a interface, aplica a identidade Nous e cria os atalhos — na **área de trabalho** e no **Menu Iniciar**. Ao final, o Nous abre sozinho no navegador.
+
+O Nous fica instalado em `%LOCALAPPDATA%\Programs\Nous`: depois da instalação, a pasta que você baixou pode ser apagada. Se algo falhar no caminho, o instalador mostra o motivo em vermelho em vez de dizer "Pronto!".
 
 ---
 
@@ -191,7 +193,7 @@ O card **Recursos** (canto inferior esquerdo) mostra VRAM em tempo real, os mode
 Comportamento padrão para software sem assinatura digital. Clique em **"Mais informações" → "Executar assim mesmo"**.
 
 **O atalho não apareceu na área de trabalho**  
-Alguns antivírus bloqueiam a criação de atalhos. Aperte a **tecla Windows** e digite **Nous** — o atalho do Menu Iniciar sempre é criado. Alternativa: clique duplo em `iniciar.bat` na pasta do Nous.
+Alguns antivírus bloqueiam a criação de atalhos. Aperte a **tecla Windows** e digite **Nous** — o atalho do Menu Iniciar sempre é criado. Alternativa: clique duplo em `iniciar.bat` em `%LOCALAPPDATA%\Programs\Nous`.
 
 **A tela inicial não mostra a logo do Nous / aparece "Open WebUI"**  
 Abra o Nous pelo atalho e pressione **Ctrl+Shift+R** no navegador. A identidade é verificada e reaplicada automaticamente a cada inicialização.
@@ -206,7 +208,7 @@ Abra o Nous pelo atalho (não pelo endereço direto no navegador) — o atalho i
 Clique duplo em `desinstalar.bat` → opção **[1] Remoção segura** → rode `instalar.bat` de novo. Suas conversas e notas são preservadas.
 
 **Esqueci minha senha**  
-Na pasta do Nous:
+Em `%LOCALAPPDATA%\Programs\Nous`:
 ```powershell
 python tools\reset-password.py --email seuemail@exemplo.com
 ```
@@ -215,7 +217,7 @@ python tools\reset-password.py --email seuemail@exemplo.com
 
 ## Desinstalar
 
-Clique duplo em **`desinstalar.bat`**:
+Em **Configurações → Aplicativos → Aplicativos instalados**, procure **Nous** e clique em **Desinstalar** (ou dê clique duplo em `desinstalar.bat`, em `%LOCALAPPDATA%\Programs\Nous`):
 
 - **[1] Remoção segura** *(recomendada)* — remove o app e o ambiente Python. Preserva conversas, notas, Ollama e Python.
 - **[2] Remover tudo** — apaga também as conversas e desinstala Ollama/Python, **somente** se foi o Nous que os instalou. Programas que já existiam não são tocados.

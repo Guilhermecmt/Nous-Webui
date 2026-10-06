@@ -1,5 +1,51 @@
 # Changelog
 
+## [2.6.0] - 2026-10-05
+Rodada de correções para quem instala e usa o Nous pela primeira vez.
+### Corrigido
+- **Instalador e verificação de saúde travavam** quando o Ollama estava
+  parado: `ollama list` abria o app do Ollama, que herdava a saída do script,
+  e o PowerShell esperava para sempre. Agora a checagem de modelos é pela API.
+- **Falhas apareciam como sucesso**: o instalador não conferia o resultado do
+  pip, do venv nem da instalação do Python, e o `instalar.bat` terminava em
+  "Pronto!" mesmo assim. Agora para com a mensagem em vermelho e código 1.
+- **PCs de 8 GB eram recusados** ("INCAPAZ"): o Windows reporta ~7,6 GB.
+  Mesma folga de 0,6 GB da Loja de Modelos.
+- **"O que há de novo" do Open WebUI, em inglês, era a 1ª tela após criar a
+  conta**, e o aviso "nova versão disponível" levava ao GitHub. Os dois somem.
+- **Link "Criar conta" morto** na tela de login (o Open WebUI ignora
+  `?mode=signup`): virou a explicação do caminho real (Painel Admin › Usuários).
+- **Assistente de primeiro uso** podia ficar em "Baixando… 0%" para sempre se o
+  pedido falhasse; agora mostra o erro e "Tentar de novo". Ao terminar, abre o
+  chat já com o modelo novo (antes podia cair no de embeddings).
+- **Card Recursos e botão de memória** apareciam na tela de login; no celular,
+  o wordmark encavalava no seletor de modelo e o card cobria as sugestões.
+- **Badge de VRAM** marcava em vermelho justamente o modelo já carregado
+  (comparava com a VRAM livre, não com a total).
+- `gemma4:e4b` aparecia com 9,6 GB (são ~6,6), o que distorcia a recomendação.
+- `stop-nous.ps1` só fechava a porta 8080; agora encerra todos os serviços.
+- Segundo clique no atalho durante a partida subia **outro servidor** contra o
+  mesmo banco; agora só reabre a tela de carregamento.
+- Se o servidor não sobe em 5 min, aparece um aviso em vez de silêncio.
+### Mudado
+- **O app passa a morar em `%LOCALAPPDATA%\Programs\Nous`**: o instalador copia
+  tudo para lá, e limpar a pasta Downloads não quebra mais o atalho.
+- **Nous aparece em Configurações › Aplicativos** (desinstalar como qualquer
+  programa) e ganha o atalho **"Parar Nous"** no Menu Iniciar.
+- **Servidor só em `127.0.0.1`** (antes `0.0.0.0`, visível na rede local).
+- **Monitor (8990)**: recusa DNS rebinding (header Host), aceita `/pull` só de
+  modelos do catálogo e ganha `/installed` — o painel não chama mais o Ollama
+  direto do navegador.
+- Reinstalar preserva no manifesto o que o Nous instalou antes (o "Remover
+  tudo" voltou a funcionar após reinstalação) e só grava o modelo se ele foi
+  escolhido de fato.
+- `nous-setup.iss` atualizado: copia o projeto inteiro, atalhos via `.vbs`,
+  desinstalação segura pelo próprio Inno.
+### Adicionado
+- `tools/lint.ps1` + workflow `lint` (GitHub Actions, Windows): scripts do
+  Windows em ASCII ou UTF-8 com BOM, sintaxe no PowerShell 5.1, Python, JSON e
+  JavaScript válidos.
+
 ## [2.5.0] - 2026-06-13
 ### Adicionado
 - **Assistente de Email (Nous Email)** — triagem, resumo e rascunho de resposta

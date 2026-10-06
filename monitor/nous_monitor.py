@@ -2,11 +2,12 @@
 """
 Nous Monitor - micro-servico local que alimenta o painel de recursos do Nous.
 
-Expoe (em http://127.0.0.1:8990, com CORS liberado p/ o navegador):
+Expoe (em http://127.0.0.1:8990, so' para paginas locais - ver cors_mw):
   GET  /stats        -> { gpu:{ded_used,ded_total,shr_used,shr_total}, models:[...] }
   POST /unload       -> descarrega modelo(s) do Ollama (libera a VRAM na hora)
                         body opcional: {"model":"gemma4:12b"}; sem body = todos
   GET  /hardware     -> { gpu_name, vram_gb, ram_gb, tier }  (tier: gpu-20/gpu-12/gpu-8/cpu)
+  GET  /installed    -> { online, models:[{name,size}], chat:[nomes] }
   GET  /catalog      -> catalogo curado (catalog.json) + installed/fit/pull por modelo,
                         ordenado: recomendados p/ esta maquina primeiro
   POST /pull         -> body {"model":"tag"}; inicia download via Ollama /api/pull
@@ -46,7 +47,11 @@ def _data_dir():
         if v:
             return Path(v)
     return Path.home() / "NousData"
-_GPU_TTL = 2.5  # s de cache p/ nao chamar o powershell a cada poll
+# s de cache: maior que o intervalo do painel (3 s), p/ que cada ciclo de
+# polling reaproveite a leitura anterior em vez de abrir outro powershell.
+_GPU_TTL = 4.0
+# Modelos de apoio que o proprio Nous baixa (fora do catalogo da Loja).
+_EXTRA_PULLABLE = {"nomic-embed-text"}
 
 # PowerShell que devolve a memoria da GPU (usada + total) em bytes, como JSON.
 _PS_GPU = r"""
@@ -160,16 +165,31 @@ def _load_catalog():
         return []
 
 
-async def _installed_tags():
-    """Nomes instalados no Ollama; None = Ollama fora do ar."""
+async def _installed_models():
+    """[{name, size}] instalados no Ollama; None = Ollama fora do ar."""
     try:
         timeout = aiohttp.ClientTimeout(total=5)
         async with aiohttp.ClientSession(timeout=timeout) as s:
             async with s.get(f"{OLLAMA}/api/tags") as r:
                 data = await r.json()
-        return [m.get("name") or m.get("model") or "" for m in data.get("models", [])]
+        return [{"name": m.get("name") or m.get("model") or "",
+                 "size": m.get("size") or 0} for m in data.get("models", [])]
     except Exception:
         return None
+
+
+async def _installed_tags():
+    """Nomes instalados no Ollama; None = Ollama fora do ar."""
+    models = await _installed_models()
+    return None if models is None else [m["name"] for m in models]
+
+
+_NOT_CHAT = ("embed", "minilm", "bge-", "rerank")
+
+
+def _is_chat(name):
+    n = (name or "").lower()
+    return not any(k in n for k in _NOT_CHAT)
 
 
 def _fit(model, hw):
@@ -275,6 +295,13 @@ def _origin_ok(origin):
     return host in ("localhost", "127.0.0.1", "::1")
 
 
+def _host_ok(request):
+    # Barra DNS rebinding: um dominio externo apontado p/ 127.0.0.1 chega com
+    # Host: dominio-externo (e Origin dele mesmo, que o _origin_ok ja recusa).
+    host = (request.host or "").rsplit(":", 1)[0].strip("[]")
+    return host in ("localhost", "127.0.0.1", "::1")
+
+
 def _cors_headers(origin):
     return {
         "Access-Control-Allow-Origin":  origin if (origin and _origin_ok(origin)) else "null",
@@ -287,7 +314,7 @@ def _cors_headers(origin):
 @web.middleware
 async def cors_mw(request, handler):
     origin = request.headers.get("Origin")
-    if not _origin_ok(origin):
+    if not _origin_ok(origin) or not _host_ok(request):
         return web.json_response({"error": "forbidden origin"}, status=403,
                                  headers=_cors_headers(origin))
     if request.method == "OPTIONS":
@@ -347,6 +374,12 @@ async def h_pull(request):
     if not tag:
         return web.json_response(
             {"started": False, "reason": "modelo nao informado"}, status=400)
+    allowed = {m.get("tag") for m in _load_catalog()} | _EXTRA_PULLABLE
+    if tag not in allowed:
+        # So' o catalogo da Loja: sem isto qualquer pagina local podia pedir um
+        # modelo de centenas de GB. Outros modelos: Painel Admin > Modelos.
+        return web.json_response(
+            {"started": False, "reason": "modelo fora do catalogo"}, status=400)
     cur = _pulls.get(tag)
     if cur and cur["status"] == "baixando":
         return web.json_response({"started": False, "reason": "em andamento"})
@@ -357,6 +390,16 @@ async def h_pull(request):
                    "completed_gb": 0.0, "total_gb": 0.0, "error": None}
     _pull_tasks[tag] = asyncio.get_event_loop().create_task(_do_pull(tag))
     return web.json_response({"started": True})
+
+
+async def h_installed(request):
+    """Modelos instalados (com tamanho). O painel usa isto em vez de chamar o
+    Ollama direto do navegador. chat = so' modelos de conversa (sem embeddings)."""
+    models = await _installed_models()
+    if models is None:
+        return web.json_response({"online": False, "models": [], "chat": []})
+    return web.json_response({"online": True, "models": models,
+                              "chat": [m["name"] for m in models if _is_chat(m["name"])]})
 
 
 async def h_pull_status(request):
@@ -458,6 +501,7 @@ def build_app():
                     web.get("/health", h_health),
                     web.get("/hardware", h_hardware),
                     web.get("/catalog", h_catalog),
+                    web.get("/installed", h_installed),
                     web.post("/pull", h_pull),
                     web.get("/pull/status", h_pull_status),
                     web.get("/voice/status", h_voice_status),

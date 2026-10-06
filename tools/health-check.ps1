@@ -6,7 +6,7 @@
   presente, ambiente Open WebUI, identidade Nous aplicada e (se rodando)
   o servidor respondendo. Retorna 0 se tudo certo, 1 se houver falhas.
 #>
-param([string]$Model = "gemma4:12b")
+param([string]$Model)
 $ErrorActionPreference = "SilentlyContinue"
 
 $venv    = Join-Path $env:USERPROFILE "open-webui"
@@ -42,10 +42,18 @@ $apiUp = $false
 try { Invoke-RestMethod "http://127.0.0.1:11434/api/version" -TimeoutSec 3 | Out-Null; $apiUp = $true } catch {}
 Check "Servico Ollama no ar" $apiUp "API 11434 nao responde"
 
-$hasModel = $false
-if (Test-Path $ollamaExe) { $hasModel = [bool]((& $ollamaExe list 2>$null) -match [regex]::Escape($Model)) }
-if ($hasModel) { Check "Modelo $Model presente" $true "" }
-else { Note "Modelo" "nenhum baixado ainda - o Nous oferece o download no primeiro uso (Loja de Modelos)" }
+# Pela API, nunca por "ollama list": com o servico parado o CLI abre o app do
+# Ollama, que herda o pipe de saida, e o script fica esperando para sempre.
+$chatModels = @()
+if ($apiUp) {
+    try {
+        $tags = Invoke-RestMethod "http://127.0.0.1:11434/api/tags" -TimeoutSec 5
+        $chatModels = @($tags.models | Where-Object { $_.name -notmatch "embed|minilm|bge-|rerank" } | ForEach-Object { $_.name })
+    } catch {}
+}
+if ($Model -and ($chatModels | Where-Object { $_ -eq $Model -or $_ -eq "${Model}:latest" })) { Check "Modelo $Model presente" $true "" }
+elseif ($chatModels.Count) { Check "Modelos de IA instalados: $($chatModels -join ', ')" $true "" }
+elseif ($apiUp) { Note "Modelo" "nenhum baixado ainda - o Nous oferece o download no primeiro uso (Loja de Modelos)" }
 
 Check "Open WebUI instalado" (Test-Path (Join-Path $venv "Scripts\open-webui.exe")) "ambiente/open-webui ausente"
 
@@ -122,11 +130,11 @@ if (Test-Path $emailAcct) {
     try {
         $emailResp = Invoke-RestMethod "http://127.0.0.1:8995/status" -TimeoutSec 3 -ErrorAction Stop
         $emailUp = $true
-        Note "Email" "conectado ($($emailResp.user)) — serviço ativo (8995)"
+        Note "Email" "conectado ($($emailResp.user)) - servico ativo (8995)"
     } catch {}
-    if (-not $emailUp) { Note "Email" "conta configurada, mas serviço 8995 não responde (iniciará no próximo boot)" }
+    if (-not $emailUp) { Note "Email" "conta configurada, mas servico 8995 nao responde (iniciara no proximo boot)" }
 } else {
-    Note "Email" "não configurado (use conectar-email.bat para ativar)"
+    Note "Email" "nao configurado (use conectar-email.bat para ativar)"
 }
 
 Write-Host ""

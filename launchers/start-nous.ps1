@@ -1,7 +1,7 @@
 ﻿<#
   Nous WebUI - Iniciar (em segundo plano, sem janela de terminal).
   Sobe o Ollama (se preciso) + o servidor Nous OCULTO e abre o navegador.
-  Compile para .exe com build-exe.ps1 (-noConsole) para nao mostrar janela.
+  Chamado sem janela pelo nous-hidden.vbs (atalho "Nous" / iniciar.bat).
   Para encerrar: use stop-nous.ps1 (ou o atalho "Parar Nous").
 #>
 $ErrorActionPreference = "SilentlyContinue"
@@ -32,12 +32,13 @@ $env:PORT                = "8080"
 # Arena é gerenciado pelo register_arena.py (register via DB no boot).
 # DEFAULT_MODELS só é definido se o instalador gravou um modelo escolhido.
 $manifestPath = Join-Path $env:DATA_DIR "install-manifest.json"
+$manifestModel = $null
 if (Test-Path $manifestPath) {
-    try {
-        $man = Get-Content $manifestPath -Raw | ConvertFrom-Json
-        if ($man.model) { $env:DEFAULT_MODELS = $man.model }
-    } catch {}
+    try { $manifestModel = (Get-Content $manifestPath -Raw | ConvertFrom-Json).model } catch {}
 }
+# O aviso "Uma nova versao do Open WebUI esta disponivel" leva ao GitHub e o
+# usuario leigo nao tem como atualizar por la' - quem atualiza e' o Nous.
+$env:ENABLE_VERSION_UPDATE_CHECK = "False"
 
 # Modelos de NUVEM opcionais (GPT-4, Claude via OpenRouter, Gemini...). Deixamos a
 # conexao OpenAI-compativel LIGADA para que o usuario POSSA adicionar uma chave em
@@ -62,7 +63,7 @@ if (-not (Test-Path $keyFile)) {
 $env:WEBUI_SECRET_KEY = (Get-Content $keyFile -Raw).Trim()
 
 # Sugestoes da tela inicial (substitui as genericas em ingles)
-$env:DEFAULT_PROMPT_SUGGESTIONS = '[{"title":["Resumir um texto","cole o conteudo e peca um resumo claro"],"content":"Resuma o texto a seguir de forma clara e objetiva:\n\n"},{"title":["Escrever um e-mail","profissional e direto"],"content":"Escreva um e-mail profissional sobre: "},{"title":["Explicar um conceito","de forma simples"],"content":"Explique de forma simples o conceito de: "},{"title":["Ideias criativas","para um projeto"],"content":"Me de 5 ideias criativas para: "}]'
+$env:DEFAULT_PROMPT_SUGGESTIONS = '[{"title":["Resumir um texto","cole o conteúdo e peça um resumo claro"],"content":"Resuma o texto a seguir de forma clara e objetiva:\n\n"},{"title":["Escrever um e-mail","profissional e direto"],"content":"Escreva um e-mail profissional sobre: "},{"title":["Explicar um conceito","de forma simples"],"content":"Explique de forma simples o conceito de: "},{"title":["Ideias criativas","para um projeto"],"content":"Me dê 5 ideias criativas para: "}]'
 
 function Test-Up {
     try { return (Invoke-WebRequest "$url/health" -TimeoutSec 3 -UseBasicParsing).StatusCode -eq 200 }
@@ -291,41 +292,119 @@ function Register-Cloud {
     }
 }
 
+# --- Partida -----------------------------------------------------------------
+
+# Sobe o Nous Monitor (painel de VRAM / Loja de Modelos) em segundo plano. Roda
+# em TODO inicio - inclusive com o servidor ja no ar - para que um monitor que
+# caiu volte sem precisar reiniciar o computador.
+function Start-Monitor {
+    $monitor = Join-Path $PSScriptRoot "..\monitor\nous_monitor.py"
+    if ((Test-Path $py) -and (Test-Path $monitor)) {
+        try { Invoke-RestMethod "http://127.0.0.1:8990/health" -TimeoutSec 2 | Out-Null }
+        catch { Start-Process -FilePath $py -ArgumentList "`"$monitor`"" -WindowStyle Hidden }
+    }
+}
+
+# Mesma busca do instalador: o Ollama pode estar no PATH ou em Program Files,
+# nao so' em LOCALAPPDATA.
+function Find-OllamaApp {
+    $dirs = @()
+    $c = Get-Command ollama -ErrorAction SilentlyContinue
+    if ($c) { $dirs += (Split-Path $c.Source) }
+    $dirs += (Join-Path $env:LOCALAPPDATA "Programs\Ollama")
+    $dirs += (Join-Path $env:ProgramFiles "Ollama")
+    foreach ($d in $dirs) {
+        $app = Join-Path $d "ollama app.exe"
+        if (Test-Path $app) { return @{ exe = $app; args = $null } }
+        $cli = Join-Path $d "ollama.exe"
+        if (Test-Path $cli) { return @{ exe = $cli; args = "serve" } }
+    }
+    return $null
+}
+
+# Servidor do Nous ja em processo de partida (um segundo clique no atalho)?
+function Test-ServerProcess {
+    [bool](Get-Process open-webui -ErrorAction SilentlyContinue |
+        Where-Object { $_.Path -and $_.Path -like "$venv\*" })
+}
+
+function Register-All {
+    Ensure-Branding; Register-Memory; Register-Pipe; Register-Research; Register-Arena
+    Register-Cloud; Register-Voice; Start-VoiceServer; Start-ComfyUI; Setup-Files
+    Setup-History; Hide-EmbedModels; Set-ModelCtx; Start-MemoryAPI; Start-EmailAPI
+}
+
+function Show-Error([string]$msg) {
+    Add-Type -AssemblyName System.Windows.Forms
+    [System.Windows.Forms.MessageBox]::Show($msg, "Nous",
+        [System.Windows.Forms.MessageBoxButtons]::OK,
+        [System.Windows.Forms.MessageBoxIcon]::Warning) | Out-Null
+}
+
+if (-not (Test-Path $exe)) {
+    Show-Error ("O Nous nao esta instalado por completo (falta a interface).`n`n" +
+        "Rode o instalar.bat de novo. Suas conversas sao preservadas.")
+    return
+}
+
+Start-Monitor
+
 # Ja esta rodando? Garante funcoes nativas e abre o navegador.
-if (Test-Up) { Ensure-Branding; Register-Memory; Register-Pipe; Register-Research; Register-Arena; Register-Cloud; Register-Voice; Start-VoiceServer; Start-ComfyUI; Setup-Files; Setup-History; Hide-EmbedModels; Set-ModelCtx; Start-MemoryAPI; Start-EmailAPI; Start-Process $url; return }
+if (Test-Up) { Register-All; Start-Process $url; return }
 
 # O servidor NAO esta no ar: abre JA a tela de carregamento (o usuario ve o logo
 # do Nous e uma barra de progresso na hora). Ela mesma checa o servidor e abre o
 # Nous sozinha quando estiver pronto. Sem isto, o navegador so' abriria 1-2 min
-# depois — tempo em que a pessoa acha que travou e clica varias vezes.
+# depois - tempo em que a pessoa acha que travou e clica varias vezes.
 $loading = Join-Path $PSScriptRoot "loading.html"
 if (Test-Path $loading) { Start-Process $loading }
+
+# Um clique anterior ja esta subindo o servidor: fica so' a tela de carregamento.
+# Sem esta trava, cada clique subia OUTRO servidor contra o mesmo webui.db.
+if (Test-ServerProcess) { return }
 
 # Garante o Ollama (em segundo plano)
 try { Invoke-RestMethod "http://127.0.0.1:11434/api/version" -TimeoutSec 3 | Out-Null }
 catch {
-    $ollama = Join-Path $env:LOCALAPPDATA "Programs\Ollama\ollama app.exe"
-    if (Test-Path $ollama) { Start-Process $ollama -WindowStyle Hidden }
-    Start-Sleep -Seconds 4
+    $ol = Find-OllamaApp
+    if ($ol) {
+        if ($ol.args) { Start-Process $ol.exe -ArgumentList $ol.args -WindowStyle Hidden }
+        else          { Start-Process $ol.exe -WindowStyle Hidden }
+    }
+}
+
+# Modelo padrao so' se ele de fato estiver instalado (o Open WebUI escolhe o
+# primeiro disponivel sozinho quando nao ha padrao).
+if ($manifestModel) {
+    for ($i = 0; $i -lt 10; $i++) {
+        try {
+            $tags = Invoke-RestMethod "http://127.0.0.1:11434/api/tags" -TimeoutSec 3
+            if ($tags.models | Where-Object { $_.name -eq $manifestModel -or $_.name -eq "${manifestModel}:latest" }) {
+                $env:DEFAULT_MODELS = $manifestModel
+            }
+            break
+        } catch { Start-Sleep -Seconds 1 }
+    }
 }
 
 # Garante a identidade ANTES do servidor subir (1a requisicao ja sai com logo)
 Ensure-Branding
 
-# Sobe o servidor OCULTO (sem janela) e desanexa
-Start-Process -FilePath $exe -ArgumentList "serve" -WindowStyle Hidden
+# Sobe o servidor OCULTO (sem janela) e desanexa. So' em 127.0.0.1: o Nous e'
+# privado e nao deve aparecer para outros aparelhos da rede (antes: 0.0.0.0).
+Start-Process -FilePath $exe -ArgumentList "serve --host 127.0.0.1 --port 8080" -WindowStyle Hidden
 
-# Sobe o Nous Monitor (painel de VRAM / modelos) em segundo plano
-$monitor = Join-Path $PSScriptRoot "..\monitor\nous_monitor.py"
-if ((Test-Path $py) -and (Test-Path $monitor)) {
-    try { Invoke-RestMethod "http://127.0.0.1:8990/health" -TimeoutSec 2 | Out-Null }
-    catch { Start-Process -FilePath $py -ArgumentList "`"$monitor`"" -WindowStyle Hidden }
-}
-
-# Espera ficar pronto e garante as funcoes nativas. NAO abre o navegador aqui:
-# a tela de carregamento (loading.html), aberta la' em cima, detecta o servidor
-# no ar e redireciona sozinha para o Nous.
-for ($i = 0; $i -lt 90; $i++) {
+# Espera ficar pronto (ate 5 min: 1a partida num PC modesto) e garante as
+# funcoes nativas. NAO abre o navegador aqui: a tela de carregamento, aberta
+# la' em cima, detecta o servidor no ar e redireciona sozinha para o Nous.
+$up = $false
+for ($i = 0; $i -lt 150; $i++) {
     Start-Sleep -Seconds 2
-    if (Test-Up) { Ensure-Branding; Register-Memory; Register-Pipe; Register-Research; Register-Arena; Register-Cloud; Register-Voice; Start-VoiceServer; Start-ComfyUI; Setup-Files; Setup-History; Hide-EmbedModels; Set-ModelCtx; Start-MemoryAPI; Start-EmailAPI; break }
+    if (Test-Up) { $up = $true; break }
+}
+if ($up) { Register-All }
+else {
+    Show-Error ("O Nous demorou demais para abrir.`n`n" +
+        "Tente: menu Iniciar > Parar Nous, e depois abra o Nous de novo.`n" +
+        "Se continuar, reinicie o computador.")
 }

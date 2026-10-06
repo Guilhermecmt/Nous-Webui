@@ -9,7 +9,7 @@
 Chat · Vision · Image generation · Web search — 100% on your PC.  
 No cloud. No subscription. Your conversations never leave your machine.
 
-[![version](https://img.shields.io/badge/version-2.5.0-c8962e)](CHANGELOG.md)
+[![version](https://img.shields.io/badge/version-2.6.0-c8962e)](CHANGELOG.md)
 [![license](https://img.shields.io/badge/license-MIT-black)](LICENSE)
 [![platform](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6)](#requirements)
 [![local](https://img.shields.io/badge/100%25-local%20%26%20private-2ea44f)](#why-nous)
@@ -69,6 +69,8 @@ What you get over an ordinary AI chat:
 2. Open the folder and **double-click `instalar.bat`**. If Windows shows a security warning, choose **"More info → Run anyway"**.
 
 The installer checks your hardware, installs Ollama, Python and the interface, applies the Nous identity and creates shortcuts — on the **Desktop** and in the **Start Menu**. When it finishes, Nous opens in your browser by itself.
+
+Nous is installed to `%LOCALAPPDATA%\Programs\Nous`, so the downloaded folder can be deleted afterwards. If a step fails, the installer shows the reason in red instead of saying "Pronto!".
 
 ---
 
@@ -191,7 +193,7 @@ The **Recursos** card (bottom-left) shows live VRAM, the models loaded in memory
 Standard behaviour for unsigned software. Click **"More info" → "Run anyway"**.
 
 **The shortcut didn't appear on the Desktop**  
-Some antivirus tools block shortcut creation. Press the **Windows key** and type **Nous** — the Start Menu shortcut is always created. Alternative: double-click `iniciar.bat` in the Nous folder.
+Some antivirus tools block shortcut creation. Press the **Windows key** and type **Nous** — the Start Menu shortcut is always created. Alternative: double-click `iniciar.bat` in `%LOCALAPPDATA%\Programs\Nous`.
 
 **The start screen doesn't show the Nous logo / says "Open WebUI"**  
 Open Nous from the shortcut and press **Ctrl+Shift+R** in the browser. The identity is verified and re-applied automatically on every launch.
@@ -206,7 +208,7 @@ Open Nous from the shortcut (not by typing the address in the browser) — the s
 Double-click `desinstalar.bat` → option **[1] Safe removal** → run `instalar.bat` again. Conversations and notes are preserved.
 
 **I forgot my password**  
-From inside the Nous folder:
+From `%LOCALAPPDATA%\Programs\Nous`:
 ```powershell
 python tools\reset-password.py --email you@example.com
 ```
@@ -215,7 +217,7 @@ python tools\reset-password.py --email you@example.com
 
 ## Uninstall
 
-Double-click **`desinstalar.bat`**:
+Go to **Settings → Apps → Installed apps**, find **Nous** and click **Uninstall** (or double-click `desinstalar.bat` in `%LOCALAPPDATA%\Programs\Nous`):
 
 - **[1] Safe removal** *(recommended)* — removes the app and its Python environment. Keeps conversations, notes, Ollama and Python.
 - **[2] Remove everything** — also deletes conversations and uninstalls Ollama/Python, **only** if Nous installed them. Pre-existing programs are never touched.

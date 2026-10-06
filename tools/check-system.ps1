@@ -2,17 +2,16 @@
 .SYNOPSIS
   Nous WebUI - Analise de capacidade da maquina.
 .DESCRIPTION
-  Verifica se a maquina tem capacidade para rodar o Nous (Gemma 4 12B via Ollama):
+  Verifica se a maquina tem capacidade para rodar o Nous (modelos locais via Ollama):
   RAM, VRAM (real, via registro), espaco em disco e SO. Retorna um veredito e
   um codigo de saida:
      0 = CAPAZ (GPU)      apta, com aceleracao de GPU
      2 = CAPAZ (CPU)      roda, porem so na CPU (mais lento)
      1 = INCAPAZ          nao atende aos requisitos minimos
 .NOTES
-  Requisitos do modelo gemma4:12b (Q4 ~ 8 GB):
-     RAM   minimo 16 GB   | recomendado 32 GB
-     VRAM  >= 8 GB para aceleracao por GPU (ideal 12 GB+)
-     Disco >= 20 GB livres
+  O minimo (8 GB de RAM, 20 GB livres) cobre os modelos leves do catalogo
+  (ex.: llama3.2:3b, qwen3.5:4b) rodando na CPU. Com GPU >= 8 GB de VRAM a
+  Loja de Modelos passa a recomendar modelos maiores.
 #>
 
 $ErrorActionPreference = "SilentlyContinue"
@@ -52,47 +51,25 @@ Write-Host ("Disco {0} : {1} GB livres   (min {2})" -f $sys, $freeGB, $MIN_DISK_
 Write-Host ""
 
 $problemas = @()
-if ($ramGB  -lt $MIN_RAM_GB)  { $problemas += "RAM insuficiente ($ramGB GB < $MIN_RAM_GB GB)" }
-if ($freeGB -lt $MIN_DISK_GB) { $problemas += "Disco insuficiente ($freeGB GB < $MIN_DISK_GB GB)" }
+# Folga de 0.6 GB: um PC "de 8 GB" reporta ~7.4-7.9 GB (memoria reservada pelo
+# sistema/video integrado). Mesma tolerancia da Loja de Modelos (nous_monitor).
+if ($ramGB + 0.6 -lt $MIN_RAM_GB) { $problemas += "Memoria RAM insuficiente ($ramGB GB; o minimo e' $MIN_RAM_GB GB)" }
+if ($freeGB -lt $MIN_DISK_GB)    { $problemas += "Pouco espaco livre no disco $sys ($freeGB GB; precisa de $MIN_DISK_GB GB)" }
 
+# Modelos NAO sao listados aqui: a Loja de Modelos (dentro do app) recomenda o
+# ideal para esta maquina a partir do catalogo atualizado.
 if ($problemas.Count -gt 0) {
     Write-Host "VEREDITO: INCAPAZ" -ForegroundColor Red
     $problemas | ForEach-Object { Write-Host "  - $_" -ForegroundColor Red }
     exit 1
 }
 elseif ($vramGB -ge $GPU_VRAM_GB) {
-    Write-Host "VEREDITO: CAPAZ (GPU) - apta com aceleracao de GPU" -ForegroundColor Green
-    Write-Host ""
-    Write-Host "  Modelos recomendados (escolha 1 de acordo com sua VRAM):" -ForegroundColor Cyan
-    Write-Host ""
-    Write-Host "  BASICO   (8-10 GB VRAM)  ->  gemma4:12b" -ForegroundColor White
-    Write-Host "    Bom para uso geral no dia a dia. Roda bem em qualquer GPU de jogos moderna."
-    Write-Host ""
-    Write-Host "  MEDIO    (12-16 GB VRAM) ->  qwen3:14b" -ForegroundColor White
-    Write-Host "    Melhor raciocinio e contexto longo. Ideal para RX 9070 XT / RTX 4080."
-    Write-Host ""
-    Write-Host "  AVANCADO (20+ GB VRAM)   ->  qwen3:32b" -ForegroundColor White
-    Write-Host "    Qualidade proxima do GPT-4. Para GPUs high-end (RX 9070 XT 16GB, RTX 4090)."
-    Write-Host ""
-    Write-Host "  Voce nao precisa decorar nada: no primeiro uso o Nous recomenda e" -ForegroundColor DarkGray
-    Write-Host "  baixa o modelo ideal sozinho (Loja de Modelos, dentro do app)." -ForegroundColor DarkGray
+    Write-Host "VEREDITO: CAPAZ (GPU) - sua placa de video vai acelerar a IA" -ForegroundColor Green
+    Write-Host "  No primeiro uso o Nous recomenda e baixa o modelo ideal para ela." -ForegroundColor DarkGray
     exit 0
 }
 else {
-    Write-Host "VEREDITO: CAPAZ (CPU) - roda, porem sem GPU sera mais lento" -ForegroundColor Yellow
-    Write-Host ""
-    Write-Host "  Modelos recomendados (sem GPU dedicada):" -ForegroundColor Cyan
-    Write-Host ""
-    Write-Host "  BASICO   (8-16 GB RAM, CPU moderna) ->  gemma4:e4b" -ForegroundColor White
-    Write-Host "    Leve e rapido na CPU. Qualidade boa para perguntas cotidianas."
-    Write-Host ""
-    Write-Host "  MEDIO    (16-32 GB RAM)             ->  gemma4:12b  (lento, porem completo)" -ForegroundColor White
-    Write-Host "    Funciona, mas pode levar 1-2 min por resposta."
-    Write-Host ""
-    Write-Host "  AVANCADO (CPU com 32+ GB RAM)       ->  qwen3:8b" -ForegroundColor White
-    Write-Host "    Melhor relacao qualidade/velocidade em CPU com muita RAM."
-    Write-Host ""
-    Write-Host "  Voce nao precisa decorar nada: no primeiro uso o Nous detecta o modo" -ForegroundColor DarkGray
-    Write-Host "  CPU e recomenda modelos leves sozinho (Loja de Modelos, dentro do app)." -ForegroundColor DarkGray
+    Write-Host "VEREDITO: CAPAZ (CPU) - funciona, so' que as respostas demoram mais" -ForegroundColor Yellow
+    Write-Host "  No primeiro uso o Nous recomenda modelos leves, feitos para rodar sem placa de video." -ForegroundColor DarkGray
     exit 2
 }

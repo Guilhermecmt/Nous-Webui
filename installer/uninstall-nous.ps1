@@ -28,7 +28,8 @@ param(
     [switch]$RemoveOllama,
     [switch]$RemovePython,
     [switch]$All,
-    [switch]$Force
+    [switch]$Force,
+    [switch]$KeepAppFolder   # chamado pelo desinstalador do Inno, que apaga a pasta sozinho
 )
 $ErrorActionPreference = "SilentlyContinue"
 if ($All) { $RemoveData = $true; $RemoveOllama = $true; $RemovePython = $true }
@@ -76,13 +77,18 @@ if (Test-Path $manPath) { try { $man = Get-Content $manPath -Raw | ConvertFrom-J
 # 1) parar processos (todos os micro-servicos do Nous) ----------------------
 #    8080 servidor · 8990 monitor · 8991 indexador arquivos · 8992 historico
 #    8993 memoria · 8994 TTS/voz · 8995 email
+#    (o stop-nous.ps1 tambem pega os processos-pai que rodam do venv, que
+#    seguravam arquivos e faziam a remocao do passo 2 falhar pela metade)
 Write-Host "`n[1] Parando o Nous" -ForegroundColor Cyan
+$stop = Join-Path $PSScriptRoot "..\launchers\stop-nous.ps1"
+if (Test-Path $stop) { & $stop | Out-Null }
 foreach ($p in 8080, 8990, 8991, 8992, 8993, 8994, 8995) {
     $c = Get-NetTCPConnection -LocalPort $p -State Listen -ErrorAction SilentlyContinue
     if ($c) {
         $c.OwningProcess | Select-Object -Unique | ForEach-Object { Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue }
     }
 }
+Start-Sleep -Seconds 2
 Ok "processos encerrados"
 
 # 2) remover o app isolado (sempre - e' 100% do Nous) -----------------------
@@ -90,17 +96,40 @@ Write-Host "`n[2] Removendo o app Nous (ambiente isolado)" -ForegroundColor Cyan
 if (Test-Path $venv) {
     Info "apagando o ambiente Python (pode levar um tempo em disco lento)..."
     Remove-FolderWithProgress $venv "o app Nous" | Out-Null
-    Ok "ambiente removido: $venv"
+    if (Test-Path $venv) { Warn "parte do ambiente ficou em $venv (arquivo em uso) - reinicie e apague a pasta" }
+    else { Ok "ambiente removido: $venv" }
 }
 else { Info "ambiente nao encontrado (ja' removido?)" }
-$desktop = [Environment]::GetFolderPath("Desktop")
-foreach ($lnk in "Nous.lnk", "Parar Nous.lnk") {
-    $lp = Join-Path $desktop $lnk
-    if (Test-Path $lp) { Remove-Item $lp -Force; Ok "atalho removido: $lnk" }
+$lnkDirs = @([Environment]::GetFolderPath("Desktop"),
+             [Environment]::GetFolderPath("CommonDesktopDirectory"),
+             [Environment]::GetFolderPath("Programs"))
+foreach ($d in $lnkDirs) {
+    foreach ($lnk in "Nous.lnk", "Parar Nous.lnk") {
+        $lp = Join-Path $d $lnk
+        if ($d -and (Test-Path $lp)) { Remove-Item $lp -Force; Ok "atalho removido: $lp" }
+    }
 }
 foreach ($exe in "Nous.exe", "Parar Nous.exe") {
     $ep = Join-Path $REPO "launchers\$exe"
     if (Test-Path $ep) { Remove-Item $ep -Force; Ok "launcher removido: $exe" }
+}
+Remove-Item "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\Nous" -Recurse -Force -ErrorAction SilentlyContinue
+
+# Pasta do app (%LOCALAPPDATA%\Programs\Nous). Os backups em bkp\ ficam.
+# O desinstalar.bat que esta rodando agora pode morar nela: o cmd le o .bat
+# linha a linha, entao ele (e a pasta) so' saem depois que a janela fechar.
+$app = Join-Path $env:LOCALAPPDATA "Programs\Nous"
+if ((Test-Path $app) -and -not $KeepAppFolder) {
+    $hasBkp = [bool](Get-ChildItem (Join-Path $app "bkp") -Filter *.zip -ErrorAction SilentlyContinue)
+    Get-ChildItem $app -Force | Where-Object { $_.Name -notin "bkp", "desinstalar.bat" } |
+        Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+    $parent = (Get-CimInstance Win32_Process -Filter "ProcessId=$PID").ParentProcessId
+    $target = if ($hasBkp) { Join-Path $app "desinstalar.bat" } else { $app }
+    $cleanup = "Wait-Process -Id $parent -ErrorAction SilentlyContinue; Start-Sleep -Seconds 1; " +
+               "Remove-Item -LiteralPath '$target' -Recurse -Force -ErrorAction SilentlyContinue"
+    Start-Process powershell.exe -ArgumentList "-NoProfile -WindowStyle Hidden -Command `"$cleanup`"" -WindowStyle Hidden
+    if ($hasBkp) { Ok "app removido; seus backups ficaram em $(Join-Path $app 'bkp')" }
+    else         { Ok "app removido: $app" }
 }
 
 # 3) dados pessoais (opcional) ----------------------------------------------

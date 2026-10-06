@@ -36,7 +36,7 @@
       "tag": "gemma4:e4b",
       "name": "Gemma 4 E4B",
       "desc": "Feito pelo Google para rodar bem fora de GPUs potentes. Entende imagens.",
-      "download_gb": 9.6,
+      "download_gb": 6.6,
       "category": "leve",
       "min_vram_gb": 6,
       "min_ram_cpu_gb": 16,

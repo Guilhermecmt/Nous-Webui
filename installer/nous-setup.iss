@@ -1,14 +1,15 @@
 ; ============================================================
 ;  Nous - Instalador (Inno Setup)
-;  Gera Nous-Setup.exe: instalador online pequeno que baixa e
-;  configura tudo (Ollama, Python, Open WebUI) na maquina do usuario.
+;  Gera Nous-Setup.exe: instalador online pequeno que copia o app para
+;  %LOCALAPPDATA%\Programs\Nous e roda o install-nous.ps1, que baixa e
+;  configura o resto (Ollama, Python, Open WebUI) na maquina do usuario.
 ;  Compilar:  ISCC.exe nous-setup.iss
 ; ============================================================
 
 #define MyAppName "Nous"
-#define MyAppVersion "1.4.0"
+#define MyAppVersion "2.6.0"
 #define MyAppPublisher "Nous"
-#define MyAppURL "https://github.com/Guilhermecmt/nous-webui"
+#define MyAppURL "https://github.com/Guilhermecmt/Nous-Webui"
 
 [Setup]
 AppId={{8E5F2B41-9C3A-4D7E-AB12-A1B2C3D4E5F6}
@@ -16,13 +17,15 @@ AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
 AppPublisherURL={#MyAppURL}
+; Mesmo lugar usado pelo install-nous.ps1 (assim ele nao copia de novo).
 DefaultDirName={localappdata}\Programs\Nous
+DisableDirPage=yes
 DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
 OutputDir=..\dist
 OutputBaseFilename=Nous-Setup
 SetupIconFile=..\branding\assets\nous.ico
-UninstallDisplayIcon={app}\launchers\Nous.exe
+UninstallDisplayIcon={app}\branding\assets\nous.ico
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
@@ -34,35 +37,35 @@ Name: "pt"; MessagesFile: "compiler:Languages\BrazilianPortuguese.isl"
 Name: "desktopicon"; Description: "Criar um atalho na Area de Trabalho"; GroupDescription: "Atalhos:"
 
 [Files]
-Source: "..\branding\*"; DestDir: "{app}\branding"; Excludes: "marble*.png,__pycache__\*,*.pyc"; Flags: recursesubdirs ignoreversion
-Source: "..\launchers\*"; DestDir: "{app}\launchers"; Excludes: "*.exe,.webui_secret_key"; Flags: recursesubdirs ignoreversion
-Source: "..\tools\*"; DestDir: "{app}\tools"; Excludes: "__pycache__\*,*.pyc"; Flags: recursesubdirs ignoreversion
-Source: "..\images\*"; DestDir: "{app}\images"; Excludes: "__pycache__\*,*.pyc"; Flags: recursesubdirs ignoreversion
-Source: "..\monitor\*"; DestDir: "{app}\monitor"; Excludes: "__pycache__\*,*.pyc"; Flags: recursesubdirs ignoreversion
-Source: "..\search\*"; DestDir: "{app}\search"; Excludes: "*.sqlite,__pycache__\*,*.pyc"; Flags: recursesubdirs ignoreversion
-Source: "..\docs\*"; DestDir: "{app}\docs"; Flags: recursesubdirs ignoreversion
-Source: "..\installer\install-nous.ps1"; DestDir: "{app}\installer"; Flags: ignoreversion
-Source: "..\README.md"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\README.pt-BR.md"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\CHANGELOG.md"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\VERSION"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
+; O repositorio inteiro, menos o que e' de desenvolvimento ou gerado.
+Source: "..\*"; DestDir: "{app}"; \
+    Excludes: ".git\*,.github\*,dist\*,bkp\*.zip,mockups\*,docs\screenshots\*,__pycache__\*,*.pyc,*.log,*.exe,*.sqlite,.webui_secret_key,branding\assets\marble*.png"; \
+    Flags: recursesubdirs ignoreversion
 
 [Icons]
-Name: "{group}\Nous"; Filename: "{app}\launchers\Nous.exe"; IconFilename: "{app}\branding\assets\nous.ico"
-Name: "{group}\Parar Nous"; Filename: "{app}\launchers\Parar Nous.exe"
-Name: "{group}\Desinstalar o Nous"; Filename: "{uninstallexe}"
-Name: "{autodesktop}\Nous"; Filename: "{app}\launchers\Nous.exe"; IconFilename: "{app}\branding\assets\nous.ico"; Tasks: desktopicon
+; wscript + .vbs: abre sem janela de console (sem ps2exe, que quebrava o
+; $PSScriptRoot e impedia os servicos auxiliares de subir).
+Name: "{userprograms}\Nous"; Filename: "{sys}\wscript.exe"; Parameters: """{app}\launchers\nous-hidden.vbs"""; WorkingDir: "{app}\launchers"; IconFilename: "{app}\branding\assets\nous.ico"
+Name: "{userprograms}\Parar Nous"; Filename: "{sys}\wscript.exe"; Parameters: """{app}\launchers\parar-nous.vbs"""; WorkingDir: "{app}\launchers"; IconFilename: "{app}\branding\assets\nous.ico"
+Name: "{userdesktop}\Nous"; Filename: "{sys}\wscript.exe"; Parameters: """{app}\launchers\nous-hidden.vbs"""; WorkingDir: "{app}\launchers"; IconFilename: "{app}\branding\assets\nous.ico"; Tasks: desktopicon
 
 [Run]
 ; Configura o backend (Ollama, Python, Open WebUI, identidade). Janela visivel
-; de proposito para o usuario acompanhar o download (~5-6 GB na primeira vez).
+; de proposito para o usuario acompanhar o download (varios GB na 1a vez).
 Filename: "powershell.exe"; \
-    Parameters: "-ExecutionPolicy Bypass -NoProfile -File ""{app}\installer\install-nous.ps1"""; \
+    Parameters: "-ExecutionPolicy Bypass -NoProfile -File ""{app}\installer\install-nous.ps1"" -NoUninstallEntry"; \
     StatusMsg: "Configurando o Nous: instalando Ollama, Python e o Open WebUI (pode levar varios minutos)..."; \
     Flags: waituntilterminated
 ; Abre o Nous ao final (opcional)
-Filename: "{app}\launchers\Nous.exe"; Description: "Abrir o Nous agora"; Flags: nowait postinstall skipifsilent
+Filename: "{sys}\wscript.exe"; Parameters: """{app}\launchers\nous-hidden.vbs"""; Description: "Abrir o Nous agora"; Flags: nowait postinstall skipifsilent
+
+[UninstallRun]
+; Remocao segura: para os processos e apaga o ambiente Python. Preserva as
+; conversas (NousData), o Ollama e o Python.
+Filename: "powershell.exe"; \
+    Parameters: "-ExecutionPolicy Bypass -NoProfile -WindowStyle Hidden -File ""{app}\installer\uninstall-nous.ps1"" -KeepAppFolder"; \
+    Flags: runhidden waituntilterminated; RunOnceId: "NousSafeUninstall"
 
 [UninstallDelete]
-Type: filesandordirs; Name: "{app}"
+Type: filesandordirs; Name: "{app}\launchers"
+Type: filesandordirs; Name: "{app}\installer"

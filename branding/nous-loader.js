@@ -837,6 +837,9 @@
 			list.innerHTML =
 				'<div class="nous-store-empty">O motor de IA (Ollama) nao esta no ar.<br>' +
 				'Abra o Nous pelo atalho da area de trabalho — ele inicia tudo sozinho.</div>';
+			/* tenta de novo sozinho: o Ollama costuma subir alguns segundos depois */
+			if (storeTimer) clearTimeout(storeTimer);
+			storeTimer = setTimeout(storeRefresh, 3000);
 			return;
 		}
 		var models = data.models || [];
@@ -892,13 +895,18 @@
 		if (anyPulling) storeTimer = setTimeout(storeRefresh, 2000);
 	}
 
+	/* Resolve true se o download comecou (ou ja estava em andamento). */
 	function startPull(tag) {
-		if (!tag) return;
-		fetch(MON_URL + '/pull', {
+		if (!tag) return Promise.resolve(false);
+		return fetch(MON_URL + '/pull', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ model: tag })
-		}).catch(function () {}).then(function () { setTimeout(storeRefresh, 400); });
+		})
+			.then(function (r) { return r.json().catch(function () { return {}; }); })
+			.then(function (d) { return !!(d.started || d.reason === 'em andamento'); })
+			.catch(function () { return false; })
+			.then(function (ok) { setTimeout(storeRefresh, 400); return ok; });
 	}
 
 	/* ====================== Painel de Voz local (v2.3) ======================
@@ -1262,15 +1270,10 @@
 		var token = '';
 		try { token = localStorage.getItem('token') || ''; } catch (e) {}
 		if (!token) return;
-		fetch('http://127.0.0.1:11434/api/tags', { cache: 'no-store' })
+		fetch(MON_URL + '/installed', { cache: 'no-store' })
 			.then(function (r) { return r.json(); })
 			.then(function (data) {
-				var chat = (data.models || []).filter(function (m) {
-					var n = (m.name || '').toLowerCase();
-					return n.indexOf('embed') === -1 && n.indexOf('minilm') === -1 &&
-						n.indexOf('bge-') === -1 && n.indexOf('rerank') === -1;
-				});
-				if (!chat.length && !wizShown && !storeOpen) showWizard();
+				if (data.online && !(data.chat || []).length && !wizShown && !storeOpen) showWizard();
 			})
 			.catch(function () {});
 	}
@@ -1344,9 +1347,13 @@
 		zone.innerHTML =
 			'<button class="nous-store-btn" type="button" style="width:100%;padding:9px;font-size:13px">' +
 			'Baixar e comecar</button>';
-		zone.querySelector('button').addEventListener('click', function () {
-			startPull(rec.tag);
-			_wizProgress(rec);
+		zone.querySelector('button').addEventListener('click', function () { _wizStart(rec); });
+	}
+
+	function _wizStart(rec) {
+		_wizProgress(rec);
+		startPull(rec.tag).then(function (ok) {
+			if (!ok) _wizError(rec, 'Não consegui iniciar o download. Confira a internet e tente de novo.');
 		});
 	}
 
@@ -1358,13 +1365,20 @@
 			'<div class="nous-mon-track"><div class="nous-mon-fill" id="nous-wiz-fill" style="width:0%"></div></div>' +
 			'<span class="nous-store-ptxt" id="nous-wiz-ptxt">Iniciando o download... ' +
 			'Pode deixar esta janela aberta — avisamos quando terminar.</span></div>';
+		var none = 0;
 		function poll() {
 			fetch(MON_URL + '/pull/status?model=' + encodeURIComponent(rec.tag), { cache: 'no-store' })
 				.then(function (r) { return r.json(); })
 				.then(function (st) {
 					if (!wizEl) return;
-					if (st.status === 'pronto') { _wizDone(); return; }
+					if (st.status === 'pronto') { _wizDone(rec); return; }
 					if (st.status === 'erro') { _wizError(rec, st.error); return; }
+					/* "nenhum" = o monitor nao conhece este download (o pedido falhou
+					   ou o monitor reiniciou). Antes: "Baixando... 0%" para sempre. */
+					if (st.status === 'nenhum' && ++none >= 5) {
+						_wizError(rec, 'O download parou. Tente de novo.');
+						return;
+					}
 					var pct = Math.round((st.pct || 0) * 100);
 					var fill = wizEl.querySelector('#nous-wiz-fill');
 					var txt = wizEl.querySelector('#nous-wiz-ptxt');
@@ -1385,13 +1399,10 @@
 		zone.innerHTML =
 			'<span class="nous-store-err">' + _esc(msg || 'O download falhou.') + '</span>' +
 			'<button class="nous-store-btn" type="button">Tentar de novo</button>';
-		zone.querySelector('button').addEventListener('click', function () {
-			startPull(rec.tag);
-			_wizProgress(rec);
-		});
+		zone.querySelector('button').addEventListener('click', function () { _wizStart(rec); });
 	}
 
-	function _wizDone() {
+	function _wizDone(rec) {
 		var zone = wizEl && wizEl.querySelector('#nous-wiz-zone');
 		if (!zone) return;
 		zone.innerHTML =
@@ -1401,77 +1412,67 @@
 			'<button class="nous-store-btn" type="button" style="width:100%;padding:9px;font-size:13px">' +
 			'Comecar a conversar</button></div>';
 		zone.querySelector('button').addEventListener('click', function () {
-			location.reload();
+			/* Abre o chat JA com o modelo novo: com reload puro o Open WebUI podia
+			   escolher o primeiro da lista - as vezes o de embeddings, que nao conversa. */
+			location.href = '/?model=' + encodeURIComponent(rec.tag);
 		});
 	}
 
-	/* ====================== Link "Criar conta" na tela de auth ====================== *
-	 * O Open WebUI esconde o botao "Criar conta" quando ENABLE_SIGNUP=False ou quando  *
-	 * o admin ja' existe. Injetamos um link discreto para /auth?mode=signup para que   *
-	 * novos usuarios possam se cadastrar sem terminal.                                  *
-	 * ================================================================================= */
+	/* ====================== Dica de cadastro na tela de login ====================== *
+	 * O Open WebUI fecha o cadastro depois que a primeira conta (admin) e' criada, e  *
+	 * novas contas nascem "pendentes". O antigo link "Criar conta" levava a          *
+	 * /auth?mode=signup, parametro que o Open WebUI ignora: voltava ao login.        *
+	 * Agora: so' na tela de LOGIN (sem campo de nome), explica o caminho real.       *
+	 * ============================================================================== */
 	function onAuth() {
 		return location.pathname === '/auth';
 	}
 
 	function ensureSignupLink() {
-		if (!onAuth()) {
-			var old = document.getElementById('nous-signup-link');
-			if (old) old.remove();
-			return;
-		}
-		/* Nao injeta em modo signup (o formulario ja' esta' aberto) */
-		if (location.search.indexOf('mode=signup') !== -1) {
-			var old2 = document.getElementById('nous-signup-link');
-			if (old2) old2.remove();
-			return;
-		}
-		if (document.getElementById('nous-signup-link')) return;
-		/* Aguarda o formulario de login estar no DOM */
-		var form = document.querySelector('form');
-		if (!form) return;
-		var link = document.createElement('p');
-		link.id = 'nous-signup-link';
-		link.style.cssText =
-			'text-align:center;margin-top:14px;font-size:13px;' +
+		var old = document.getElementById('nous-signup-link');
+		var form = onAuth() ? document.querySelector('form') : null;
+		/* Cadastro aberto (1a conta = administrador) tem campo de nome: sem dica */
+		var isLogin = form && !form.querySelector('input[autocomplete="name"]') &&
+			form.querySelector('input[type="password"]');
+		if (!isLogin) { if (old) old.remove(); return; }
+		if (old) return;
+		var hint = document.createElement('p');
+		hint.id = 'nous-signup-link';
+		hint.style.cssText =
+			'text-align:center;margin-top:14px;font-size:13px;line-height:1.5;' +
 			'font-family:Inter,system-ui,sans-serif;color:#888;';
-		link.innerHTML =
-			'Primeiro acesso? <a href="/auth?mode=signup" ' +
-			'style="color:#c8962e;text-decoration:none;font-weight:600;" ' +
-			'onmouseover="this.style.textDecoration=\'underline\'" ' +
-			'onmouseout="this.style.textDecoration=\'none\'">' +
-			'Criar conta</a>';
-		/* Insere depois do form */
-		form.parentNode.insertBefore(link, form.nextSibling);
+		hint.innerHTML =
+			'Novo por aqui? Peça a quem administra o Nous para criar sua conta em ' +
+			'<b style="color:#c8962e;font-weight:600">Painel Admin › Usuários</b>.';
+		form.parentNode.insertBefore(hint, form.nextSibling);
 	}
 
 	/* ====================== Capability gate (badge VRAM nos modelos) ==================
 	 * Mostra um badge colorido ao lado de cada modelo no dropdown do chat:
-	 *   🟢 verde  — cabe confortavelmente na VRAM disponivel (< 85%)
+	 *   🟢 verde  — cabe confortavelmente na VRAM da placa (< 85%)
 	 *   🟡 amarelo — cabe mas apertado (85-100% da VRAM)
-	 *   🔴 vermelho — nao cabe (maior que a VRAM disponivel)
+	 *   🔴 vermelho — nao cabe (maior que a VRAM da placa)
 	 *   ⚪ cinza   — sem informacao de tamanho
-	 * Dados: /api/tags do Ollama (tamanho) + /stats do monitor (VRAM livre).
+	 * Dados: /installed (tamanho) + /stats (VRAM total), ambos do monitor.
 	 * ================================================================================= */
 	var _capModels  = {};   /* { modelName: sizeBytes } */
-	var _capVramFree = -1;  /* bytes livres; -1 = nao inicializado */
+	/* VRAM TOTAL da placa. Comparar com a livre deixava vermelho justamente o
+	   modelo que ja estava carregado (ele mesmo ocupa a VRAM). -1 = sem dado. */
+	var _capVramTotal = -1;
 	var _capLastFetch = 0;
 
 	function _capRefresh() {
 		var now = Date.now();
 		if (now - _capLastFetch < 10000) return; /* atualiza a cada 10s */
 		_capLastFetch = now;
-		/* VRAM livre via monitor */
 		fetch(MON_URL + '/stats', { cache: 'no-store' })
 			.then(function(r) { return r.json(); })
 			.then(function(s) {
 				var g = s.gpu || {};
-				if (g.ded_total && g.ded_used != null) {
-					_capVramFree = g.ded_total - g.ded_used;
-				}
+				if (g.ded_total) _capVramTotal = g.ded_total;
 			}).catch(function() {});
-		/* Tamanhos dos modelos via Ollama */
-		fetch('http://127.0.0.1:11434/api/tags', { cache: 'no-store' })
+		/* Tamanhos dos modelos via monitor (que consulta o Ollama) */
+		fetch(MON_URL + '/installed', { cache: 'no-store' })
 			.then(function(r) { return r.json(); })
 			.then(function(data) {
 				var models = data.models || [];
@@ -1486,7 +1487,7 @@
 	}
 
 	function _capBadge(modelName) {
-		if (_capVramFree < 0) return '';
+		if (_capVramTotal < 0) return '';
 		/* Tenta match exato, depois base (sem tag), depois prefixo */
 		var sz = _capModels[modelName];
 		if (!sz) {
@@ -1494,7 +1495,7 @@
 			sz = _capModels[base];
 		}
 		if (!sz) return '';
-		var ratio = sz / (_capVramFree || 1);
+		var ratio = sz / (_capVramTotal || 1);
 		var dot, tip;
 		if (ratio <= 0.85)      { dot = '#3ad07a'; tip = 'Cabe bem na VRAM'; }
 		else if (ratio <= 1.0)  { dot = '#f5a623'; tip = 'Cabe (VRAM apertada)'; }
@@ -1543,6 +1544,49 @@
 		setInterval(_capApply, 1000);
 	}
 
+	/* ====================== "O que ha de novo" do Open WebUI ======================
+	 * Logo apos criar a conta, o Open WebUI abria as notas de versao EM INGLES, com
+	 * links do GitHub - a primeira coisa que o leigo via. O modal aparece quando a
+	 * conta e' admin e settings.version != versao do servidor. Aqui: fechamos o
+	 * modal (o fechar grava a versao) e desligamos showChangelog na conta, para
+	 * nao voltar nem depois de um upgrade.
+	 * =============================================================================== */
+	var CHANGELOG_H3 = /^v\d+\.\d+\.\d+ - \d{4}-\d{2}-\d{2}$/;
+	var _clPrefDone = false;
+
+	function suppressChangelog() {
+		var hs = document.querySelectorAll('h3');
+		for (var i = 0; i < hs.length; i++) {
+			if (!CHANGELOG_H3.test((hs[i].textContent || '').trim())) continue;
+			/* sobe ate o cartao do modal: o X e' o primeiro botao do cabecalho */
+			var box = hs[i].parentElement;
+			while (box && box !== document.body && !box.querySelector('h2 + button, h2 ~ button')) box = box.parentElement;
+			var close = box && box !== document.body && box.querySelector('h2 ~ button');
+			if (close) { close.click(); break; }
+		}
+		if (_clPrefDone) return;
+		var token = '';
+		try { token = localStorage.getItem('token') || ''; } catch (e) {}
+		if (!token) return;
+		_clPrefDone = true;
+		var H = { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' };
+		/* depois do fechar do modal salvar a versao, para nao disputar a escrita */
+		setTimeout(function () {
+			fetch('/api/v1/users/user/settings', { headers: H })
+				.then(function (r) { return r.ok ? r.json() : null; })
+				.then(function (cur) {
+					var ui = (cur && cur.ui) || {};
+					if (ui.showChangelog === false) return;
+					ui.showChangelog = false;
+					var body = cur || {};
+					body.ui = ui;
+					return fetch('/api/v1/users/user/settings/update',
+						{ method: 'POST', headers: H, body: JSON.stringify(body) });
+				})
+				.catch(function () {});
+		}, 3000);
+	}
+
 	function tick() {
 		ensureToggle();
 		if (btn) btn.style.display = onHome() ? 'flex' : 'none';
@@ -1551,6 +1595,11 @@
 		ensureTopWordmark();
 		ensureMemBtn();
 		ensureSignupLink();
+		suppressChangelog();
+		/* Tela de login/cadastro: nada de VRAM, modelos ou memoria antes de entrar */
+		var auth = onAuth();
+		if (monEl) monEl.style.display = auth ? 'none' : '';
+		if (memBtnEl) memBtnEl.style.display = auth ? 'none' : '';
 	}
 
 	function start() {
