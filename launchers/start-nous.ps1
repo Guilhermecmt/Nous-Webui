@@ -290,6 +290,26 @@ function Register-Utilidades {
     }
 }
 
+# --- Agenda (v2.7): notas, lembretes, calendario e tarefas agendadas (8996) ---
+
+# Sobe o servico da agenda. Sempre: o relogio dele dispara os lembretes e as
+# tarefas agendadas mesmo com o navegador fechado.
+function Start-AgendaAPI {
+    $api = Join-Path $PSScriptRoot "..\agenda\nous_agenda_api.py"
+    if ((Test-Path $py) -and (Test-Path $api)) {
+        try { Invoke-RestMethod "http://127.0.0.1:8996/health" -TimeoutSec 2 | Out-Null }
+        catch { Start-Process -FilePath $py -ArgumentList "`"$api`"" -WindowStyle Hidden }
+    }
+}
+
+# Filtro 'Nous Agenda' (pedidos de agenda pelo chat), global e ativo.
+function Register-Agenda {
+    $reg = Join-Path $PSScriptRoot "..\agenda\register_agenda.py"
+    if ((Test-Path $py) -and (Test-Path $reg)) {
+        & $py "$reg" --data-dir "$env:DATA_DIR" | Out-Null
+    }
+}
+
 # --- Nuvem NVIDIA NIM (v2.1): conexao opt-in registrada/removida a cada boot ---
 
 # Garante a conexao NVIDIA NIM no banco (se a chave existir) ou a remove.
@@ -341,7 +361,7 @@ function Register-All {
     Ensure-Branding; Register-Memory; Register-Pipe; Register-Research; Register-Arena
     Register-Cloud; Register-Voice; Start-VoiceServer; Start-ComfyUI; Setup-Files
     Setup-History; Hide-EmbedModels; Set-ModelCtx; Start-MemoryAPI; Start-EmailAPI
-    Register-Utilidades
+    Register-Utilidades; Start-AgendaAPI; Register-Agenda
 }
 
 function Show-Error([string]$msg) {

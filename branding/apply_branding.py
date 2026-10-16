@@ -37,6 +37,25 @@ ASSETS = os.path.join(REPO, "branding", "assets")
 MASTER = os.path.join(ASSETS, "nous_logo.png")
 CSS_SRC = os.path.join(REPO, "branding", "nous-gold.css")
 JS_SRC = os.path.join(REPO, "branding", "nous-loader.js")
+# Paineis extras (agenda, skills...): cada um e' um IIFE proprio, concatenado
+# depois do nous-loader.js no mesmo loader.js (sem <script> a mais).
+JS_MODULES = os.path.join(REPO, "branding", "modules")
+
+
+def _module_files():
+    if not os.path.isdir(JS_MODULES):
+        return []
+    return [os.path.join(JS_MODULES, f) for f in sorted(os.listdir(JS_MODULES)) if f.endswith(".js")]
+
+
+def _loader_js():
+    if not os.path.exists(JS_SRC):
+        return ""
+    parts = [open(JS_SRC, encoding="utf-8").read()]
+    for p in _module_files():
+        parts.append(f"\n/* ---- modulo: {os.path.basename(p)} ---- */\n"
+                     + open(p, encoding="utf-8").read())
+    return "\n".join(parts)
 BACKUP = os.path.join(REPO, "bkp", "openwebui-originais")
 
 STATIC_DIRS = {
@@ -78,7 +97,7 @@ def _sha256(path):
 def _inputs_hash():
     """Hash conjunto da logo + css + js: qualquer mudanca reaplica tudo."""
     h = hashlib.sha256()
-    for p in (MASTER, CSS_SRC, JS_SRC):
+    for p in (MASTER, CSS_SRC, JS_SRC, *_module_files()):
         if os.path.exists(p):
             h.update(_sha256(p).encode())
     return h.hexdigest()
@@ -163,7 +182,7 @@ def apply_favicons_and_css(Image, master):
     )
     ico_sizes = [(256, 256), (128, 128), (64, 64), (48, 48), (32, 32), (16, 16)]
     css = open(CSS_SRC, encoding="utf-8").read()
-    js = open(JS_SRC, encoding="utf-8").read() if os.path.exists(JS_SRC) else ""
+    js = _loader_js()
     for label, d in STATIC_DIRS.items():
         if not os.path.isdir(d):
             continue

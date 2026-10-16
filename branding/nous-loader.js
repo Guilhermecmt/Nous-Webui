@@ -1630,6 +1630,10 @@
 		setInterval(wizCheck, 12000);
 	}
 
+	/* Utilitarios para os modulos em branding/modules/*.js (agenda, skills...),
+	 * que o apply_branding.py concatena depois deste arquivo no loader.js. */
+	window.NousUI = { loadUserId: loadUserId, esc: _esc, onAuth: onAuth };
+
 	if (document.readyState === 'loading') {
 		document.addEventListener('DOMContentLoaded', start);
 	} else {

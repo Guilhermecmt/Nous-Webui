@@ -76,13 +76,13 @@ if (Test-Path $manPath) { try { $man = Get-Content $manPath -Raw | ConvertFrom-J
 
 # 1) parar processos (todos os micro-servicos do Nous) ----------------------
 #    8080 servidor · 8990 monitor · 8991 indexador arquivos · 8992 historico
-#    8993 memoria · 8994 TTS/voz · 8995 email
+#    8993 memoria · 8994 TTS/voz · 8995 email · 8996 agenda
 #    (o stop-nous.ps1 tambem pega os processos-pai que rodam do venv, que
 #    seguravam arquivos e faziam a remocao do passo 2 falhar pela metade)
 Write-Host "`n[1] Parando o Nous" -ForegroundColor Cyan
 $stop = Join-Path $PSScriptRoot "..\launchers\stop-nous.ps1"
 if (Test-Path $stop) { & $stop | Out-Null }
-foreach ($p in 8080, 8990, 8991, 8992, 8993, 8994, 8995) {
+foreach ($p in 8080, 8990, 8991, 8992, 8993, 8994, 8995, 8996) {
     $c = Get-NetTCPConnection -LocalPort $p -State Listen -ErrorAction SilentlyContinue
     if ($c) {
         $c.OwningProcess | Select-Object -Unique | ForEach-Object { Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue }
