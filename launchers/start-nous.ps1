@@ -310,6 +310,23 @@ function Register-Agenda {
     }
 }
 
+# --- Habilidades (v2.7): filtro 'Nous Skills' + API do painel (8997) ---
+
+function Start-SkillsAPI {
+    $api = Join-Path $PSScriptRoot "..\skills\nous_skills_api.py"
+    if ((Test-Path $py) -and (Test-Path $api)) {
+        try { Invoke-RestMethod "http://127.0.0.1:8997/health" -TimeoutSec 2 | Out-Null }
+        catch { Start-Process -FilePath $py -ArgumentList "`"$api`"" -WindowStyle Hidden }
+    }
+}
+
+function Register-Skills {
+    $reg = Join-Path $PSScriptRoot "..\skills\register_skills.py"
+    if ((Test-Path $py) -and (Test-Path $reg)) {
+        & $py "$reg" --data-dir "$env:DATA_DIR" | Out-Null
+    }
+}
+
 # --- Nuvem NVIDIA NIM (v2.1): conexao opt-in registrada/removida a cada boot ---
 
 # Garante a conexao NVIDIA NIM no banco (se a chave existir) ou a remove.
@@ -361,7 +378,7 @@ function Register-All {
     Ensure-Branding; Register-Memory; Register-Pipe; Register-Research; Register-Arena
     Register-Cloud; Register-Voice; Start-VoiceServer; Start-ComfyUI; Setup-Files
     Setup-History; Hide-EmbedModels; Set-ModelCtx; Start-MemoryAPI; Start-EmailAPI
-    Register-Utilidades; Start-AgendaAPI; Register-Agenda
+    Register-Utilidades; Start-AgendaAPI; Register-Agenda; Start-SkillsAPI; Register-Skills
 }
 
 function Show-Error([string]$msg) {
