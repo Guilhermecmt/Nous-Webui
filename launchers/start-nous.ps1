@@ -281,6 +281,15 @@ function Start-EmailAPI {
     }
 }
 
+# --- Utilidades (v2.7): YouTube e Clima, Filters globais registrados no banco ---
+
+function Register-Utilidades {
+    $reg = Join-Path $PSScriptRoot "..\utilidades\register_utilidades.py"
+    if ((Test-Path $py) -and (Test-Path $reg)) {
+        & $py "$reg" --data-dir "$env:DATA_DIR" | Out-Null
+    }
+}
+
 # --- Nuvem NVIDIA NIM (v2.1): conexao opt-in registrada/removida a cada boot ---
 
 # Garante a conexao NVIDIA NIM no banco (se a chave existir) ou a remove.
@@ -332,6 +341,7 @@ function Register-All {
     Ensure-Branding; Register-Memory; Register-Pipe; Register-Research; Register-Arena
     Register-Cloud; Register-Voice; Start-VoiceServer; Start-ComfyUI; Setup-Files
     Setup-History; Hide-EmbedModels; Set-ModelCtx; Start-MemoryAPI; Start-EmailAPI
+    Register-Utilidades
 }
 
 function Show-Error([string]$msg) {

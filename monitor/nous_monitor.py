@@ -66,7 +66,9 @@ Get-ChildItem 'HKLM:\SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-
 }
 $ram = (Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory
 $name = (Get-CimInstance Win32_VideoController | Sort-Object AdapterRAM -Descending | Select-Object -First 1).Name
-[pscustomobject]@{ded_used=[int64]$ded;shr_used=[int64]$shr;ded_total=[int64]$total;shr_total=[int64]($ram/2);ram_total=[int64]$ram;gpu_name=[string]$name} | ConvertTo-Json -Compress
+$dimms = @(Get-CimInstance Win32_PhysicalMemory)
+$mts = ($dimms | Measure-Object ConfiguredClockSpeed -Maximum).Maximum
+[pscustomobject]@{ded_used=[int64]$ded;shr_used=[int64]$shr;ded_total=[int64]$total;shr_total=[int64]($ram/2);ram_total=[int64]$ram;gpu_name=[string]$name;ram_mts=[int]$mts;ram_dimms=[int]$dimms.Count} | ConvertTo-Json -Compress
 """
 
 _gpu_cache = {"t": 0.0, "data": None, "fetched": False}
@@ -152,9 +154,72 @@ async def _hardware():
     ram_gb = round((gpu.get("ram_total") or 0) / GB, 1)
     if not ram_gb and gpu.get("shr_total"):
         ram_gb = round(gpu["shr_total"] * 2 / GB, 1)
+    tier = _tier(vram_gb, ram_gb)
     return {"gpu_name": gpu.get("gpu_name") or "",
-            "vram_gb": vram_gb, "ram_gb": ram_gb,
-            "tier": _tier(vram_gb, ram_gb)}
+            "vram_gb": vram_gb, "ram_gb": ram_gb, "tier": tier,
+            "gpu_bw": _gpu_bandwidth(gpu.get("gpu_name"), vram_gb) if tier != "cpu" else 0,
+            "ram_bw": _ram_bandwidth(gpu.get("ram_mts"), gpu.get("ram_dimms"))}
+
+
+# ---------------------------------------------- Estimativa de velocidade
+# Gerar 1 token le o modelo inteiro da memoria, entao a velocidade e' limitada
+# pela banda: tokens/s ~= banda (GB/s) / tamanho do modelo (GB) * eficiencia.
+# Ideia do llmfit (MIT, Alex Jones); tabela e formula escritas aqui.
+# Banda em GB/s pela ficha tecnica oficial de cada placa.
+_GPU_BW = {
+    "rtx 5090": 1792, "rtx 5080": 960, "rtx 5070 ti": 896, "rtx 5070": 672,
+    "rtx 5060 ti": 448, "rtx 5060": 448,
+    "rtx 4090": 1008, "rtx 4080 super": 736, "rtx 4080": 717,
+    "rtx 4070 ti super": 672, "rtx 4070 ti": 504, "rtx 4070 super": 504,
+    "rtx 4070": 504, "rtx 4060 ti": 288, "rtx 4060": 272,
+    "rtx 3090 ti": 1008, "rtx 3090": 936, "rtx 3080 ti": 912, "rtx 3080": 760,
+    "rtx 3070 ti": 608, "rtx 3070": 448, "rtx 3060 ti": 448, "rtx 3060": 360,
+    "rtx 3050": 224, "rtx 2080 ti": 616, "rtx 2080": 448, "rtx 2070": 448,
+    "rtx 2060": 336, "gtx 1660 super": 336, "gtx 1660": 192,
+    "gtx 1080 ti": 484, "gtx 1080": 320, "gtx 1070": 256,
+    "rx 9070 xt": 640, "rx 9070": 640, "rx 9060 xt": 320,
+    "rx 7900 xtx": 960, "rx 7900 xt": 800, "rx 7900 gre": 576,
+    "rx 7800 xt": 624, "rx 7700 xt": 432, "rx 7600 xt": 288, "rx 7600": 288,
+    "rx 6950 xt": 576, "rx 6900 xt": 512, "rx 6800 xt": 512, "rx 6800": 512,
+    "rx 6750 xt": 432, "rx 6700 xt": 384, "rx 6650 xt": 280, "rx 6600": 224,
+    "arc b580": 456, "arc a770": 560, "arc a750": 512,
+}
+_GPU_BW_KEYS = sorted(_GPU_BW, key=len, reverse=True)  # "4070 ti" antes de "4070"
+_GPU_EFF = 0.55
+_CPU_EFF = 0.5
+
+
+def _gpu_bandwidth(name, vram_gb):
+    n = (name or "").lower()
+    for k in _GPU_BW_KEYS:
+        if k in n:
+            return _GPU_BW[k]
+    # placa desconhecida: placas com mais VRAM costumam ter barramento maior
+    return 450 if vram_gb >= 16 else 300 if vram_gb >= 8 else 200
+
+
+def _ram_bandwidth(mts, dimms):
+    mts = mts or 0
+    if mts <= 0:
+        return 50  # DDR4 dual channel tipico
+    channels = 2 if (dimms or 0) >= 2 else 1
+    return round(mts * 8 * channels / 1000)
+
+
+def _speed(model, hw):
+    """{tps, onde}: tokens/s estimados e onde o modelo roda (gpu|misto|cpu)."""
+    size = model["download_gb"] * 1.1  # pesos + buffers do runtime
+    ram_bw = hw.get("ram_bw") or 50
+    gpu_bw = hw.get("gpu_bw") or 0
+    if hw["tier"] == "cpu" or not gpu_bw:
+        return {"tps": round(ram_bw / size * _CPU_EFF, 1), "onde": "cpu"}
+    # ~1.5 GB da VRAM ficam para o contexto da conversa e o sistema
+    frac = max(0.0, min(1.0, (hw["vram_gb"] - 1.5) / size))
+    if frac >= 1.0:
+        return {"tps": round(gpu_bw / size * _GPU_EFF, 1), "onde": "gpu"}
+    # parte na RAM: cada token passa pelos dois lados, e o lado lento domina
+    t = (frac * size / (gpu_bw * _GPU_EFF)) + ((1 - frac) * size / (ram_bw * _CPU_EFF))
+    return {"tps": round(1 / t, 1), "onde": "misto" if frac > 0 else "cpu"}
 
 
 def _load_catalog():
@@ -356,6 +421,7 @@ async def h_catalog(request):
             n == m["tag"] or n.startswith(m["tag"] + ":")
             for n in (installed or []))
         e["fit"] = _fit(m, hw)
+        e["speed"] = _speed(m, hw)
         pull = _pulls.get(m["tag"])
         if pull:
             e["pull"] = pull

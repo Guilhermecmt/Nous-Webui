@@ -755,6 +755,8 @@
 			'.nous-b-inst{background:rgba(58,208,122,.14);color:#5fd693;border:1px solid rgba(58,208,122,.4)}' +
 			'.nous-b-vis{background:rgba(110,150,230,.14);color:#9db8ee;border:1px solid rgba(110,150,230,.35)}' +
 			'.nous-store-desc{margin:5px 0 7px;font-size:12px;line-height:1.45;opacity:.8}' +
+			'.nous-store-speed{margin:-3px 0 7px;font-size:11px;opacity:.65}' +
+			'.nous-store-speed b{color:#e7c069;font-weight:600}' +
 			'.nous-store-row{display:flex;align-items:center;gap:10px}' +
 			'.nous-store-size{font-size:11px;opacity:.55;flex:1}' +
 			'.nous-store-btn{background:rgba(200,150,46,.18);border:1px solid rgba(200,150,46,.45);' +
@@ -828,6 +830,18 @@
 		return 'Sua maquina: ' + _esc(hw.gpu_name || 'GPU') + ' · ' + hw.vram_gb + ' GB de VRAM';
 	}
 
+	/* Estimativa do monitor (tokens/s) em palavras por segundo: ~0,7 palavra
+	 * por token em portugues. Abaixo de ~3 palavras/s a leitura fica arrastada. */
+	function _speedTxt(m) {
+		var s = m.speed;
+		if (!s || !s.tps) return '';
+		var wps = Math.max(1, Math.round(s.tps * 0.7));
+		var nivel = wps >= 15 ? 'rapido' : wps >= 6 ? 'bom' : wps >= 3 ? 'devagar' : 'muito lento';
+		var onde = s.onde === 'misto' ? ' · parte fica na RAM' : s.onde === 'cpu' ? ' · roda no processador' : '';
+		return '<div class="nous-store-speed">Velocidade estimada: <b>' + nivel + '</b> (~' + wps +
+			' palavras/s)' + onde + '</div>';
+	}
+
 	function renderStore(data) {
 		if (!storeOpen || !storeEl) return;
 		var hwEl = storeEl.querySelector('#nous-store-hw');
@@ -885,6 +899,7 @@
 				'<div class="nous-store-top"><span class="nous-store-name">' + _esc(m.name) + '</span>' +
 				badges + '</div>' +
 				'<div class="nous-store-desc">' + _esc(m.desc) + '</div>' +
+				_speedTxt(m) +
 				'<div class="nous-store-row">' + rowHtml + '</div>';
 			list.appendChild(card);
 		});
