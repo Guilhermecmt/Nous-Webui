@@ -144,6 +144,7 @@ Select **"Pesquisa Profunda (Nous)"** in the model dropdown and ask any research
 2. Searches the web (SearXNG, running locally) for each sub-question.
 3. Downloads the most relevant pages and reads them.
 4. Writes a structured markdown report with inline citations `[n]` and a **Fontes** (Sources) section with clickable URLs.
+5. Saves a **visual report** (table of contents, clickable citations, source cards, print-ready) to the **Recursos › Relatórios** library, linked at the end of the answer.
 
 All computation happens on your machine. No API key, no cloud. Requires the SearXNG container (runs automatically when Docker is available).
 
@@ -181,9 +182,32 @@ Nous is local by default. To try state-of-the-art models (DeepSeek R1, Llama 3.3
 
 You can also plug in paid providers (GPT, Claude via OpenRouter) under Admin Panel → Settings → Connections. Without a key, nothing leaves your machine.
 
+### Agenda — notes, reminders and calendar
+
+Ask in the chat: *"me lembre de pagar a luz sexta às 9h"* (remind me to pay the power bill Friday at 9), *"marca dentista dia 20 às 14h"*, *"o que eu tenho amanhã?"*. The local model extracts the request and saves it; at the right time Nous shows a **Windows notification** (even with the browser closed) and an in-app card.
+
+**Recursos › 📅 Agenda** has four tabs: **Hoje** (overdue + next 7 days), **Notas** (search, pin, complete, repeat), **Calendário** (month view, events with advance alerts, `.ics` import/export) and **Tarefas**. Google Calendar, Outlook or iCloud can be added by pasting the calendar's **iCal** address (read-only, refreshed hourly).
+
+### Scheduled tasks — Nous works on its own
+
+In **Agenda › Tarefas**: a morning briefing with today's agenda and emails, a weekly web research, an evening inbox summary. Tasks run on schedule even with the browser closed; the result becomes a note, a notification and, optionally, an email to yourself.
+
+### Skills — Nous learns how you like things done
+
+After getting something right in a conversation, say **"aprenda isso"** ("learn this"). Nous distills the procedure into a skill (a readable `.md` file in `NousData\skills`) and applies it to similar requests later. **Recursos › 🧠 Habilidades** lets you review, edit, create and import `SKILL.md` files from a GitHub link.
+
+### Chat utilities
+
+- **YouTube:** paste a link and ask for a summary — Nous reads the captions and answers with timestamps.
+- **Weather:** *"vai chover amanhã em Curitiba?"* — Open-Meteo forecast (free, no key).
+
+### Photo editor
+
+**Recursos › 🖼 Editor de fotos**, or the **"✎ Editar"** chip over chat images. Crop (free, 1:1, 4:3, 16:9, 9:16), rotate, flip, light/color, filters, resize, undo/redo, download PNG/JPG or copy. **Remove background** runs a 4.5 MB U²-Net model locally, downloaded on first use.
+
 ### Resource panel
 
-The **Recursos** card (bottom-left) shows live VRAM, the models loaded in memory, and the **"Parar modelos"** (frees the GPU instantly) and **"Baixar modelos"** (opens the Store) buttons.
+The **Recursos** card (bottom-left) shows live VRAM, the models loaded in memory, and the **"Parar modelos"** (frees the GPU instantly) and **"Baixar modelos"** (opens the Store, now with an **estimated speed** per model on your GPU) buttons, plus shortcuts to Agenda, Skills, Reports and the Photo editor.
 
 ---
 
@@ -241,6 +265,9 @@ Nous WebUI/
 ├─ search/      web search + Deep Research Pipe (SearXNG + Ollama)
 ├─ evaluation/  Comparar Modelos: Arena register (blind A/B model comparison)
 ├─ email/       Email assistant: IMAP/SMTP client + REST API (port 8995)
+├─ agenda/      notes, reminders, calendar and scheduled tasks (port 8996)
+├─ skills/      skills: chat filter + panel API (port 8997)
+├─ utilidades/  YouTube and weather filters
 ├─ tools/       capability check, backup, password reset, health check
 └─ docs/        roadmap, screenshots
 ```
@@ -296,7 +323,12 @@ GET  /catalog      curated catalogue, ranked for this machine
 POST /pull         {"model":"tag"} — starts a background download
 GET  /pull/status  ?model=tag — live progress
 POST /unload       unloads models from VRAM
+GET  /research     Deep Research report library (/research/view?id=)
+POST /image/remove-bg  image -> PNG without background (photo editor)
 ```
+
+Agenda (8996) and Skills (8997) document their routes at the top of
+`agenda/nous_agenda_api.py` and `skills/nous_skills_api.py`.
 
 ### Inno Setup installer (.exe)
 
@@ -317,7 +349,12 @@ POST /unload       unloads models from VRAM
 [Open WebUI](https://github.com/open-webui/open-webui) ·
 [Ollama](https://ollama.com) ·
 [ComfyUI](https://github.com/comfyanonymous/ComfyUI) ·
-[Flux.1 Schnell](https://huggingface.co/black-forest-labs/FLUX.1-schnell) (Apache-2.0).  
+[Flux.1 Schnell](https://huggingface.co/black-forest-labs/FLUX.1-schnell) (Apache-2.0) ·
+[U²-Net](https://github.com/xuebinqin/U-2-Net) (Apache-2.0, `u2netp` model as published by [rembg](https://github.com/danielgatis/rembg)) ·
+[Open-Meteo](https://open-meteo.com).  
+Agenda, scheduled tasks, skills, the visual report, the photo editor and the Store's speed estimate were
+**inspired** by [Odysseus](https://github.com/odysseus-dev/odysseus) (AGPL-3.0) and by the idea behind
+[llmfit](https://github.com/AlexsJones/llmfit) (MIT); Nous's code was written from scratch and stays MIT.  
 All trademarks belong to their respective projects.
 
 ## License

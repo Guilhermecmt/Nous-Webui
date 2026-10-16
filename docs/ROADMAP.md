@@ -31,6 +31,15 @@ sem conhecimento tecnico, com tudo acontecendo em segundo plano.
   historico, painel "O que o Nous sabe" + personas, link criar conta, badges
   de capacidade VRAM por modelo, citacoes de fonte.
 
+### v2.7 — Funcoes inspiradas no Odysseus
+- Agenda (notas, lembretes, calendario, assinatura iCal) com aviso do Windows,
+  agenda pelo chat, tarefas agendadas, habilidades ("aprenda isso"), relatorio
+  visual da pesquisa, editor de fotos com remover fundo local, YouTube e clima
+  no chat, velocidade estimada na Loja. Codigo proprio (o Odysseus e' AGPL).
+- Pendente: validar o filtro da agenda e o "aprenda isso" com modelos de chat
+  pequenos (llama3.2:3b, qwen3:4b); ligar a galeria (wip-galeria) ao editor
+  via `window.NousEditor.openUrl`; sincronizacao CalDAV de duas vias.
+
 ### v2.6 — Correcoes para o primeiro acesso
 - Instalador que nao trava nem mente ("Pronto!" so' quando deu certo), app em
   `%LOCALAPPDATA%\Programs\Nous`, entrada em Aplicativos instalados.

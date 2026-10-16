@@ -144,6 +144,7 @@ Selecione **"Pesquisa Profunda (Nous)"** no dropdown de modelos e faça qualquer
 2. Busca a web (SearXNG local) para cada sub-pergunta.
 3. Baixa e lê as páginas mais relevantes.
 4. Escreve um relatório em markdown com citações `[n]` e uma seção **Fontes** com URLs clicáveis.
+5. Salva um **relatório visual** (sumário, citações clicáveis, cartões das fontes, pronto para PDF) na biblioteca **Recursos › Relatórios**, com o link no fim da resposta.
 
 Tudo roda na sua máquina. Sem chave de API, sem nuvem. Requer o container SearXNG (sobe automaticamente quando o Docker está disponível).
 
@@ -181,9 +182,32 @@ O Nous é local por padrão. Se quiser experimentar modelos de ponta (DeepSeek R
 
 Também é possível plugar provedores pagos (GPT, Claude via OpenRouter) em Admin Panel → Settings → Connections. Sem chave, nada sai da máquina.
 
+### Agenda — notas, lembretes e calendário
+
+Peça no chat: *"me lembre de pagar a luz sexta às 9h"*, *"marca dentista dia 20 às 14h"*, *"anota: ideia para o projeto…"*, *"o que eu tenho amanhã?"*. O modelo local entende o pedido e grava na agenda; na hora certa o Nous avisa com uma **notificação do Windows** (mesmo com o navegador fechado) e um cartão na tela.
+
+O painel **Recursos › 📅 Agenda** tem quatro abas: **Hoje** (atrasados e próximos 7 dias), **Notas** (busca, fixar, concluir, repetir todo dia/dias úteis/semana/mês/ano), **Calendário** (mês, compromissos com aviso antes, importar/exportar `.ics`) e **Tarefas**. Dá para trazer o Google Agenda, o Outlook ou o iCloud colando o endereço **iCal** da agenda (só leitura, atualiza de hora em hora).
+
+### Tarefas agendadas — o Nous trabalha sozinho
+
+Em **Agenda › Tarefas**: *"todo dia às 8h, bom dia com a agenda e os e-mails"*, *"toda segunda, pesquise novidades de IA"*, *"às 18h, resuma meus e-mails"*. Rodam no horário mesmo com o navegador fechado; o resultado vira uma nota, um aviso e, se quiser, um e-mail para você.
+
+### Habilidades — o Nous aprende o seu jeito
+
+Depois de acertar algo numa conversa (o formato do relatório, o tom do e-mail de cobrança…), diga **"aprenda isso"**. O Nous resume o passo a passo numa habilidade (um arquivo `.md` legível em `NousData\skills`) e, nos próximos pedidos parecidos, segue sozinho. Em **Recursos › 🧠 Habilidades** você revisa, edita, cria e importa habilidades no formato `SKILL.md` de um link do GitHub.
+
+### Utilidades no chat
+
+- **YouTube:** cole um link e peça "resuma" ou pergunte sobre o vídeo — o Nous lê a legenda (português, se houver) e responde citando os minutos.
+- **Clima:** *"vai chover amanhã em Curitiba?"* — previsão do Open-Meteo (gratuito, sem chave). Defina uma cidade padrão em Painel Admin › Funções › Nous Clima.
+
+### Editor de fotos
+
+**Recursos › 🖼 Editor de fotos**, ou o botão **"✎ Editar"** que aparece sobre as imagens do chat. Cortar (livre, 1:1, 4:3, 16:9, 9:16), girar, espelhar, brilho/contraste/saturação/temperatura, filtros, redimensionar, desfazer/refazer, baixar PNG/JPG ou copiar. **Remover fundo** usa um modelo U²-Net de 4,5 MB, baixado no primeiro uso e rodando na sua máquina.
+
 ### Painel de recursos
 
-O card **Recursos** (canto inferior esquerdo) mostra VRAM em tempo real, os modelos carregados na memória e os botões **"Parar modelos"** (libera a GPU na hora) e **"Baixar modelos"** (abre a Loja).
+O card **Recursos** (canto inferior esquerdo) mostra VRAM em tempo real, os modelos carregados na memória e os botões **"Parar modelos"** (libera a GPU na hora) e **"Baixar modelos"** (abre a Loja, que mostra a **velocidade estimada** de cada modelo na sua placa), além dos atalhos para Agenda, Habilidades, Relatórios e Editor de fotos.
 
 ---
 
@@ -241,6 +265,9 @@ Nous WebUI/
 ├─ search/      busca na web + Pipe de Pesquisa Profunda (SearXNG + Ollama)
 ├─ evaluation/  Comparar Modelos: registro do Arena (comparação cega A/B)
 ├─ email/       Assistente de Email: cliente IMAP/SMTP + API REST (porta 8995)
+├─ agenda/      notas, lembretes, calendário e tarefas agendadas (porta 8996)
+├─ skills/      habilidades: filtro do chat + API do painel (porta 8997)
+├─ utilidades/  filtros de YouTube e clima
 ├─ tools/       análise de capacidade, backup, reset de senha, health check
 └─ docs/        roadmap, screenshots
 ```
@@ -296,7 +323,12 @@ GET  /catalog      catálogo curado, ordenado para esta máquina
 POST /pull         {"model":"tag"} — inicia download em background
 GET  /pull/status  ?model=tag — progresso em tempo real
 POST /unload       descarrega modelos da VRAM
+GET  /research     biblioteca de relatórios da Pesquisa Profunda (/research/view?id=)
+POST /image/remove-bg  imagem -> PNG sem fundo (editor de fotos)
 ```
+
+Agenda (8996) e Habilidades (8997) documentam as rotas no topo de
+`agenda/nous_agenda_api.py` e `skills/nous_skills_api.py`.
 
 ### Instalador .exe (Inno Setup)
 
@@ -317,7 +349,12 @@ POST /unload       descarrega modelos da VRAM
 [Open WebUI](https://github.com/open-webui/open-webui) ·
 [Ollama](https://ollama.com) ·
 [ComfyUI](https://github.com/comfyanonymous/ComfyUI) ·
-[Flux.1 Schnell](https://huggingface.co/black-forest-labs/FLUX.1-schnell) (Apache-2.0).  
+[Flux.1 Schnell](https://huggingface.co/black-forest-labs/FLUX.1-schnell) (Apache-2.0) ·
+[U²-Net](https://github.com/xuebinqin/U-2-Net) (Apache-2.0, modelo `u2netp` publicado pelo [rembg](https://github.com/danielgatis/rembg)) ·
+[Open-Meteo](https://open-meteo.com).  
+Agenda, tarefas agendadas, habilidades, relatório visual, editor de fotos e a estimativa de velocidade
+da Loja foram **inspirados** no [Odysseus](https://github.com/odysseus-dev/odysseus) (AGPL-3.0) e na ideia
+do [llmfit](https://github.com/AlexsJones/llmfit) (MIT); o código do Nous foi escrito do zero e continua MIT.  
 Marcas pertencem aos seus respectivos projetos.
 
 ## Licença

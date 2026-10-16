@@ -1,5 +1,34 @@
 # Changelog
 
+## [2.7.0] - 2026-10-16
+Funções inspiradas no Odysseus (PewDiePie), reescritas no estilo do Nous
+(o Odysseus é AGPL; nenhum código dele foi copiado e o Nous continua MIT).
+### Novo
+- **Agenda** (`agenda/`, porta 8996): notas, lembretes com repetição,
+  calendário com compromissos e aviso antes, importar/exportar `.ics` e
+  assinatura do Google Agenda/Outlook/iCloud pelo endereço iCal (só leitura).
+  Lembretes chegam como notificação do Windows mesmo com o navegador fechado.
+- **Agenda pelo chat** (filtro Nous Agenda): "me lembre de...", "marca
+  dentista dia 20", "o que tenho amanhã?". Regenerar a resposta não duplica.
+- **Tarefas agendadas**: pergunta ao modelo, pesquisa na web, resumo dos
+  e-mails e "bom dia" (agenda + e-mails), no horário, com o resultado em nota,
+  aviso e e-mail opcional.
+- **Habilidades** (`skills/`, porta 8997): "aprenda isso" no chat guarda o
+  passo a passo em Markdown; pedidos parecidos depois usam a habilidade.
+  Painel para revisar, editar e importar SKILL.md do GitHub.
+- **Relatório visual da Pesquisa Profunda** com biblioteca em Recursos ›
+  Relatórios (HTML escapado + CSP sem scripts).
+- **Editor de fotos**: cortar, girar, luz/cor, filtros, redimensionar,
+  desfazer, baixar/copiar e **remover fundo** (U²-Net local, 4,5 MB).
+- **YouTube** (resume vídeos pela legenda) e **Clima** (Open-Meteo) no chat.
+- **Loja de Modelos** mostra a velocidade estimada de cada modelo na sua placa.
+### Corrigido
+- **Pesquisa Profunda não achava o pacote `nous_search`** dentro do Open WebUI
+  (o pipe roda de um arquivo temporário); o registro grava a pasta real.
+### Mudado
+- `apply_branding.py` concatena `branding/modules/*.js` no `loader.js`
+  (painéis novos em arquivos próprios; `window.NousUI` expõe utilitários).
+
 ## [2.6.0] - 2026-10-05
 Rodada de correções para quem instala e usa o Nous pela primeira vez.
 ### Corrigido
