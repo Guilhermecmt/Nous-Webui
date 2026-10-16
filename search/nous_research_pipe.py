@@ -17,10 +17,15 @@ from typing import Optional
 
 from pydantic import BaseModel, Field
 
-# Adiciona o diretório pai ao path para importar nous_search
-_HERE = os.path.dirname(os.path.abspath(__file__))
-if _HERE not in sys.path:
-    sys.path.insert(0, _HERE)
+# O Open WebUI executa este código a partir de um arquivo TEMPORÁRIO (o
+# __file__ aponta para a pasta temp), então o pacote nous_search não estaria
+# ao lado. O register_research_pipe.py grava aqui a pasta real do search/.
+_SEARCH_DIR = r"__NOUS_SEARCH_DIR__"
+for _d in (_SEARCH_DIR, os.path.dirname(os.path.abspath(__file__))):
+    if os.path.isdir(os.path.join(_d, "nous_search")) and _d not in sys.path:
+        sys.path.insert(0, _d)
+
+MONITOR_URL = "http://127.0.0.1:8990"
 
 
 def _searxng_available(url: str, timeout: int = 5) -> bool:
@@ -129,5 +134,15 @@ class Pipe:
             yield f"*(Erro durante a pesquisa: {e})*"
             return
 
+        report = result.get("report", "Não foi possível gerar o relatório.")
+        link = ""
+        if result.get("sources"):
+            try:
+                from nous_search.report import save
+                rid = save(question, report, result["sources"], self.valves.OLLAMA_MODEL)
+                link = (f"\n\n---\n📄 [Abrir o relatório visual]({MONITOR_URL}/research/view?id={rid})"
+                        " · também fica em Recursos > Relatórios")
+            except Exception:
+                pass
         await emit({"type": "status", "data": {"description": "Pesquisa concluída", "done": True}})
-        yield result.get("report", "Não foi possível gerar o relatório.")
+        yield report + link

@@ -13,6 +13,9 @@ Expoe (em http://127.0.0.1:8990, so' para paginas locais - ver cors_mw):
   POST /pull         -> body {"model":"tag"}; inicia download via Ollama /api/pull
                         em background (singleton por modelo)
   GET  /pull/status  -> ?model=tag -> { status: baixando|pronto|erro, pct, ... }
+  GET  /research     -> biblioteca de relatorios da Pesquisa Profunda
+  GET  /research/view?id=  -> o relatorio visual (HTML, CSP sem scripts)
+  POST /research/delete    -> body {"id": ...}
 
 GPU: lido dos contadores de desempenho do Windows (funcionam em PT-BR com os
 nomes em ingles) + tamanho real da VRAM via registro (qwMemorySize).
@@ -560,6 +563,46 @@ async def h_voice_install(request):
     return web.json_response({"started": True})
 
 
+# ------------------------------------------------- Relatorios de pesquisa (v2.7)
+# Biblioteca da Pesquisa Profunda (search/nous_search/report.py grava em
+# NousData/research). A pagina e' servida com CSP sem scripts: o texto veio da
+# web via LLM.
+
+_REPORT_CSP = ("default-src 'none'; style-src 'unsafe-inline'; img-src https: data:; "
+               "base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
+
+
+def _report_mod():
+    sp = str(Path(__file__).resolve().parent.parent / "search")
+    if sp not in sys.path:
+        sys.path.insert(0, sp)
+    from nous_search import report
+    return report
+
+
+async def h_research_list(request):
+    return web.json_response({"reports": _report_mod().list_reports()})
+
+
+async def h_research_view(request):
+    p = _report_mod().report_path(request.query.get("id"))
+    if not p:
+        return web.Response(status=404, text="Relatorio nao encontrado.")
+    with open(p, encoding="utf-8") as f:
+        return web.Response(text=f.read(), content_type="text/html",
+                            headers={"Content-Security-Policy": _REPORT_CSP,
+                                     "Referrer-Policy": "no-referrer"})
+
+
+async def h_research_delete(request):
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    _report_mod().delete((body or {}).get("id"))
+    return web.json_response({"ok": True})
+
+
 def build_app():
     app = web.Application(middlewares=[cors_mw])
     app.add_routes([web.get("/stats", h_stats),
@@ -571,7 +614,10 @@ def build_app():
                     web.post("/pull", h_pull),
                     web.get("/pull/status", h_pull_status),
                     web.get("/voice/status", h_voice_status),
-                    web.post("/voice/install", h_voice_install)])
+                    web.post("/voice/install", h_voice_install),
+                    web.get("/research", h_research_list),
+                    web.get("/research/view", h_research_view),
+                    web.post("/research/delete", h_research_delete)])
     return app
 
 

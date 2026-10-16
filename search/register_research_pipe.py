@@ -93,6 +93,9 @@ def main():
         return
 
     content = open(a.pipe, encoding="utf-8").read()
+    # O pipe roda de um arquivo temporario: grava nele onde esta o nous_search.
+    content = content.replace("__NOUS_SEARCH_DIR__",
+                              os.path.dirname(os.path.abspath(a.pipe)))
 
     db = resolve_db(a.data_dir)
     if not db or not os.path.isfile(db):

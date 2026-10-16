@@ -220,8 +220,17 @@ def run_task(cx, task):
         if sp not in sys.path:
             sys.path.insert(0, sp)
         from nous_search.deep_research import deep_research
-        res = deep_research(prompt, model=local_model())
-        return res.get("report") or "(a pesquisa nao trouxe resultado)"
+        model = local_model()
+        res = deep_research(prompt, model=model)
+        text = res.get("report") or "(a pesquisa nao trouxe resultado)"
+        if res.get("sources"):
+            try:
+                from nous_search.report import save
+                rid = save(prompt, text, res["sources"], model)
+                text += ("\n\nRelatorio visual: http://127.0.0.1:8990/research/view?id=" + rid)
+            except Exception:
+                pass
+        return text
     if kind == "emails":
         extra = f"\nFoco pedido pelo usuario: {prompt}" if prompt else ""
         return llm("Voce e' o assistente de e-mail do usuario. Abaixo estao os e-mails "
