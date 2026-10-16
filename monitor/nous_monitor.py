@@ -16,6 +16,7 @@ Expoe (em http://127.0.0.1:8990, so' para paginas locais - ver cors_mw):
   GET  /research     -> biblioteca de relatorios da Pesquisa Profunda
   GET  /research/view?id=  -> o relatorio visual (HTML, CSP sem scripts)
   POST /research/delete    -> body {"id": ...}
+  POST /image/remove-bg    -> corpo = bytes da imagem; devolve PNG sem fundo
 
 GPU: lido dos contadores de desempenho do Windows (funcionam em PT-BR com os
 nomes em ingles) + tamanho real da VRAM via registro (qwMemorySize).
@@ -603,8 +604,82 @@ async def h_research_delete(request):
     return web.json_response({"ok": True})
 
 
+# ------------------------------------------------- Editor de fotos (v2.7)
+# "Remover fundo" do editor: U^2-Net pequeno (u2netp, Apache-2.0, 4,5 MB) via
+# onnxruntime, que ja vem no venv do Open WebUI. Baixado no primeiro uso para
+# NousData/models e conferido pelo SHA-256. O resto do editor roda no navegador.
+
+_U2NET_URL = "https://github.com/danielgatis/rembg/releases/download/v0.0.0/u2netp.onnx"
+_U2NET_SHA = "309c8469258dda742793dce0ebea8e6dd393174f89934733ecc8b14c76f4ddd8"
+_MAX_IMG = 20 * 1024 * 1024
+_u2net = {"session": None}
+_u2net_lock = asyncio.Lock()
+
+
+def _u2net_session():
+    if _u2net["session"] is not None:
+        return _u2net["session"]
+    import hashlib
+    import urllib.request
+    import onnxruntime as ort
+    path = _data_dir() / "models" / "u2netp.onnx"
+    if not path.is_file():
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(".part")
+        urllib.request.urlretrieve(_U2NET_URL, tmp)
+        if hashlib.sha256(tmp.read_bytes()).hexdigest() != _U2NET_SHA:
+            tmp.unlink()
+            raise RuntimeError("o arquivo do modelo veio corrompido")
+        tmp.replace(path)
+    _u2net["session"] = ort.InferenceSession(str(path), providers=["CPUExecutionProvider"])
+    return _u2net["session"]
+
+
+def _remove_bg(data):
+    import io
+    import numpy as np
+    from PIL import Image
+    img = Image.open(io.BytesIO(data))
+    img.load()
+    img = img.convert("RGBA")
+    rgb = img.convert("RGB")
+    x = np.asarray(rgb.resize((320, 320), Image.LANCZOS), dtype=np.float32)
+    x = x / max(1.0, float(x.max()))
+    x = (x - np.array([0.485, 0.456, 0.406], dtype=np.float32)) / np.array([0.229, 0.224, 0.225], dtype=np.float32)
+    x = x.transpose(2, 0, 1)[None, ...].astype(np.float32)
+    sess = _u2net_session()
+    pred = sess.run(None, {sess.get_inputs()[0].name: x})[0][0, 0]
+    lo, hi = float(pred.min()), float(pred.max())
+    pred = (pred - lo) / ((hi - lo) or 1.0)
+    mask = Image.fromarray((pred * 255).astype("uint8"), "L").resize(img.size, Image.LANCZOS)
+    # mantem a transparencia que a imagem ja tinha
+    alpha = Image.fromarray(np.minimum(np.asarray(mask), np.asarray(img.getchannel("A"))))
+    img.putalpha(alpha)
+    out = io.BytesIO()
+    img.save(out, "PNG")
+    return out.getvalue()
+
+
+async def h_remove_bg(request):
+    data = await request.read()
+    if not data or len(data) > _MAX_IMG:
+        return web.json_response({"error": "imagem vazia ou maior que 20 MB"}, status=400)
+    async with _u2net_lock:  # um por vez: CPU e memoria
+        try:
+            png = await asyncio.get_event_loop().run_in_executor(None, _remove_bg, data)
+        except Exception as e:
+            msg = str(e)
+            if "urlopen" in msg or "getaddrinfo" in msg or "corrompido" in msg:
+                msg = "Nao consegui baixar o modelo de recorte (4,5 MB). Verifique a internet."
+            else:
+                print(f"[Nous][editor] remover fundo: {e}", file=sys.stderr)
+                msg = "Nao consegui abrir esta imagem."
+            return web.json_response({"error": msg}, status=500)
+    return web.Response(body=png, content_type="image/png")
+
+
 def build_app():
-    app = web.Application(middlewares=[cors_mw])
+    app = web.Application(middlewares=[cors_mw], client_max_size=_MAX_IMG + 1024)
     app.add_routes([web.get("/stats", h_stats),
                     web.post("/unload", h_unload),
                     web.get("/health", h_health),
@@ -617,7 +692,8 @@ def build_app():
                     web.post("/voice/install", h_voice_install),
                     web.get("/research", h_research_list),
                     web.get("/research/view", h_research_view),
-                    web.post("/research/delete", h_research_delete)])
+                    web.post("/research/delete", h_research_delete),
+                    web.post("/image/remove-bg", h_remove_bg)])
     return app
 
 
