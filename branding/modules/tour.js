@@ -8,11 +8,12 @@
 	'use strict';
 
 	var TOURS = {
-		home: { when: function () { return !!document.getElementById('chat-input') && !!document.getElementById('nous-mon-body') && !anyPanel(); },
+		home: { when: function () { return !!document.getElementById('chat-input') && visible('nous-pn') && document.body.classList.contains('nous-pn-fixo') && !anyPanel(); },
 			steps: [
 				['#chat-input', 'Converse aqui, em portugues. Alem de perguntas, voce pode pedir: "me lembre de pagar a luz sexta as 9h", "manda um e-mail pra Maria..." ou colar a foto de um boleto.'],
-				['#nous-monitor', 'Este e\' o seu painel: quanto da placa de video esta em uso e os atalhos para Agenda, E-mail, Habilidades, Editor de fotos e mais.'],
-				['#nous-mem-btn', 'Aqui fica o que o Nous sabe sobre voce. Veja, corrija ou apague quando quiser.']] },
+				['#nous-pn-head', 'Este e\' o seu Nous. O anel em volta da coruja mostra quanto da placa de video esta em uso; fica dourado quando um modelo esta pronto para responder.'],
+				['#nous-pn-mem', 'Aqui fica o que o Nous sabe sobre voce. Veja, corrija ou apague quando quiser.'],
+				['#nous-pn-ferr', 'Agenda, Documentos, E-mail, Editor de fotos e o resto: tudo a um clique.']] },
 		agenda: { when: function () { return visible('nous-ag-ov'); },
 			steps: [
 				['#nous-ag-tabs', 'Hoje mostra o que vem por ai. Notas guarda listas e lembretes. Calendario traz o Google Agenda. Tarefas faz o Nous trabalhar sozinho no horario.'],

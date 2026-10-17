@@ -17,6 +17,17 @@ O Nous abre como um programa do computador: sem tela de login.
   nome, frase de privacidade, uma dica do Nous a cada visita e o botão
   **Conversa privada** (o chat temporário do Open WebUI). Sem login, o "Sair"
   do menu da conta e o aviso "Você agora está logado" somem.
+- **Painel "Seu Nous"** (`branding/modules/painel.js`): um painel fixo à
+  direita reúne o que antes flutuava pela tela. A coruja fica dentro de um anel
+  que mostra o uso da placa de vídeo (dourado quando há modelo carregado, com
+  "Liberar a placa de vídeo"), e o painel traz a conversa privada, os próximos
+  lembretes da Agenda, as memórias mais recentes e as 12 ferramentas com nome.
+  Em tela larga o chat abre espaço; em tela menor vira gaveta; fechado, sobra
+  só a coruja no canto, e o Nous lembra a escolha. Saem o card "Recursos", o
+  botão flutuante da memória, o do tema, o NOUS do topo e o ícone do chat
+  temporário.
+- **Casca:** marca maior na barra lateral, estrela ao lado do modelo no lugar
+  de "Definir como padrão" e primeiro nome no lugar do nome inteiro cortado.
 ### Corrigido
 - **Memória:** o filtro não aprende nada de conversa temporária (id
   `local:...`); antes ela sumia do histórico mas ainda podia virar memória.

@@ -48,6 +48,7 @@ O que você ganha em relação a um chat de IA comum:
 ### Novidades da versão 2.10
 
 - **Sem login:** o Nous abre direto no chat, como qualquer programa do computador — nada de conta nem senha para lembrar. Ele só aceita conexões do próprio PC, então quem protege é a senha do Windows. Suas conversas antigas continuam lá.
+- **Painel "Seu Nous":** à direita, a coruja num anel mostra quanto da placa de vídeo está em uso, e logo abaixo ficam a conversa privada, os próximos lembretes, o que o Nous sabe de você e todas as ferramentas com nome. Fechado, sobra só a coruja no canto.
 - **Tela inicial nova:** *"Boa tarde, Fulano"*, uma dica do Nous a cada visita e o botão **Conversa privada** — a conversa não fica no histórico nem vira memória.
 
 ### Novidades da versão 2.9
