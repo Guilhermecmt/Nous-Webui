@@ -398,9 +398,7 @@ Agenda (8996) e Habilidades (8997) documentam as rotas no topo de
 [Granite Embedding](https://huggingface.co/ibm-granite/granite-embedding-278m-multilingual) (Apache-2.0) ·
 [ntfy](https://ntfy.sh) ·
 [Open-Meteo](https://open-meteo.com).  
-Agenda, tarefas agendadas, habilidades, relatório visual, editor de fotos e a estimativa de velocidade
-da Loja foram **inspirados** no [Odysseus](https://github.com/odysseus-dev/odysseus) (AGPL-3.0) e na ideia
-do [llmfit](https://github.com/AlexsJones/llmfit) (MIT); o código do Nous foi escrito do zero e continua MIT.  
+A estimativa de velocidade da Loja foi inspirada na ideia do [llmfit](https://github.com/AlexsJones/llmfit) (MIT).  
 Marcas pertencem aos seus respectivos projetos.
 
 ## Licença

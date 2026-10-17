@@ -4,7 +4,7 @@
 > Objetivo: dar ao Nous **conversa por voz natural, 100% local e em português** —
 > falar com o Nous e ouvir a resposta, sem internet, rodando até em CPU.
 > É o maior diferencial inédito identificado na análise competitiva
-> (ver memória `competitive-landscape`): nem o Odysseus (só STT, inglês) nem os
+> (ver memória `competitive-landscape`): os
 > concorrentes (Cherry/Open WebUI: voz básica, inglês, instalação técnica)
 > entregam voz conversacional em PT-BR empacotada para leigos.
 

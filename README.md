@@ -398,9 +398,7 @@ Agenda (8996) and Skills (8997) document their routes at the top of
 [Granite Embedding](https://huggingface.co/ibm-granite/granite-embedding-278m-multilingual) (Apache-2.0) ·
 [ntfy](https://ntfy.sh) ·
 [Open-Meteo](https://open-meteo.com).  
-Agenda, scheduled tasks, skills, the visual report, the photo editor and the Store's speed estimate were
-**inspired** by [Odysseus](https://github.com/odysseus-dev/odysseus) (AGPL-3.0) and by the idea behind
-[llmfit](https://github.com/AlexsJones/llmfit) (MIT); Nous's code was written from scratch and stays MIT.  
+The Store's speed estimate was inspired by the idea behind [llmfit](https://github.com/AlexsJones/llmfit) (MIT).  
 All trademarks belong to their respective projects.
 
 ## License

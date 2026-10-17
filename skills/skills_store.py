@@ -62,7 +62,7 @@ def parse(text):
                 k, v = line.split(":", 1)
                 meta[k.strip().lower()] = v.strip().strip('"').strip("'")
         body = m.group(2)
-    # SKILL.md do Claude/Odysseus usa name/description: aceita os dois
+    # SKILL.md do Claude usa name/description: aceita os dois
     out = {
         "nome": meta.get("nome") or meta.get("name") or "",
         "quando_usar": meta.get("quando_usar") or meta.get("description") or "",
