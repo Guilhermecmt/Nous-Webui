@@ -32,9 +32,12 @@ Nao usa dependencia nova: aiohttp ja vem no venv do Open WebUI.
 import os
 import sys
 import json
+import re
 import asyncio
 import subprocess
 import urllib.parse
+import sqlite3
+import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -142,7 +145,83 @@ async def _unload(model=None):
                     pass
             except Exception:
                 pass
+    # Para o ComfyUI (porta 8188) matando o processo Python que o sustenta.
+    # O /interrupt do ComfyUI aborta a geração em curso mas não libera a VRAM;
+    # apenas encerrar o processo libera completamente.
+    await _stop_comfyui()
     return targets
+
+
+async def _start_comfyui() -> bool:
+    """Sobe o ComfyUI (porta 8188) se ainda não estiver no ar. Retorna True se ok."""
+    # Já está no ar?
+    try:
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=4)) as s:
+            async with s.get("http://localhost:8188/system_stats") as r:
+                if r.status < 500:
+                    return True
+    except Exception:
+        pass
+
+    # Localiza o ComfyUI
+    home = Path.home()
+    cu = None
+    for d in ("ComfyUI", "ComfyUI-Zluda"):
+        candidate = home / d
+        if (candidate / "venv" / "Scripts" / "python.exe").exists():
+            cu = candidate
+            break
+    if not cu:
+        return False
+
+    cpy  = str(cu / "venv" / "Scripts" / "python.exe")
+    main = str(cu / "main.py")
+    env  = {**os.environ, "PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8"}
+    try:
+        await asyncio.create_subprocess_exec(
+            cpy, main, "--port", "8188",
+            cwd=str(cu),
+            env=env,
+            stdout=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.DEVNULL,
+            creationflags=0x08000000,  # CREATE_NO_WINDOW
+        )
+    except Exception:
+        return False
+
+    # Aguarda até 90 s
+    deadline = asyncio.get_event_loop().time() + 90
+    chk = aiohttp.ClientTimeout(total=4)
+    while asyncio.get_event_loop().time() < deadline:
+        await asyncio.sleep(3)
+        try:
+            async with aiohttp.ClientSession(timeout=chk) as s:
+                async with s.get("http://localhost:8188/system_stats") as r:
+                    if r.status < 500:
+                        return True
+        except Exception:
+            pass
+    return False
+
+
+async def h_comfyui_start(request):
+    ok = await _start_comfyui()
+    return web.json_response({"ok": ok})
+
+
+async def _stop_comfyui():
+    """Encerra o processo Python do ComfyUI (porta 8188) liberando a VRAM."""
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "powershell.exe", "-NoProfile", "-NonInteractive", "-Command",
+            "Get-NetTCPConnection -LocalPort 8188 -State Listen -ErrorAction SilentlyContinue"
+            " | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }",
+            stdout=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.DEVNULL,
+        )
+        await asyncio.wait_for(proc.communicate(), timeout=8)
+    except Exception:
+        pass
 
 
 # ------------------------------------------------- Loja de Modelos (v2.2)
@@ -569,6 +648,185 @@ async def h_voice_install(request):
     return web.json_response({"started": True})
 
 
+# ------------------------------------------------- Galeria de Imagens (v2.3)
+
+def _webui_db():
+    dd = _data_dir()
+    p = dd / "webui.db"
+    return str(p) if p.is_file() else None
+
+
+def _gallery_images():
+    """Retorna lista de dicts com metadados de imagens geradas pelo Flux."""
+    db_path = _webui_db()
+    if not db_path:
+        return []
+    try:
+        cx = sqlite3.connect(db_path, timeout=10)
+        cx.row_factory = sqlite3.Row
+        rows = cx.execute(
+            "SELECT id, filename, meta, path, created_at FROM file "
+            "WHERE filename LIKE '%generated-image%' OR filename LIKE '%image.png' "
+            "ORDER BY created_at DESC"
+        ).fetchall()
+        cx.close()
+    except Exception:
+        return []
+    images = []
+    for r in rows:
+        try:
+            meta = json.loads(r["meta"] or "{}")
+        except Exception:
+            meta = {}
+        # Filtra apenas imagens geradas pelo pipe (content_type image/png)
+        if meta.get("content_type") not in ("image/png", "image/jpeg", "image/webp"):
+            continue
+        path = r["path"] or ""
+        exists = os.path.isfile(path) if path else False
+        images.append({
+            "id": r["id"],
+            "filename": r["filename"],
+            "path": path,
+            "exists": exists,
+            "size": meta.get("size", 0),
+            "chat_id": (meta.get("data") or {}).get("chat_id"),
+            "created_at": r["created_at"],
+        })
+    return images
+
+
+def _gal_meta_path():
+    return _data_dir() / "gallery_meta.json"
+
+
+def _gal_meta():
+    """{id: {"fav": bool, "album": str}} - favoritas e albuns da galeria (v2.8)."""
+    try:
+        return json.loads(_gal_meta_path().read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+async def h_gallery(request):
+    images = await asyncio.get_event_loop().run_in_executor(None, _gallery_images)
+    meta = _gal_meta()
+    # Não expõe o path completo ao frontend por segurança
+    safe = [{**{k: v for k, v in img.items() if k != "path"},
+             "fav": bool(meta.get(img["id"], {}).get("fav")),
+             "album": meta.get(img["id"], {}).get("album", "")} for img in images]
+    albums = sorted({m.get("album") for m in meta.values() if m.get("album")})
+    return web.json_response({"images": safe, "albums": albums})
+
+
+async def h_gallery_meta(request):
+    """{id, fav?, album?}: marca favorita / poe num album ("" tira do album)."""
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    img_id = str((body or {}).get("id") or "")
+    if not img_id:
+        return web.json_response({"error": "id ausente"}, status=400)
+    meta = _gal_meta()
+    m = meta.setdefault(img_id, {})
+    if "fav" in body:
+        m["fav"] = bool(body["fav"])
+    if "album" in body:
+        m["album"] = re.sub(r"\s+", " ", str(body["album"] or "")).strip()[:60]
+    if not m.get("fav") and not m.get("album"):
+        meta.pop(img_id, None)
+    p = _gal_meta_path()
+    tmp = p.with_suffix(".tmp")
+    tmp.write_text(json.dumps(meta, ensure_ascii=False), encoding="utf-8")
+    tmp.replace(p)
+    return web.json_response({"ok": True})
+
+
+async def h_gallery_image(request):
+    """Serve os bytes da imagem para exibição na galeria (miniatura inline)."""
+    img_id = request.match_info.get("id", "")
+    if not img_id:
+        return web.Response(status=400)
+    images = await asyncio.get_event_loop().run_in_executor(None, _gallery_images)
+    match = next((img for img in images if img["id"] == img_id), None)
+    if not match:
+        return web.Response(status=404)
+    path = match.get("path", "")
+    if not path or not os.path.isfile(path):
+        return web.Response(status=404)
+    try:
+        data = Path(path).read_bytes()
+        return web.Response(body=data, content_type="image/png",
+                            headers={"Cache-Control": "max-age=3600"})
+    except Exception:
+        return web.Response(status=500)
+
+
+def _move_to_recycle(path: str) -> bool:
+    """Move arquivo para o lixeiro do Windows via PowerShell."""
+    try:
+        script = (
+            "Add-Type -AssemblyName Microsoft.VisualBasic; "
+            f"[Microsoft.VisualBasic.FileIO.FileSystem]::DeleteFile("
+            "'" + path.replace("'", "''") + "',"
+            f"'OnlyErrorDialogs','SendToRecycleBin')"
+        )
+        result = subprocess.run(
+            ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", script],
+            timeout=10, capture_output=True
+        )
+        return result.returncode == 0
+    except Exception:
+        return False
+
+
+def _delete_image(img_id: str, permanent: bool) -> dict:
+    db_path = _webui_db()
+    if not db_path:
+        return {"ok": False, "error": "banco nao encontrado"}
+
+    try:
+        cx = sqlite3.connect(db_path, timeout=10)
+        row = cx.execute("SELECT path FROM file WHERE id=?", (img_id,)).fetchone()
+        if not row:
+            cx.close()
+            return {"ok": False, "error": "imagem nao encontrada"}
+        file_path = row[0] or ""
+        cx.execute("DELETE FROM file WHERE id=?", (img_id,))
+        cx.commit()
+        cx.close()
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+    file_deleted = False
+    if file_path and os.path.isfile(file_path):
+        if permanent:
+            try:
+                os.remove(file_path)
+                file_deleted = True
+            except Exception:
+                pass
+        else:
+            file_deleted = _move_to_recycle(file_path)
+
+    return {"ok": True, "file_deleted": file_deleted,
+            "permanent": permanent, "id": img_id}
+
+
+async def h_gallery_delete(request):
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    img_id = (body.get("id") or "").strip()
+    permanent = bool(body.get("permanent", False))
+    if not img_id:
+        return web.json_response({"ok": False, "error": "id ausente"}, status=400)
+    result = await asyncio.get_event_loop().run_in_executor(
+        None, _delete_image, img_id, permanent)
+    return web.json_response(result)
+
+
 # ------------------------------------------------- Relatorios de pesquisa (v2.7)
 # Biblioteca da Pesquisa Profunda (search/nous_search/report.py grava em
 # NousData/research). A pagina e' servida com CSP sem scripts: o texto veio da
@@ -857,6 +1115,136 @@ async def h_pdf_autofill(request):
     return web.json_response({"values": {k: v for k, v in values.items() if isinstance(v, str) and v.strip()}})
 
 
+# --------------------------------------------------------------------------
+# Comparar modelos (v2.8): a mesma pergunta para 2 a 4 modelos, um de cada vez
+# (uma placa so': em paralelo eles disputariam a VRAM e a velocidade mentiria).
+# Cada resposta volta com tempo e tokens/s; o voto do usuario vai para um placar.
+# --------------------------------------------------------------------------
+
+_CMP_LOCK = asyncio.Lock()
+_CMP_SYSTEM = "Responda sempre em portugues do Brasil, de forma clara e direta."
+
+
+def _score_path():
+    return _data_dir() / "compare_score.json"
+
+
+def _score_read():
+    try:
+        return json.loads(_score_path().read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def _score_write(sc):
+    p = _score_path()
+    tmp = p.with_suffix(".tmp")
+    tmp.write_text(json.dumps(sc, ensure_ascii=False), encoding="utf-8")
+    tmp.replace(p)
+
+
+def _score_list(sc):
+    out = []
+    for name, v in sc.items():
+        jogos = v.get("jogos", 0)
+        out.append({"model": name, "jogos": jogos, "vitorias": v.get("vitorias", 0),
+                    "empates": v.get("empates", 0),
+                    "taxa": round(100 * v.get("vitorias", 0) / jogos) if jogos else 0,
+                    "tps": round(v["tps_soma"] / v["tps_n"], 1) if v.get("tps_n") else None})
+    out.sort(key=lambda x: (-x["taxa"], -x["vitorias"], -x["jogos"], x["model"]))
+    return out
+
+
+async def _cmp_chat(s, payload):
+    async with s.post(f"{OLLAMA}/api/chat", json=payload) as r:
+        d = await r.json(content_type=None)
+        return r.status, d
+
+
+async def h_compare_run(request):
+    """{model, prompt} -> {text, secs, load, tokens, tps}. Um modelo por vez."""
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    model = str(body.get("model") or "")[:120]
+    prompt = str(body.get("prompt") or "").strip()[:8000]
+    if not model or not prompt:
+        return web.json_response({"error": "faltou o modelo ou a pergunta"}, status=400)
+    tags = await _installed_tags()
+    if tags is None:
+        return web.json_response({"error": "o motor de IA (Ollama) nao esta no ar"}, status=503)
+    if model not in tags or not _is_chat(model):
+        return web.json_response({"error": "esse modelo nao esta instalado"}, status=400)
+    payload = {"model": model, "stream": False, "think": False, "keep_alive": "2m",
+               "messages": [{"role": "system", "content": _CMP_SYSTEM}, {"role": "user", "content": prompt}],
+               "options": {"num_ctx": int(os.environ.get("NOUS_NUM_CTX", "16384"))}}
+    async with _CMP_LOCK:
+        try:
+            timeout = aiohttp.ClientTimeout(total=600)
+            async with aiohttp.ClientSession(timeout=timeout) as s:
+                status, d = await _cmp_chat(s, payload)
+                if status != 200 and "think" in str(d.get("error", "")).lower():
+                    payload.pop("think")  # modelo sem modo de pensar: pede de novo sem o campo
+                    status, d = await _cmp_chat(s, payload)
+        except asyncio.TimeoutError:
+            return web.json_response({"error": "o modelo demorou demais (10 min)"}, status=504)
+        except Exception:
+            return web.json_response({"error": "o motor de IA nao respondeu"}, status=502)
+    if status != 200:
+        return web.json_response({"error": str(d.get("error") or "falhou")[:300]}, status=502)
+    text = (d.get("message") or {}).get("content") or ""
+    # alguns modelos (qwen3) pensam em voz alta mesmo com think=False e o "<think>"
+    # de abertura fica no molde: vale o que vem depois do ultimo "</think>"
+    text = text.rsplit("</think>", 1)[-1].strip()
+    ev, evd = d.get("eval_count") or 0, d.get("eval_duration") or 0
+    return web.json_response({"text": text,
+                              "secs": round((d.get("total_duration") or 0) / 1e9, 1),
+                              "load": round((d.get("load_duration") or 0) / 1e9, 1),
+                              "tokens": ev,
+                              "tps": round(ev / (evd / 1e9), 1) if evd else None})
+
+
+async def h_compare_vote(request):
+    """{models:[...], winner: modelo|"" (empate), tps:{modelo: n}} -> placar."""
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    models = [str(m)[:120] for m in (body.get("models") or []) if isinstance(m, str) and m]
+    models = list(dict.fromkeys(models))
+    winner = str(body.get("winner") or "")
+    tps = body.get("tps") or {}
+    if not 2 <= len(models) <= 4 or (winner and winner not in models):
+        return web.json_response({"error": "voto invalido"}, status=400)
+    sc = _score_read()
+    for m in models:
+        v = sc.setdefault(m, {"jogos": 0, "vitorias": 0, "empates": 0, "tps_soma": 0.0, "tps_n": 0})
+        v["jogos"] += 1
+        if not winner:
+            v["empates"] = v.get("empates", 0) + 1
+        elif m == winner:
+            v["vitorias"] += 1
+        t = tps.get(m) if isinstance(tps, dict) else None
+        if isinstance(t, (int, float)) and 0 < t < 10000:
+            v["tps_soma"] += float(t)
+            v["tps_n"] += 1
+    _score_write(sc)
+    return web.json_response({"placar": _score_list(sc)})
+
+
+async def h_compare_score(request):
+    return web.json_response({"placar": _score_list(_score_read())})
+
+
+async def h_compare_reset(request):
+    try:
+        _score_path().unlink()
+    except FileNotFoundError:
+        pass
+    return web.json_response({"placar": []})
+
+
 def build_app():
     app = web.Application(middlewares=[cors_mw], client_max_size=_MAX_IMG + 1024)
     app.add_routes([web.get("/stats", h_stats),
@@ -869,6 +1257,11 @@ def build_app():
                     web.get("/pull/status", h_pull_status),
                     web.get("/voice/status", h_voice_status),
                     web.post("/voice/install", h_voice_install),
+                    web.post("/comfyui/start", h_comfyui_start),
+                    web.get("/gallery", h_gallery),
+                    web.get("/gallery/image/{id}", h_gallery_image),
+                    web.post("/gallery/delete", h_gallery_delete),
+                    web.post("/gallery/meta", h_gallery_meta),
                     web.get("/research", h_research_list),
                     web.get("/research/view", h_research_view),
                     web.post("/research/delete", h_research_delete),
@@ -879,7 +1272,11 @@ def build_app():
                     web.post("/pdf/autofill", h_pdf_autofill),
                     web.get("/pdf/signature", h_pdf_sig_get),
                     web.post("/pdf/signature", h_pdf_sig_save),
-                    web.post("/pdf/signature/delete", h_pdf_sig_delete)])
+                    web.post("/pdf/signature/delete", h_pdf_sig_delete),
+                    web.post("/compare/run", h_compare_run),
+                    web.post("/compare/vote", h_compare_vote),
+                    web.get("/compare/score", h_compare_score),
+                    web.post("/compare/reset", h_compare_reset)])
     return app
 
 

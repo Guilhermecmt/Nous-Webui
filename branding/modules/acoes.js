@@ -30,11 +30,15 @@
 		pdf: function () { if (window.NousPdf) window.NousPdf.open(); },
 		loja: function () { if (window.NousUI && window.NousUI.openStore) window.NousUI.openStore(); },
 		memoria: function () { if (window.NousUI && window.NousUI.openMemory) window.NousUI.openMemory(); },
-		diagnostico: function () { if (window.NousDiag) window.NousDiag.open(); }
+		diagnostico: function () { if (window.NousDiag) window.NousDiag.open(); },
+		galeria: function () { if (window.NousUI && window.NousUI.openGallery) window.NousUI.openGallery(); },
+		comparar: function () { if (window.NousCompare) window.NousCompare.open('comparar'); },
+		placar: function () { if (window.NousCompare) window.NousCompare.open('placar'); }
 	};
 	var ROTULO = { agenda: '📅 Abrir Agenda', email: '✉ Abrir Email', habilidades: '🧠 Abrir Habilidades',
 		relatorios: '🔎 Abrir Relatorios', editor: '🖼 Abrir Editor', pdf: '📄 Abrir Formularios',
-		loja: '⬇ Abrir Loja de modelos', memoria: '💭 O que o Nous sabe', diagnostico: '🩺 Abrir Diagnostico' };
+		loja: '⬇ Abrir Loja de modelos', memoria: '💭 O que o Nous sabe', diagnostico: '🩺 Abrir Diagnostico',
+		galeria: '🖼 Abrir Galeria', comparar: '⚖ Comparar modelos', placar: '🏆 Ver o placar' };
 
 	function injectStyle() {
 		if (document.getElementById('nous-act-style')) return;

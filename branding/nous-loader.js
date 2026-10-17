@@ -210,7 +210,66 @@
 			'.nous-email-back:hover{text-decoration:underline}' +
 			'.nous-email-draft{width:100%;box-sizing:border-box;min-height:120px;padding:8px;' +
 			'background:rgba(255,255,255,.06);border:1px solid rgba(200,150,46,.25);' +
-			'border-radius:8px;color:#eee;font-size:12px;resize:vertical;margin:8px 0}';
+			'border-radius:8px;color:#eee;font-size:12px;resize:vertical;margin:8px 0}' +
+			/* galeria */
+			'#nous-gallery-open{width:100%;margin-top:5px;padding:6px;border:1px solid rgba(200,150,46,.25);' +
+			'border-radius:8px;cursor:pointer;background:transparent;color:#e7c069;' +
+			'font-weight:600;font-size:12px;transition:background .15s}' +
+			'#nous-gallery-open:hover{background:rgba(200,150,46,.12)}' +
+			'#nous-gal-ov{position:fixed;inset:0;z-index:10001;background:rgba(0,0,0,.6);' +
+			'display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)}' +
+			'#nous-gal-ov.nous-hidden{display:none}' +
+			'#nous-gal-box{width:700px;max-width:96vw;max-height:88vh;display:flex;flex-direction:column;' +
+			'font-family:Inter,system-ui,sans-serif;font-size:13px;color:#eee;' +
+			'background:rgba(18,18,22,.98);border:1px solid rgba(200,150,46,.4);' +
+			'border-radius:16px;box-shadow:0 16px 48px rgba(0,0,0,.6);overflow:hidden}' +
+			'#nous-gal-head{display:flex;align-items:center;gap:8px;padding:14px 16px 10px;' +
+			'border-bottom:1px solid rgba(255,255,255,.07);flex-shrink:0}' +
+			'#nous-gal-head span{flex:1;font-weight:700;font-size:15px;color:#e7c069}' +
+			'#nous-gal-count{font-size:11px;opacity:.5;font-weight:400}' +
+			'#nous-gal-close{background:none;border:none;color:#888;cursor:pointer;font-size:19px;line-height:1}' +
+			'#nous-gal-close:hover{color:#eee}' +
+			'#nous-gal-grid{flex:1;overflow-y:auto;padding:14px;' +
+			'display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px}' +
+			'#nous-gal-grid::-webkit-scrollbar{width:6px}' +
+			'#nous-gal-grid::-webkit-scrollbar-thumb{background:rgba(200,150,46,.3);border-radius:4px}' +
+			'.nous-gal-card{position:relative;border-radius:10px;overflow:hidden;' +
+			'background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);' +
+			'aspect-ratio:1/1;cursor:pointer;transition:border-color .15s}' +
+			'.nous-gal-card:hover{border-color:rgba(200,150,46,.5)}' +
+			'.nous-gal-card img{width:100%;height:100%;object-fit:cover;display:block}' +
+			'.nous-gal-card .nous-gal-overlay{position:absolute;inset:0;background:rgba(0,0,0,.0);' +
+			'display:flex;flex-direction:column;justify-content:flex-end;transition:background .2s}' +
+			'.nous-gal-card:hover .nous-gal-overlay{background:rgba(0,0,0,.55)}' +
+			'.nous-gal-actions{display:flex;gap:5px;padding:8px;opacity:0;transition:opacity .2s}' +
+			'.nous-gal-card:hover .nous-gal-actions{opacity:1}' +
+			'.nous-gal-btn{flex:1;padding:5px;border:none;border-radius:6px;font-size:11px;' +
+			'font-weight:600;cursor:pointer;transition:background .15s}' +
+			'.nous-gal-btn-trash{background:rgba(240,120,60,.25);color:#f08060}' +
+			'.nous-gal-btn-trash:hover{background:rgba(240,120,60,.5)}' +
+			'.nous-gal-btn-del{background:rgba(220,50,50,.25);color:#e06060}' +
+			'.nous-gal-btn-del:hover{background:rgba(220,50,50,.5)}' +
+			'.nous-gal-date{font-size:10px;opacity:.5;padding:0 8px 6px;' +
+			'overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
+			'.nous-gal-empty{grid-column:1/-1;text-align:center;padding:40px 20px;' +
+			'opacity:.5;font-size:13px;line-height:1.6}' +
+			'#nous-gal-lightbox{position:fixed;inset:0;z-index:10010;background:rgba(0,0,0,.92);' +
+			'display:flex;align-items:center;justify-content:center;overflow:hidden}' +
+			'#nous-gal-lightbox.nous-hidden{display:none}' +
+			'#nous-gal-lightbox img{max-width:90vw;max-height:90vh;border-radius:8px;' +
+			'box-shadow:0 8px 40px rgba(0,0,0,.6);cursor:zoom-in;transform-origin:center center;' +
+			'transition:transform .2s ease,border-radius .2s;user-select:none;-webkit-user-drag:none}' +
+			'#nous-gal-lightbox img.zoomed{cursor:zoom-out;border-radius:2px}' +
+			'#nous-gal-lb-close{position:absolute;top:16px;right:20px;background:none;border:none;' +
+			'color:#fff;font-size:28px;cursor:pointer;line-height:1;opacity:.7;z-index:1}' +
+			'#nous-gal-lb-close:hover{opacity:1}' +
+			'#nous-gal-lb-edit{position:absolute;top:16px;left:20px;padding:7px 13px;border-radius:9px;cursor:pointer;' +
+			'border:1px solid rgba(200,150,46,.6);background:rgba(18,18,22,.85);color:#e7c069;font-weight:600;font-size:13px}' +
+			'#nous-gal-filter{display:flex;gap:6px;flex-wrap:wrap;padding:0 16px 8px}' +
+			'.nous-gal-chip{padding:4px 10px;border-radius:99px;border:1px solid rgba(200,150,46,.35);background:transparent;' +
+			'color:#e7c069;font-size:11px;cursor:pointer}.nous-gal-chip.on{background:rgba(200,150,46,.25)}' +
+			'#nous-gal-lb-hint{position:absolute;bottom:18px;left:50%;transform:translateX(-50%);' +
+			'color:rgba(255,255,255,.35);font-size:11px;pointer-events:none;font-family:Inter,system-ui,sans-serif}';
 		var st = document.createElement('style');
 		st.id = 'nous-monitor-style';
 		st.textContent = css;
@@ -234,7 +293,8 @@
 			'<button id="nous-mon-stop" type="button" disabled>Parar modelos</button>' +
 			'<button id="nous-store-open" type="button">Baixar modelos</button>' +
 			'<button id="nous-voice-open" type="button">🎙 Ativar voz em PT-BR</button>' +
-			'<button id="nous-email-open" type="button">✉ Assistente de Email</button></div>';
+			'<button id="nous-email-open" type="button">✉ Assistente de Email</button>' +
+			'<button id="nous-gallery-open" type="button">🖼 Galeria de Imagens</button></div>';
 		document.body.appendChild(monEl);
 		monModels = monEl.querySelector('#nous-mon-models');
 		monBtn = monEl.querySelector('#nous-mon-stop');
@@ -258,6 +318,7 @@
 		monEl.querySelector('#nous-store-open').addEventListener('click', openStore);
 		monEl.querySelector('#nous-voice-open').addEventListener('click', openVoice);
 		monEl.querySelector('#nous-email-open').addEventListener('click', openEmail);
+		monEl.querySelector('#nous-gallery-open').addEventListener('click', openGallery);
 		monEl.classList.toggle('nous-collapsed', monCollapsed);
 	}
 
@@ -1456,6 +1517,297 @@
 		}, 3000);
 	}
 
+	/* ========================== Galeria de Imagens ========================== */
+
+	/* Injeta item "Galeria" na sidebar lateral, entre /workspace e /notes */
+	var _galNavInjected = false;
+	function ensureGalleryNavItem() {
+		if (_galNavInjected) return;
+		/* âncora: o link /notes já renderizado pelo Svelte */
+		var notesLink = document.querySelector('a[href="/notes"]');
+		if (!notesLink) return;
+		/* parentElement direto = div.flex.items-center.w-full (wrapper do item) */
+		var wrapper = notesLink.parentElement;
+		if (!wrapper || !wrapper.parentElement) return;
+		/* evita duplicar */
+		if (wrapper.parentElement.querySelector('#nous-gal-nav')) return;
+		_galNavInjected = true;
+
+		var item = document.createElement('div');
+		item.id = 'nous-gal-nav';
+		item.className = 'flex items-center w-full';
+		item.innerHTML =
+			'<a href="javascript:void(0)" id="nous-gal-nav-link" draggable="false" ' +
+			'class="flex flex-1 rounded-xl py-1.5 px-3 hover:bg-gray-50 dark:hover:bg-gray-800 transition cursor-pointer select-none">' +
+			'<div class="self-center mr-3">' +
+			'<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-5">' +
+			'<path stroke-linecap="round" stroke-linejoin="round" ' +
+			'd="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z"/>' +
+			'</svg></div>' +
+			'<div class="self-center truncate">Galeria</div>' +
+			'</a>';
+
+		/* insere ANTES do wrapper do /notes */
+		wrapper.parentElement.insertBefore(item, wrapper);
+		item.querySelector('#nous-gal-nav-link').addEventListener('click', openGallery);
+	}
+
+	var galEl = null, galLbEl = null, galOpen = false;
+
+	function buildGallery() {
+		if (galEl && document.body && document.body.contains(galEl)) return;
+		if (!document.body) return;
+		galEl = document.createElement('div');
+		galEl.id = 'nous-gal-ov';
+		galEl.classList.add('nous-hidden');
+		galEl.innerHTML =
+			'<div id="nous-gal-box">' +
+			'<div id="nous-gal-head">' +
+			'<span>🖼 Galeria de Imagens <small id="nous-gal-count"></small></span>' +
+			'<button id="nous-gal-close" type="button" aria-label="Fechar">&#x2715;</button>' +
+			'</div>' +
+			'<div id="nous-gal-filter"></div>' +
+			'<div id="nous-gal-grid"><div class="nous-gal-empty">Carregando...</div></div>' +
+			'</div>';
+		document.body.appendChild(galEl);
+		galEl.addEventListener('click', function (e) { if (e.target === galEl) closeGallery(); });
+		galEl.querySelector('#nous-gal-close').addEventListener('click', closeGallery);
+
+		/* lightbox */
+		galLbEl = document.createElement('div');
+		galLbEl.id = 'nous-gal-lightbox';
+		galLbEl.classList.add('nous-hidden');
+		galLbEl.innerHTML =
+			'<button id="nous-gal-lb-close" type="button">&#x2715;</button>' +
+			'<img id="nous-gal-lb-img" src="" alt="">' +
+			'<button id="nous-gal-lb-edit" type="button">✎ Editar esta imagem</button>' +
+			'<div id="nous-gal-lb-hint">Scroll para ampliar · Esc para fechar</div>';
+		document.body.appendChild(galLbEl);
+		galLbEl.addEventListener('click', function (e) { if (e.target === galLbEl) closeLightbox(); });
+		galLbEl.querySelector('#nous-gal-lb-close').addEventListener('click', closeLightbox);
+		galLbEl.querySelector('#nous-gal-lb-edit').addEventListener('click', function (e) {
+			e.stopPropagation();
+			editImage(galLbEl.dataset.id);
+		});
+
+		/* zoom com scroll */
+		var lbImg = galLbEl.querySelector('#nous-gal-lb-img');
+		var lbScale = 1, lbMinScale = 1, lbMaxScale = 4;
+		function _lbApplyZoom(newScale) {
+			lbScale = Math.min(lbMaxScale, Math.max(lbMinScale, newScale));
+			lbImg.style.transform = lbScale > 1 ? 'scale(' + lbScale + ')' : '';
+			lbImg.classList.toggle('zoomed', lbScale > 1);
+		}
+		galLbEl.addEventListener('wheel', function (e) {
+			e.preventDefault();
+			_lbApplyZoom(lbScale * (e.deltaY < 0 ? 1.15 : 0.87));
+		}, { passive: false });
+		/* clique na imagem: toggle zoom 1x / 2x */
+		lbImg.addEventListener('click', function (e) {
+			e.stopPropagation();
+			_lbApplyZoom(lbScale > 1 ? lbMinScale : 2);
+		});
+		/* Esc fecha */
+		document.addEventListener('keydown', function (e) {
+			if (e.key === 'Escape' && galLbEl && !galLbEl.classList.contains('nous-hidden')) closeLightbox();
+		});
+		galLbEl._resetZoom = function () { lbScale = 1; lbImg.style.transform = ''; lbImg.classList.remove('zoomed'); };
+	}
+
+	function openGallery() {
+		buildGallery();
+		if (!galEl) return;
+		galOpen = true;
+		galEl.classList.remove('nous-hidden');
+		loadGallery();
+	}
+
+	function closeGallery() {
+		galOpen = false;
+		if (galEl) galEl.classList.add('nous-hidden');
+		closeLightbox();
+	}
+
+	function closeLightbox() {
+		if (galLbEl) {
+			galLbEl.classList.add('nous-hidden');
+			if (galLbEl._resetZoom) galLbEl._resetZoom();
+		}
+	}
+
+	function openLightbox(id) {
+		buildGallery();
+		if (!galLbEl) return;
+		if (galLbEl._resetZoom) galLbEl._resetZoom();
+		var img = galLbEl.querySelector('#nous-gal-lb-img');
+		if (img) img.src = MON_URL + '/gallery/image/' + encodeURIComponent(id);
+		galLbEl.dataset.id = id;
+		galLbEl.classList.remove('nous-hidden');
+	}
+
+	function _galFmt(ts) {
+		if (!ts) return '';
+		try {
+			var d = new Date(ts * 1000);
+			return d.toLocaleDateString('pt-BR') + ' ' +
+				d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+		} catch (e) { return ''; }
+	}
+
+	function _galSize(bytes) {
+		if (!bytes) return '';
+		if (bytes >= 1048576) return (bytes / 1048576).toFixed(1) + ' MB';
+		return Math.round(bytes / 1024) + ' KB';
+	}
+
+	function loadGallery() {
+		if (!galEl) return;
+		var grid = galEl.querySelector('#nous-gal-grid');
+		if (grid) grid.innerHTML = '<div class="nous-gal-empty">Carregando...</div>';
+		fetch(MON_URL + '/gallery', { cache: 'no-store' })
+			.then(function (r) { return r.json(); })
+			.then(renderGallery)
+			.catch(function () {
+				if (grid) grid.innerHTML =
+					'<div class="nous-gal-empty">Monitor offline.<br>Abra o Nous pelo atalho e tente de novo.</div>';
+			});
+	}
+
+	/* Abre a imagem no Editor de fotos (branding/modules/editor.js). */
+	function editImage(id) {
+		if (!window.NousEditor || !id) return;
+		closeGallery();
+		window.NousEditor.openUrl(MON_URL + '/gallery/image/' + encodeURIComponent(id), 'imagem');
+	}
+
+	function galMeta(id, patch) {
+		return fetch(MON_URL + '/gallery/meta', {
+			method: 'POST', headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify(Object.assign({ id: id }, patch))
+		}).then(loadGallery, loadGallery);
+	}
+
+	var galFilter = '';  /* '' = todas, '*' = favoritas, outro = nome do album */
+
+	function renderFilter(data) {
+		var bar = galEl.querySelector('#nous-gal-filter');
+		if (!bar) return;
+		var opts = [['', 'Todas'], ['*', '★ Favoritas']].concat(((data && data.albums) || []).map(function (a) { return [a, '📁 ' + a]; }));
+		bar.innerHTML = opts.map(function (o) {
+			return '<button type="button" class="nous-gal-chip' + (o[0] === galFilter ? ' on' : '') + '" data-f="' + _esc(o[0]) + '">' + _esc(o[1]) + '</button>';
+		}).join('');
+		bar.querySelectorAll('[data-f]').forEach(function (b) {
+			b.addEventListener('click', function () { galFilter = b.getAttribute('data-f'); renderGallery(data); });
+		});
+	}
+
+	function renderGallery(data) {
+		if (!galEl) return;
+		var grid = galEl.querySelector('#nous-gal-grid');
+		var count = galEl.querySelector('#nous-gal-count');
+		renderFilter(data);
+		var images = ((data && data.images) || []).filter(function (img) {
+			return !galFilter || (galFilter === '*' ? img.fav : img.album === galFilter);
+		});
+		if (count) count.textContent = images.length ? '(' + images.length + ')' : '';
+		if (!images.length) {
+			grid.innerHTML = '<div class="nous-gal-empty">Nenhuma imagem gerada ainda.<br>' +
+				'Diga ao Nous: <em>"crie uma imagem de..."</em></div>';
+			return;
+		}
+		grid.innerHTML = '';
+		images.forEach(function (img) {
+			var card = document.createElement('div');
+			card.className = 'nous-gal-card';
+			card.dataset.id = img.id;
+			var thumbSrc = img.exists
+				? MON_URL + '/gallery/image/' + encodeURIComponent(img.id)
+				: '';
+			var thumbHtml = thumbSrc
+				? '<img src="' + thumbSrc + '" alt="" loading="lazy" onerror="this.parentElement.style.background=\'rgba(255,255,255,.08)\'">'
+				: '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;opacity:.3;font-size:28px">🖼</div>';
+			card.innerHTML =
+				thumbHtml +
+				'<div class="nous-gal-overlay">' +
+				'<div class="nous-gal-actions">' +
+				'<button class="nous-gal-btn nous-gal-btn-fav" type="button" title="Favorita">' + (img.fav ? '★' : '☆') + '</button>' +
+				'<button class="nous-gal-btn nous-gal-btn-alb" type="button" title="Por num album">📁</button>' +
+				'<button class="nous-gal-btn nous-gal-btn-edit" type="button" title="Editar">✎</button>' +
+				'<button class="nous-gal-btn nous-gal-btn-trash" type="button" title="Mover para Lixeira">🗑 Lixeira</button>' +
+				'<button class="nous-gal-btn nous-gal-btn-del" type="button" title="Apagar definitivamente">✕ Apagar</button>' +
+				'</div>' +
+				'<div class="nous-gal-date">' + _galFmt(img.created_at) +
+				(img.size ? ' · ' + _galSize(img.size) : '') + '</div>' +
+				'</div>';
+
+			/* clique no card (exceto botões) abre lightbox */
+			if (img.exists) card.addEventListener('click', function (e) {
+				if (e.target.closest('.nous-gal-btn')) return;
+				openLightbox(img.id);
+			});
+
+			card.querySelector('.nous-gal-btn-fav').addEventListener('click', function (e) {
+				e.stopPropagation();
+				galMeta(img.id, { fav: !img.fav });
+			});
+			card.querySelector('.nous-gal-btn-alb').addEventListener('click', function (e) {
+				e.stopPropagation();
+				var nome = prompt('Nome do album (vazio tira do album):', img.album || '');
+				if (nome !== null) galMeta(img.id, { album: nome });
+			});
+			card.querySelector('.nous-gal-btn-edit').addEventListener('click', function (e) {
+				e.stopPropagation();
+				editImage(img.id);
+			});
+			card.querySelector('.nous-gal-btn-trash').addEventListener('click', function (e) {
+				e.stopPropagation();
+				deleteImage(img.id, false, card);
+			});
+			card.querySelector('.nous-gal-btn-del').addEventListener('click', function (e) {
+				e.stopPropagation();
+				if (!confirm('Apagar permanentemente esta imagem?\nEsta ação não pode ser desfeita.')) return;
+				deleteImage(img.id, true, card);
+			});
+			grid.appendChild(card);
+		});
+	}
+
+	function deleteImage(id, permanent, card) {
+		/* feedback imediato: esmaece o card */
+		if (card) { card.style.opacity = '0.35'; card.style.pointerEvents = 'none'; }
+		fetch(MON_URL + '/gallery/delete', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ id: id, permanent: permanent })
+		})
+		.then(function (r) { return r.json(); })
+		.then(function (res) {
+			if (res.ok) {
+				if (card) card.remove();
+				/* atualiza contador */
+				var grid = galEl && galEl.querySelector('#nous-gal-grid');
+				var count = galEl && galEl.querySelector('#nous-gal-count');
+				if (grid && count) {
+					var remaining = grid.querySelectorAll('.nous-gal-card').length;
+					count.textContent = remaining ? '(' + remaining + ')' : '';
+					if (!remaining) {
+						grid.innerHTML = '<div class="nous-gal-empty">Nenhuma imagem gerada ainda.<br>' +
+							'Diga ao Nous: <em>"crie uma imagem de..."</em></div>';
+					}
+				}
+			} else {
+				if (card) { card.style.opacity = '1'; card.style.pointerEvents = ''; }
+				alert('Não foi possível apagar a imagem: ' + (res.error || 'erro desconhecido'));
+			}
+		})
+		.catch(function () {
+			if (card) { card.style.opacity = '1'; card.style.pointerEvents = ''; }
+			alert('Erro de comunicação com o monitor. Tente de novo.');
+		});
+	}
+
+	/* ======================================================================== */
+
 	function tick() {
 		ensureToggle();
 		if (btn) btn.style.display = onHome() ? 'flex' : 'none';
@@ -1469,6 +1821,9 @@
 		var auth = onAuth();
 		if (monEl) monEl.style.display = auth ? 'none' : '';
 		if (memBtnEl) memBtnEl.style.display = auth ? 'none' : '';
+		/* re-injeta se o Svelte re-renderizou a sidebar (troca de rota) */
+		if (!document.getElementById('nous-gal-nav')) _galNavInjected = false;
+		ensureGalleryNavItem();
 	}
 
 	function start() {
@@ -1487,7 +1842,7 @@
 	/* Utilitarios para os modulos em branding/modules/*.js (agenda, skills...),
 	 * que o apply_branding.py concatena depois deste arquivo no loader.js. */
 	window.NousUI = { loadUserId: loadUserId, esc: _esc, onAuth: onAuth, openStore: openStore,
-		openMemory: function () { if (!memOpen) toggleMemPanel(); }, setTheme: setTheme };
+		openMemory: function () { if (!memOpen) toggleMemPanel(); }, setTheme: setTheme, openGallery: openGallery };
 
 	if (document.readyState === 'loading') {
 		document.addEventListener('DOMContentLoaded', start);

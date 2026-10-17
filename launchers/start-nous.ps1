@@ -74,6 +74,9 @@ if (-not (Test-Path (Join-Path $env:DATA_DIR "webui.db"))) {
     $env:RAG_EMBEDDING_ENGINE = "ollama"
     $env:RAG_EMBEDDING_MODEL  = "granite-embedding:278m"
 }
+# Desativa perguntas de acompanhamento automaticas (Autocomplete/Follow-up).
+$env:ENABLE_AUTOCOMPLETE_GENERATION = "False"
+$env:ENABLE_FOLLOW_UP_GENERATION    = "False"   # as sugestoes "Acompanhamento" sob a resposta
 
 # Chave secreta ESTAVEL: sem ela, o open-webui gera uma nova a cada inicio e
 # desloga voce. Guardamos uma chave local (em NousData, fora do git) e a reusamos.

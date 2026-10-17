@@ -88,6 +88,11 @@
 			'<div id="nous-ed-mid"><div id="nous-ed-stage"><canvas id="nous-ed-view"></canvas>' +
 			'<div id="nous-ed-drop">Arraste uma imagem para ca, cole com Ctrl+V<br>ou clique em <b>Abrir...</b></div></div>' +
 			'<div id="nous-ed-side">' +
+			'<h4>Diga o que fazer</h4>' +
+			'<input id="nous-ed-say" placeholder="ex.: tira o fundo e deixa mais claro" ' +
+			'style="width:100%;box-sizing:border-box;padding:6px 8px;background:rgba(255,255,255,.07);border:1px solid rgba(200,150,46,.28);' +
+			'border-radius:7px;color:#eee;font-size:12px;outline:none">' +
+			'<button class="nous-ed-b" data-a="say" style="width:100%;margin-top:5px">Fazer</button>' +
 			'<h4>Recortar e girar</h4>' +
 			'<div class="nous-ed-grid"><button class="nous-ed-b" data-a="crop">✂ Cortar</button>' +
 			'<select id="nous-ed-asp"><option value="0">Livre</option><option value="1">1:1</option>' +
@@ -135,6 +140,7 @@
 			r.addEventListener('change', function () { sliding = false; });
 		});
 		ov.querySelector('#nous-ed-flt').addEventListener('change', function (e) { pushUndo(); adj.filtro = e.target.value; render(); });
+		ov.querySelector('#nous-ed-say').addEventListener('keydown', function (e) { if (e.key === 'Enter') say(e.target.value); });
 		ov.querySelector('#nous-ed-asp').addEventListener('change', function (e) {
 			cropAspect = +e.target.value;
 			if (crop) { crop = fitAspect(crop); render(); }
@@ -192,7 +198,9 @@
 	function loadUrl(url, name) {
 		open();
 		msg('Carregando...');
-		fetch(url, { credentials: 'include' })
+		/* cookies so' para o proprio Nous: outra origem (o monitor) recusaria o pedido com credenciais */
+		var same = url.charAt(0) === '/' || url.indexOf(location.origin) === 0 || url.indexOf('data:') === 0;
+		fetch(url, { credentials: same ? 'include' : 'omit' })
 			.then(function (r) { if (!r.ok) throw new Error(); return r.blob(); })
 			.then(function (b) { loadBlob(b, name); })
 			.catch(function () {
@@ -432,8 +440,84 @@
 			msg(nw + ' x ' + nh + ' px');
 		}
 		else if (a === 'rembg') removeBg();
+		else if (a === 'say') say(ov.querySelector('#nous-ed-say').value);
 		else if (a === 'png' || a === 'jpg') download(a);
 		else if (a === 'copy') copy();
+	}
+
+	/* "Edite falando": comandos em portugues viram as mesmas acoes dos botoes.
+	 * Sem IA (funciona sem modelo): "tira o fundo, deixa mais claro e corta quadrado". */
+	var SAY = [
+		[/(tir|remov)\w* (o )?fundo|sem fundo|recort\w* (a )?pessoa/, 'fundo'],
+		[/desfa[zc]/, function () { action('undo'); return 'desfeito'; }],
+		[/mais clar|clare|mais brilh|ilumin/, function () { return adjust('brilho', 20, 'mais claro'); }],
+		[/mais escur|escure|menos brilh/, function () { return adjust('brilho', -20, 'mais escuro'); }],
+		[/mais contrast/, function () { return adjust('contraste', 20, 'mais contraste'); }],
+		[/menos contrast/, function () { return adjust('contraste', -20, 'menos contraste'); }],
+		[/mais cor|mais viv|satur|mais vibrant/, function () { return adjust('saturacao', 30, 'cores mais vivas'); }],
+		[/menos cor|desbot|apag/, function () { return adjust('saturacao', -30, 'cores mais suaves'); }],
+		[/quent/, function () { return adjust('temperatura', 20, 'mais quente'); }],
+		[/fri[oa]|azulad/, function () { return adjust('temperatura', -20, 'mais frio'); }],
+		[/tira (o )?desfoque|sem desfoque|nitid/, function () { adj.desfoque = 0; syncControls(); render(); return 'sem desfoque'; }],
+		[/desfoc|embac|borr/, function () { return adjust('desfoque', 3, 'desfocado'); }],
+		[/\bpb\b|p\s*&\s*b|cinza/, function () { return filtro('pb', 'preto e branco'); }],
+		[/s[eé]pia|antig|velh/, function () { return filtro('sepia', 'sepia'); }],
+		[/noir/, function () { return filtro('noir', 'noir'); }],
+		[/sem filtro|tira (o )?filtro|original/, function () { return filtro('', 'sem filtro'); }],
+		[/esquerda|anti-?hor/, function () { action('rotl'); return 'girada para a esquerda'; }],
+		[/direita|hor[aá]rio/, function () { action('rotr'); return 'girada para a direita'; }],
+		[/espelh/, function () { action('fliph'); return 'espelhada'; }],
+		[/cabe[cç]a para baixo|de ponta cabe|invert/, function () { action('flipv'); return 'invertida'; }],
+		[/quadrad|1:1|instagram/, function () { return cropTo(1, 'cortada quadrada'); }],
+		[/16:9|widescreen|youtube/, function () { return cropTo(16 / 9, 'cortada 16:9'); }],
+		[/9:16|stor(y|ies)|retrato|vertical/, function () { return cropTo(9 / 16, 'cortada 9:16'); }],
+		[/4:3/, function () { return cropTo(4 / 3, 'cortada 4:3'); }],
+		[/metade|50 ?%/, function () { return scaleTo(0.5, 'reduzida pela metade'); }],
+		[/dobr|2x|amplia|aumenta (o )?tamanho/, function () { return scaleTo(2, 'ampliada 2x'); }]
+	];
+	function adjust(k, delta, txt) {
+		pushUndo();
+		var lim = { brilho: [30, 200], contraste: [30, 200], saturacao: [0, 250], temperatura: [-50, 50], desfoque: [0, 20] }[k];
+		adj[k] = Math.max(lim[0], Math.min(lim[1], adj[k] + delta));
+		syncControls(); render();
+		return txt;
+	}
+	function filtro(f, txt) { pushUndo(); adj.filtro = f; syncControls(); render(); return txt; }
+	function cropTo(ratio, txt) {
+		var w = base.width, h = base.height, cw = w, ch = Math.round(w / ratio);
+		if (ch > h) { ch = h; cw = Math.round(h * ratio); }
+		var x = Math.round((w - cw) / 2), y = Math.round((h - ch) / 2), src = base;
+		transform(cw, ch, function (ctx) { ctx.drawImage(src, x, y, cw, ch, 0, 0, cw, ch); });
+		return txt;
+	}
+	function scaleTo(f, txt) {
+		var nw = Math.round(base.width * f), nh = Math.round(base.height * f), src = base;
+		if (nw < 16 || nh < 16 || nw > 8000 || nh > 8000) return '';
+		transform(nw, nh, function (ctx) { ctx.drawImage(src, 0, 0, nw, nh); });
+		return txt;
+	}
+	function say(text) {
+		if (!base) { msg('Abra uma imagem primeiro.', true); return; }
+		var t = (text || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/preto e branco/g, 'pb');
+		var passos = [], fundo = false;
+		t.split(/,|;| e (?=\w)|\.| depois /).forEach(function (part) {
+			part = part.trim();
+			if (!part) return;
+			for (var i = 0; i < SAY.length; i++) {
+				if (SAY[i][0].test(part)) { if (SAY[i][1] === 'fundo') fundo = true; else passos.push(SAY[i][1]); return; }
+			}
+		});
+		if (!fundo && !passos.length) {
+			msg('Nao entendi. Tente: "mais claro", "tira o fundo", "corta quadrado", "preto e branco", "gira para a direita".', true);
+			return;
+		}
+		function resto(pre) {
+			var feito = pre.concat(passos.map(function (f) { return f(); }).filter(Boolean));
+			msg('Feito: ' + feito.join(', ') + '.');
+		}
+		/* o recorte do fundo volta do monitor depois: ele vai primeiro, o resto em cima do resultado */
+		if (fundo) removeBg(function () { resto(['fundo removido']); });
+		else resto([]);
 	}
 
 	function linkSize(changed) {
@@ -443,7 +527,7 @@
 		else wi.value = Math.round(+hi.value * base.width / base.height) || '';
 	}
 
-	function removeBg() {
+	function removeBg(depois) {
 		var b = ov.querySelector('[data-a="rembg"]');
 		b.disabled = true;
 		msg('Recortando o fundo... (na primeira vez o Nous baixa um modelo de 4,5 MB)');
@@ -457,6 +541,7 @@
 				.then(function (bmp) {
 					transform(bmp.width, bmp.height, function (ctx) { ctx.drawImage(bmp, 0, 0); });
 					msg('Fundo removido. Baixe em PNG para manter a transparencia.');
+					if (depois) depois();
 				})
 				.catch(function (e) {
 					msg(e.message === 'Failed to fetch' ? 'O monitor do Nous nao esta no ar.' : e.message, true);

@@ -22,10 +22,13 @@ _PAINEIS = [
     ("habilidades", "as Habilidades", r"habilidades"),
     ("relatorios", "os Relatorios de pesquisa", r"relat[oó]rios?"),
     ("editor", "o Editor de fotos", r"editor(?: de fotos| de imagens)?"),
+    ("galeria", "a Galeria", r"galeria(?: de imagens| de fotos)?|imagens(?: geradas)?"),
     ("pdf", "os Formularios PDF", r"formul[aá]rios?(?: pdf)?|preencher (?:um )?pdf"),
     ("loja", "a Loja de modelos", r"loja(?: de modelos)?|baixar modelos"),
     ("memoria", "o painel 'O que o Nous sabe'", r"mem[oó]rias?|o que (?:voc[eê]|o nous) sabe (?:de|sobre) mim"),
     ("diagnostico", "o Diagnostico", r"diagn[oó]stico|o que (?:est[aá] )?funcionando|status do nous"),
+    ("comparar", "a Comparacao de modelos", r"compara[cç][aã]o(?: de modelos)?|comparar(?: os)? modelos"),
+    ("placar", "o Placar dos modelos", r"placar(?: dos modelos)?|ranking(?: dos modelos)?"),
 ]
 _OPEN = re.compile(
     r"^\s*(?:por favor,?\s*)?(?:abr[ae]|abrir|abre a[ií]|mostr[ae]|mostrar|me mostra|v[eê]|ver|vai para|ir para|quero ver)"

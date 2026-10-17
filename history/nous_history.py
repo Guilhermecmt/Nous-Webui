@@ -370,16 +370,5 @@ class Filter:
 
     async def outlet(self, body: dict, __user__: Optional[dict] = None) -> dict:
         uid = (__user__ or {}).get("id") or "_"
-        dates = self._pending_dates.pop(uid, None)
-        if not dates:
-            return body
-        messages = body.get("messages", [])
-        for i in range(len(messages) - 1, -1, -1):
-            if messages[i].get("role") == "assistant":
-                content = messages[i].get("content") or ""
-                uniq_dates = list(dict.fromkeys(dates))
-                citation = "\n\n> **Contexto de conversas anteriores:** " + ", ".join(uniq_dates)
-                messages[i]["content"] = content + citation
-                break
-        body["messages"] = messages
+        self._pending_dates.pop(uid, None)
         return body

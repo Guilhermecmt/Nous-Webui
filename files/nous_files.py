@@ -339,15 +339,5 @@ class Filter:
 
     async def outlet(self, body: dict, __user__: Optional[dict] = None) -> dict:
         uid = (__user__ or {}).get("id") or "_"
-        srcs = self._pending_srcs.pop(uid, None)
-        if not srcs:
-            return body
-        messages = body.get("messages", [])
-        for i in range(len(messages) - 1, -1, -1):
-            if messages[i].get("role") == "assistant":
-                content = messages[i].get("content") or ""
-                citation = "\n\n> **Fontes consultadas:** " + ", ".join(f"`{s}`" for s in srcs)
-                messages[i]["content"] = content + citation
-                break
-        body["messages"] = messages
+        self._pending_srcs.pop(uid, None)
         return body
