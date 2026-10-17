@@ -10,11 +10,13 @@ Rotas:
   POST /skills          {user_id, id?, nome, quando_usar, corpo}
   POST /skills/delete   {user_id, id}
   POST /skills/fetch    {url} -> {nome, quando_usar, corpo} para REVISAR (nao salva)
+  POST /skills/style    {user_id, textos:[...]} -> habilidade "Meu jeito de escrever"
 
 CORS apenas de origem local (mesmo padrao do monitor).
 """
 import os
 import sys
+import json
 import urllib.parse
 
 import requests
@@ -122,6 +124,75 @@ async def h_fetch(request):
     return web.json_response({"skill": s})
 
 
+# ---- "escreva como eu" --------------------------------------------------------
+# Textos do usuario -> guia de estilo -> habilidade "Meu jeito de escrever", que o
+# filtro Nous Skills aplica sozinho quando ele pede para escrever algo.
+
+OLLAMA_URL = os.environ.get("OLLAMA_BASE_URL", "http://127.0.0.1:11434").rstrip("/")
+NUM_CTX = int(os.environ.get("NOUS_NUM_CTX", "16384"))
+_EMBED = ("embed", "nomic", "minilm", "bge-", "e5-", "gte-")
+STYLE_ID = "meu-jeito-de-escrever"
+_STYLE_SCHEMA = {"type": "object", "required": ["tom", "regras"],
+                 "properties": {"tom": {"type": "string"},
+                                "regras": {"type": "array", "items": {"type": "string"}},
+                                "saudacoes_e_despedidas": {"type": "array", "items": {"type": "string"}},
+                                "expressoes_tipicas": {"type": "array", "items": {"type": "string"}}}}
+_STYLE_PROMPT = """Abaixo estao textos escritos pelo usuario. Descreva o JEITO DE ESCREVER dele para que
+um assistente escreva igual: tom (formal/informal, caloroso/direto), tamanho das frases, uso de
+emojis e pontuacao, como cumprimenta e se despede, expressoes que repete. NAO copie o assunto
+dos textos (nomes, valores, datas): so' o estilo. Em portugues.
+
+TEXTOS:
+{textos}"""
+
+
+def _local_model():
+    try:
+        for m in requests.get(f"{OLLAMA_URL}/api/tags", timeout=5).json().get("models", []):
+            n = m.get("name", "")
+            if "/" not in n and not any(p in n.lower() for p in _EMBED):
+                return n
+    except Exception:
+        pass
+    return None
+
+
+def _style(user_id, textos):
+    model = _local_model()
+    if not model:
+        raise ValueError("nenhum modelo de conversa instalado")
+    joined = "\n\n---\n\n".join(t.strip()[:3000] for t in textos if t.strip())
+    r = requests.post(f"{OLLAMA_URL}/api/generate",
+                      json={"model": model, "prompt": _STYLE_PROMPT.format(textos=joined), "stream": False,
+                            "think": False, "format": _STYLE_SCHEMA,
+                            "options": {"temperature": 0.2, "num_ctx": NUM_CTX}}, timeout=300)
+    r.raise_for_status()
+    d = json.loads(r.json().get("response") or "{}")
+    regras = [x for x in d.get("regras") or [] if isinstance(x, str) and x.strip()]
+    if not regras:
+        raise ValueError("nao consegui descrever o estilo; tente com textos maiores")
+    corpo = [f"Tom: {d.get('tom', '').strip()}", "", "Ao escrever em nome do usuario:"]
+    corpo += [f"{i + 1}. {x.strip()}" for i, x in enumerate(regras)]
+    if d.get("saudacoes_e_despedidas"):
+        corpo += ["", "Cumprimentos e despedidas que ele usa: " + "; ".join(d["saudacoes_e_despedidas"][:6])]
+    if d.get("expressoes_tipicas"):
+        corpo += ["Expressoes tipicas: " + "; ".join(d["expressoes_tipicas"][:8])]
+    return store.save_skill(user_id, {
+        "nome": "Meu jeito de escrever", "corpo": "\n".join(corpo), "origem": "estilo",
+        "quando_usar": ("quando o usuario pedir para escrever, redigir ou responder um texto, "
+                        "e-mail, mensagem ou post em nome dele")}, sid=STYLE_ID)
+
+
+async def h_style(request):
+    d = await _body(request)
+    textos = [t for t in (d.get("textos") or []) if isinstance(t, str)]
+    if sum(len(t.strip()) for t in textos) < 200:
+        raise ValueError("cole pelo menos um ou dois textos seus (uns 3 paragrafos no total)")
+    import asyncio
+    skill = await asyncio.get_event_loop().run_in_executor(None, _style, d.get("user_id"), textos)
+    return web.json_response({"skill": skill})
+
+
 def build_app():
     app = web.Application(middlewares=[cors_mw])
     app.add_routes([
@@ -131,6 +202,7 @@ def build_app():
         web.post("/skills", h_save),
         web.post("/skills/delete", h_delete),
         web.post("/skills/fetch", h_fetch),
+        web.post("/skills/style", h_style),
     ])
     return app
 

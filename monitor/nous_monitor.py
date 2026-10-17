@@ -17,6 +17,7 @@ Expoe (em http://127.0.0.1:8990, so' para paginas locais - ver cors_mw):
   GET  /research/view?id=  -> o relatorio visual (HTML, CSP sem scripts)
   POST /research/delete    -> body {"id": ...}
   POST /image/remove-bg    -> corpo = bytes da imagem; devolve PNG sem fundo
+  GET  /diag               -> cada peca do Nous: ok? + dica do que fazer
   POST /pdf/fields         -> corpo = PDF; campos preenchiveis
   POST /pdf/fill           -> {pdf: base64, values, place?}; devolve o PDF preenchido/assinado
   POST /pdf/autofill       -> {fields, facts}; sugere valores a partir das memorias
@@ -682,6 +683,70 @@ async def h_remove_bg(request):
     return web.Response(body=png, content_type="image/png")
 
 
+# ------------------------------------------------- Diagnostico (v2.8)
+# "O que esta funcionando?": cada peca do Nous com uma dica do que fazer.
+
+_SERVICOS = [
+    ("Servidor do Nous", "http://127.0.0.1:8080/health", True,
+     "Feche o navegador e abra o Nous pelo atalho da area de trabalho."),
+    ("Memoria e personas", "http://127.0.0.1:8993/health", True,
+     "Abra o Nous pelo atalho: ele inicia este servico sozinho."),
+    ("Assistente de Email", "http://127.0.0.1:8995/health", True,
+     "Abra o Nous pelo atalho: ele inicia este servico sozinho."),
+    ("Agenda, lembretes e tarefas", "http://127.0.0.1:8996/health", True,
+     "Abra o Nous pelo atalho. Sem este servico os lembretes nao avisam."),
+    ("Habilidades", "http://127.0.0.1:8997/health", True,
+     "Abra o Nous pelo atalho: ele inicia este servico sozinho."),
+    ("Voz (Piper)", "http://127.0.0.1:8994/health", False,
+     "Opcional. Ative em Recursos > Ativar voz em PT-BR."),
+    ("Busca na web (SearXNG)", "http://127.0.0.1:8888/healthz", False,
+     "Opcional, usada pela Pesquisa Profunda. Precisa do Docker Desktop aberto."),
+    ("Imagens (ComfyUI)", "http://127.0.0.1:8188/system_stats", False,
+     "Opcional. Instale pelo images/install-comfyui.ps1."),
+]
+
+
+async def _probe(s, url):
+    try:
+        async with s.get(url) as r:
+            return r.status < 500
+    except Exception:
+        return False
+
+
+async def h_diag(request):
+    timeout = aiohttp.ClientTimeout(total=4)
+    out = []
+    async with aiohttp.ClientSession(timeout=timeout) as s:
+        oks = await asyncio.gather(*[_probe(s, url) for _n, url, _e, _d in _SERVICOS])
+    for (nome, _url, essencial, dica), ok in zip(_SERVICOS, oks):
+        out.append({"nome": nome, "ok": ok, "essencial": essencial, "dica": "" if ok else dica})
+    models = await _installed_models()
+    if models is None:
+        out.insert(0, {"nome": "Motor de IA (Ollama)", "ok": False, "essencial": True,
+                       "dica": "Abra o Nous pelo atalho (ele liga o Ollama) ou abra o app Ollama."})
+    else:
+        names = [m["name"] for m in models]
+        chat = [n for n in names if _is_chat(n)]
+        out.insert(0, {"nome": "Motor de IA (Ollama)", "ok": True, "essencial": True, "dica": ""})
+        out.insert(1, {"nome": "Modelo de conversa", "ok": bool(chat), "essencial": True,
+                       "detalhe": ", ".join(chat[:4]),
+                       "dica": "" if chat else "Baixe um modelo em Recursos > Baixar modelos."})
+        emb = any(n.startswith("granite-embedding") for n in names)
+        out.insert(2, {"nome": "Busca por significado (embeddings)", "ok": emb, "essencial": True,
+                       "dica": "" if emb else "Abra o Nous pelo atalho: ele baixa o granite-embedding (~560 MB) sozinho."})
+    # disco onde ficam os dados
+    try:
+        import shutil
+        free = shutil.disk_usage(str(_data_dir())).free / GB
+        out.append({"nome": "Espaco livre em disco", "ok": free >= 5, "essencial": True,
+                    "detalhe": f"{free:.0f} GB livres",
+                    "dica": "" if free >= 5 else "Libere espaco: modelos de IA ocupam de 2 a 20 GB cada."})
+    except Exception:
+        pass
+    return web.json_response({"itens": out})
+
+
 # ------------------------------------------------- Formularios PDF (v2.8)
 # Preencher PDF preenchivel e carimbar a assinatura (documentos/pdf_tools.py).
 
@@ -808,6 +873,7 @@ def build_app():
                     web.get("/research/view", h_research_view),
                     web.post("/research/delete", h_research_delete),
                     web.post("/image/remove-bg", h_remove_bg),
+                    web.get("/diag", h_diag),
                     web.post("/pdf/fields", h_pdf_fields),
                     web.post("/pdf/fill", h_pdf_fill),
                     web.post("/pdf/autofill", h_pdf_autofill),

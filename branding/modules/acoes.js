@@ -29,11 +29,12 @@
 		editor: function () { if (window.NousEditor) window.NousEditor.open(); },
 		pdf: function () { if (window.NousPdf) window.NousPdf.open(); },
 		loja: function () { if (window.NousUI && window.NousUI.openStore) window.NousUI.openStore(); },
-		memoria: function () { if (window.NousUI && window.NousUI.openMemory) window.NousUI.openMemory(); }
+		memoria: function () { if (window.NousUI && window.NousUI.openMemory) window.NousUI.openMemory(); },
+		diagnostico: function () { if (window.NousDiag) window.NousDiag.open(); }
 	};
 	var ROTULO = { agenda: '📅 Abrir Agenda', email: '✉ Abrir Email', habilidades: '🧠 Abrir Habilidades',
 		relatorios: '🔎 Abrir Relatorios', editor: '🖼 Abrir Editor', pdf: '📄 Abrir Formularios',
-		loja: '⬇ Abrir Loja de modelos', memoria: '💭 O que o Nous sabe' };
+		loja: '⬇ Abrir Loja de modelos', memoria: '💭 O que o Nous sabe', diagnostico: '🩺 Abrir Diagnostico' };
 
 	function injectStyle() {
 		if (document.getElementById('nous-act-style')) return;

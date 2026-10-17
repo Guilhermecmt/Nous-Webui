@@ -11,7 +11,8 @@
 	var UI = window.NousUI || {};
 	var esc = UI.esc || function (s) { return String(s || ''); };
 	var uid = null, ov = null;
-	var ORIGEM = { conversa: 'aprendida no chat', manual: 'criada por voce', importada: 'importada' };
+	var ORIGEM = { conversa: 'aprendida no chat', manual: 'criada por voce', importada: 'importada',
+		estilo: 'seu jeito de escrever' };
 
 	function api(method, path, body) {
 		var opt = { method: method, headers: {} };
@@ -116,7 +117,8 @@
 				'Depois de acertar algo numa conversa, diga <b>"aprenda isso"</b>: o Nous guarda o passo a passo e usa ' +
 				'sozinho quando um pedido parecido aparecer.</div>' +
 				'<div style="margin-bottom:10px"><button class="nous-sk-btn" id="nous-sk-new" type="button">+ Nova habilidade</button>' +
-				'<button class="nous-sk-btn ghost" id="nous-sk-imp" type="button">Importar do GitHub</button></div>';
+				'<button class="nous-sk-btn ghost" id="nous-sk-imp" type="button">Importar do GitHub</button>' +
+				'<button class="nous-sk-btn ghost" id="nous-sk-sty" type="button">✍ Ensinar meu jeito de escrever</button></div>';
 			if (!d.skills.length) html += '<div class="nous-sk-empty">O Nous ainda nao aprendeu nenhuma habilidade.</div>';
 			d.skills.forEach(function (s) {
 				html += '<div class="nous-sk-item"><div class="nous-sk-main" data-open="' + esc(s.id) + '">' +
@@ -129,6 +131,7 @@
 			b.innerHTML = html;
 			b.querySelector('#nous-sk-new').addEventListener('click', function () { renderEdit({ origem: 'manual' }); });
 			b.querySelector('#nous-sk-imp').addEventListener('click', renderImport);
+			b.querySelector('#nous-sk-sty').addEventListener('click', renderStyle);
 			b.querySelectorAll('[data-open]').forEach(function (el) {
 				el.addEventListener('click', function () {
 					api('GET', '/skills/get?user_id=' + encodeURIComponent(uid) + '&id=' + encodeURIComponent(el.getAttribute('data-open')))
@@ -170,6 +173,28 @@
 				m.textContent = e.message;
 				m.className = 'nous-sk-msg nous-sk-bad';
 			});
+		});
+	}
+
+	/* "Escreva como eu": textos do usuario viram a habilidade "Meu jeito de escrever". */
+	function renderStyle() {
+		var b = box();
+		b.innerHTML = '<div class="nous-sk-hint">Cole dois ou tres textos que <b>voce</b> escreveu (e-mails, mensagens, posts). ' +
+			'O Nous descreve o seu jeito de escrever e passa a usar esse estilo quando voce pedir para ele escrever algo por voce. ' +
+			'So o estilo e guardado, nao o conteudo.</div><div class="nous-sk-form">' +
+			'<textarea id="nous-sk-t1" placeholder="Texto 1" style="min-height:110px"></textarea>' +
+			'<textarea id="nous-sk-t2" placeholder="Texto 2 (opcional)" style="min-height:90px"></textarea>' +
+			'<textarea id="nous-sk-t3" placeholder="Texto 3 (opcional)" style="min-height:90px"></textarea>' +
+			'<button class="nous-sk-btn" id="nous-sk-go" type="button">Aprender meu estilo</button>' +
+			'<button class="nous-sk-btn ghost" id="nous-sk-back" type="button">Voltar</button>' +
+			'<span class="nous-sk-msg" id="nous-sk-m"></span></div>';
+		b.querySelector('#nous-sk-back').addEventListener('click', renderList);
+		b.querySelector('#nous-sk-go').addEventListener('click', function () {
+			var m = b.querySelector('#nous-sk-m'), btn = this;
+			btn.disabled = true; m.className = 'nous-sk-msg'; m.textContent = 'Lendo seus textos... (pode levar um minuto)';
+			api('POST', '/skills/style', { textos: ['#nous-sk-t1', '#nous-sk-t2', '#nous-sk-t3'].map(function (s) { return b.querySelector(s).value; }) })
+				.then(function (r) { renderEdit(r.skill); })
+				.catch(function (e) { btn.disabled = false; m.textContent = e.message; m.className = 'nous-sk-msg nous-sk-bad'; });
 		});
 	}
 
