@@ -6,10 +6,10 @@
 
 **Sua IA particular — bonita, local e sua.**
 
-Chat · Visão · Geração de imagem · Busca na web — 100% no seu PC.  
+Chat · Agenda · E-mail · Visão · Imagens · Pesquisa — 100% no seu PC.  
 Sem nuvem. Sem mensalidade. Suas conversas nunca saem da sua máquina.
 
-[![version](https://img.shields.io/badge/version-2.6.0-c8962e)](CHANGELOG.md)
+[![version](https://img.shields.io/badge/version-2.8.0-c8962e)](CHANGELOG.md)
 [![license](https://img.shields.io/badge/license-MIT-black)](LICENSE)
 [![platform](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6)](#requisitos)
 [![local](https://img.shields.io/badge/100%25-local%20%26%20privado-2ea44f)](#por-que-o-nous)
@@ -30,15 +30,32 @@ O que você ganha em relação a um chat de IA comum:
 
 - **Privacidade de verdade.** O modelo roda no seu computador. Conversas, arquivos e memórias ficam com você — não há servidor para onde mandar nada.
 - **Ele lembra de você.** O Nous aprende fatos duráveis (nome, trabalho, preferências) ao longo das conversas e os usa nas seguintes. Tudo armazenado localmente.
-- **Ele lê suas anotações.** Aponte para o seu vault do Obsidian ou qualquer pasta de notas e o Nous traz os trechos relevantes para dentro da conversa, com citação da fonte.
+- **Ele lê suas anotações.** Aponte para o seu vault do Obsidian ou qualquer pasta de notas e o Nous traz os trechos relevantes para dentro da conversa.
 - **Loja de Modelos integrada.** O Nous analisa seu hardware, recomenda o modelo ideal e baixa tudo com um clique — dentro do próprio site, com barra de progresso.
 - **Visão e imagem.** Solte um print e pergunte sobre ele; peça *"crie uma imagem de…"* e ela aparece na conversa (ComfyUI + Flux, opcional).
 - **Busca na web** opcional via DuckDuckGo, sem chave de API.
 - **Pesquisa Profunda.** Selecione "Pesquisa Profunda (Nous)" no dropdown — o Nous planeja, busca a web em múltiplas etapas, lê as páginas e entrega um relatório markdown com citações numeradas e lista de fontes clicáveis. 100% local.
-- **Comparação cega de modelos.** Selecione "Comparar Modelos (Nous)" e faça uma pergunta — duas respostas anônimas aparecem lado a lado. Você vota antes de ver os nomes.
+- **Comparação cega de modelos.** A mesma pergunta para 2 a 4 modelos, voto antes de ver os nomes e um placar de qual combina mais com você.
 - **Assistente de email (opcional).** Conecte sua caixa de entrada e o Nous faz triagem, resume e rascunha respostas — tudo na sua máquina. Seus emails só chegam ao modelo Ollama local, nunca à nuvem. Envio sempre exige confirmação.
-- **Painel de recursos.** VRAM em tempo real, modelos carregados e um botão para liberar a placa de vídeo na hora.
+- **Agenda, lembretes e tarefas.** *"Me lembre de pagar a luz sexta às 9h"* vira um aviso do Windows na hora certa; tarefas como o "bom dia com a agenda e os e-mails" rodam sozinhas no horário.
+- **Ele aprende o seu jeito.** Diga *"aprenda isso"* e o Nous guarda o passo a passo para a próxima vez — inclusive o seu estilo de escrever.
+- **Lê fotos, boletos e PDFs.** Texto de prints e documentos lido na sua máquina, boleto com valor e vencimento conferidos e formulários PDF preenchidos e assinados.
+- **Editor de fotos e Galeria.** Remova o fundo, corte e ajuste — ou só escreva *"tira o fundo e corta quadrado"*.
+- **Painel de recursos.** VRAM em tempo real, modelos carregados, um botão para liberar a placa de vídeo e um **Diagnóstico** que diz o que está funcionando.
 - **Sem janelas de terminal.** Abre por um atalho, roda em segundo plano, fecha pelo "Parar Nous".
+
+### Novidades da versão 2.8
+
+- **Memória mais esperta:** fatos importantes ficam fixados e **🧹 Organizar memórias** junta as repetidas.
+- **Agenda:** listas de verificação, aviso no celular (ntfy) ou no e-mail, **↩ Desfazer** no chat e tarefas encadeadas.
+- **E-mail:** várias contas, anexos, contatos aprendidos e *"manda um e-mail para a Ana…"* direto do chat (sempre como rascunho).
+- **Leitura de imagens e boletos** e **formulários PDF** com assinatura.
+- **Modo agente leve:** botões nas respostas e comandos como *"abre minha agenda"* ou *"tema escuro"*.
+- **Primeiros passos:** Diagnóstico, dicas na primeira vez de cada painel e dados sensíveis borrados na tela.
+- **Galeria** com favoritas e álbuns, **"Diga o que fazer"** no Editor e **Comparar modelos** com placar.
+- **Mais rápido em modelos pequenos:** contexto de 16k (respostas em 5–25 s em vez de minutos) e busca nos arquivos com o granite-embedding.
+
+Tudo em detalhe no [CHANGELOG](CHANGELOG.md).
 
 ---
 
@@ -345,6 +362,11 @@ GET  /pull/status  ?model=tag — progresso em tempo real
 POST /unload       descarrega modelos da VRAM
 GET  /research     biblioteca de relatórios da Pesquisa Profunda (/research/view?id=)
 POST /image/remove-bg  imagem -> PNG sem fundo (editor de fotos)
+GET  /installed    modelos instalados no Ollama (o painel não fala com o Ollama direto)
+GET  /gallery      imagens geradas (/gallery/image/{id}, /gallery/delete, /gallery/meta)
+GET  /diag         Diagnóstico: cada parte do Nous com ✓/✗
+POST /pdf/fields   formulários PDF (/pdf/fill, /pdf/autofill, /pdf/signature)
+POST /compare/run  Comparar modelos (/compare/vote, /compare/score, /compare/reset)
 ```
 
 Agenda (8996) e Habilidades (8997) documentam as rotas no topo de
@@ -371,10 +393,12 @@ Agenda (8996) e Habilidades (8997) documentam as rotas no topo de
 [ComfyUI](https://github.com/comfyanonymous/ComfyUI) ·
 [Flux.1 Schnell](https://huggingface.co/black-forest-labs/FLUX.1-schnell) (Apache-2.0) ·
 [U²-Net](https://github.com/xuebinqin/U-2-Net) (Apache-2.0, modelo `u2netp` publicado pelo [rembg](https://github.com/danielgatis/rembg)) ·
+[RapidOCR](https://github.com/RapidAI/RapidOCR) (Apache-2.0) ·
+[pypdf](https://github.com/py-pdf/pypdf) (BSD-3) ·
+[Granite Embedding](https://huggingface.co/ibm-granite/granite-embedding-278m-multilingual) (Apache-2.0) ·
+[ntfy](https://ntfy.sh) ·
 [Open-Meteo](https://open-meteo.com).  
-Agenda, tarefas agendadas, habilidades, relatório visual, editor de fotos e a estimativa de velocidade
-da Loja foram **inspirados** no [Odysseus](https://github.com/odysseus-dev/odysseus) (AGPL-3.0) e na ideia
-do [llmfit](https://github.com/AlexsJones/llmfit) (MIT); o código do Nous foi escrito do zero e continua MIT.  
+A estimativa de velocidade da Loja foi inspirada na ideia do [llmfit](https://github.com/AlexsJones/llmfit) (MIT).  
 Marcas pertencem aos seus respectivos projetos.
 
 ## Licença

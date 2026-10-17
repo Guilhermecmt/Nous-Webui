@@ -6,10 +6,10 @@
 
 **Your own private AI — beautiful, local, and yours.**
 
-Chat · Vision · Image generation · Web search — 100% on your PC.  
+Chat · Agenda · Email · Vision · Images · Research — 100% on your PC.  
 No cloud. No subscription. Your conversations never leave your machine.
 
-[![version](https://img.shields.io/badge/version-2.6.0-c8962e)](CHANGELOG.md)
+[![version](https://img.shields.io/badge/version-2.8.0-c8962e)](CHANGELOG.md)
 [![license](https://img.shields.io/badge/license-MIT-black)](LICENSE)
 [![platform](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6)](#requirements)
 [![local](https://img.shields.io/badge/100%25-local%20%26%20private-2ea44f)](#why-nous)
@@ -30,15 +30,32 @@ What you get over an ordinary AI chat:
 
 - **Real privacy.** The model runs on your computer. Conversations, files and memories stay with you — there is no server to send anything to.
 - **It remembers you.** Nous learns durable facts (name, work, preferences) across conversations and uses them in the next ones. All stored locally.
-- **It reads your notes.** Point it at your Obsidian vault or any notes folder and Nous brings the relevant passages into the conversation, with source citations.
+- **It reads your notes.** Point it at your Obsidian vault or any notes folder and Nous brings the relevant passages into the conversation.
 - **Built-in Model Store.** Nous analyzes your hardware, recommends the ideal model and downloads it in one click — inside the app, with a progress bar.
 - **Vision and images.** Drop a screenshot and ask about it; type *"create an image of…"* and it appears in the chat (ComfyUI + Flux, optional).
 - **Optional web search** via DuckDuckGo, no API key.
 - **Deep Research.** Select "Pesquisa Profunda (Nous)" in the model dropdown — Nous plans, searches the web in multiple steps, downloads the relevant pages and writes a full report with numbered citations and a source list. 100% local.
-- **Blind model comparison.** Select "Comparar Modelos (Nous)" and send any question — two anonymous answers appear side by side. Vote for the best before the names are revealed.
+- **Blind model comparison.** The same question to 2–4 models, vote before the names are revealed, and a leaderboard of which one suits you best.
 - **Email assistant (optional).** Connect your inbox and Nous triage, summarizes and drafts replies — all on your machine. Your emails only reach the local Ollama model, never the cloud. Sending always requires explicit confirmation.
-- **Resource panel.** Live VRAM, loaded models, and a one-click button to free your GPU.
+- **Agenda, reminders and tasks.** *"Remind me to pay the power bill Friday at 9am"* becomes a Windows notification at the right time; tasks like a "good morning with my agenda and emails" run on their own on schedule.
+- **It learns your way.** Say *"learn this"* and Nous saves the steps for next time — your writing style too.
+- **Reads photos, bills and PDFs.** Text from screenshots and documents read on your machine, Brazilian boletos with amount and due date checked, PDF forms filled and signed.
+- **Photo editor and Gallery.** Remove backgrounds, crop and adjust — or just type *"remove the background and crop it square"* (Portuguese phrases).
+- **Resource panel.** Live VRAM, loaded models, a one-click button to free your GPU, and a **Diagnostics** view that tells you what is working.
 - **No terminal windows.** Opens from a shortcut, runs in the background, stops with "Parar Nous".
+
+### What's new in 2.8
+
+- **Smarter memory:** key facts stay pinned and **🧹 Organize memories** merges duplicates.
+- **Agenda:** checklists, reminders on your phone (ntfy) or by email, **↩ Undo** in the chat, and chained tasks.
+- **Email:** multiple accounts, attachments, learned contacts, and *"send Ana an email…"* straight from the chat (always as a draft).
+- **Image and boleto reading** and **PDF forms** with signature.
+- **Light agent mode:** buttons in replies and chat commands (in Portuguese) such as *"abre minha agenda"* (open my agenda) or *"tema escuro"* (dark theme).
+- **First steps:** Diagnostics, a short tip the first time you open each panel, and sensitive data blurred on screen.
+- **Gallery** with favorites and albums, **"Tell it what to do"** in the Editor, and **Compare models** with a leaderboard.
+- **Faster on small models:** 16k context (replies in 5–25 s instead of minutes) and file search with granite-embedding.
+
+Full details in the [CHANGELOG](CHANGELOG.md).
 
 ---
 
@@ -345,6 +362,11 @@ GET  /pull/status  ?model=tag — live progress
 POST /unload       unloads models from VRAM
 GET  /research     Deep Research report library (/research/view?id=)
 POST /image/remove-bg  image -> PNG without background (photo editor)
+GET  /installed    models installed in Ollama (the panel never talks to Ollama directly)
+GET  /gallery      generated images (/gallery/image/{id}, /gallery/delete, /gallery/meta)
+GET  /diag         Diagnostics: every part of Nous with ✓/✗
+POST /pdf/fields   PDF forms (/pdf/fill, /pdf/autofill, /pdf/signature)
+POST /compare/run  Compare models (/compare/vote, /compare/score, /compare/reset)
 ```
 
 Agenda (8996) and Skills (8997) document their routes at the top of
@@ -371,10 +393,12 @@ Agenda (8996) and Skills (8997) document their routes at the top of
 [ComfyUI](https://github.com/comfyanonymous/ComfyUI) ·
 [Flux.1 Schnell](https://huggingface.co/black-forest-labs/FLUX.1-schnell) (Apache-2.0) ·
 [U²-Net](https://github.com/xuebinqin/U-2-Net) (Apache-2.0, `u2netp` model as published by [rembg](https://github.com/danielgatis/rembg)) ·
+[RapidOCR](https://github.com/RapidAI/RapidOCR) (Apache-2.0) ·
+[pypdf](https://github.com/py-pdf/pypdf) (BSD-3) ·
+[Granite Embedding](https://huggingface.co/ibm-granite/granite-embedding-278m-multilingual) (Apache-2.0) ·
+[ntfy](https://ntfy.sh) ·
 [Open-Meteo](https://open-meteo.com).  
-Agenda, scheduled tasks, skills, the visual report, the photo editor and the Store's speed estimate were
-**inspired** by [Odysseus](https://github.com/odysseus-dev/odysseus) (AGPL-3.0) and by the idea behind
-[llmfit](https://github.com/AlexsJones/llmfit) (MIT); Nous's code was written from scratch and stays MIT.  
+The Store's speed estimate was inspired by the idea behind [llmfit](https://github.com/AlexsJones/llmfit) (MIT).  
 All trademarks belong to their respective projects.
 
 ## License

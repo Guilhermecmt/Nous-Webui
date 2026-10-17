@@ -1,7 +1,7 @@
 # Plano de Execução — "Pesquisa Profunda" + "Comparar Modelos" — v2.4.0
 
 > Documento de planejamento para execução pelo Sonnet. Estudo feito em 2026-06-13.
-> Objetivo: trazer duas features do Odysseus de alto valor e baixo risco para o
+> Objetivo: trazer duas features de alto valor e baixo risco para o
 > público leigo (ver memória `competitive-landscape`):
 >   A) **Pesquisa Profunda** — pesquisa multi-etapas na web com relatório e citações.
 >   B) **Comparar Modelos** — teste cego (blind) entre dois modelos para a mesma pergunta.
@@ -97,7 +97,7 @@ busca sem SearXNG (fallback DuckDuckGo HTML) — decidir na execução; não blo
 - O Open WebUI tem o recurso **Arena Models** (avaliação A/B com voto e identidade
   oculta). O Nous **desativou** isso na v1.6.0 via
   `ENABLE_EVALUATION_ARENA_MODELS=False` (CHANGELOG/monitor) "para evitar confusão".
-  O Arena É exatamente o teste cego do Odysseus — a jogada é **re-ligar e
+  O Arena JÁ É o teste cego que queremos — a jogada é **re-ligar e
   reembrulhar** com nome amigável, em vez de reconstruir split-chat no Svelte
   (que foi avaliado e adiado na v2.0.0 por risco de regressão no frontend).
 
@@ -177,6 +177,6 @@ Não bloquear o release por isso.
   Python puro.
 
 ## Fora de escopo (não fazer agora)
-- Visualizações/gráficos no relatório (o Odysseus tem; aqui é texto + citações).
+- Visualizações/gráficos no relatório (aqui é texto + citações).
 - Comparar mais de 2 modelos simultâneos.
 - Pesquisa profunda sobre arquivos locais (já há o RAG de arquivos separado).

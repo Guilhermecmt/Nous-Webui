@@ -31,13 +31,13 @@ sem conhecimento tecnico, com tudo acontecendo em segundo plano.
   historico, painel "O que o Nous sabe" + personas, link criar conta, badges
   de capacidade VRAM por modelo, citacoes de fonte.
 
-### v2.7 — Funcoes inspiradas no Odysseus
+### v2.7 — Agenda, habilidades e utilidades
 - Agenda (notas, lembretes, calendario, assinatura iCal) com aviso do Windows,
   agenda pelo chat, tarefas agendadas, habilidades ("aprenda isso"), relatorio
   visual da pesquisa, editor de fotos com remover fundo local, YouTube e clima
-  no chat, velocidade estimada na Loja. Codigo proprio (o Odysseus e' AGPL).
+  no chat, velocidade estimada na Loja.
 
-### v2.8 — O melhor do Odysseus, testado com modelo pequeno
+### v2.8 — Seis ondas, testadas com modelo pequeno
 - Memoria com fixadas e "organizar", notas com checklist, avisos no celular
   (ntfy) e no e-mail, tarefas encadeadas, conversas longas compactadas,
   pesquisa para modelos pequenos, e-mail com varias contas/anexos/contatos e

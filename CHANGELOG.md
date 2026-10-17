@@ -1,7 +1,7 @@
 # Changelog
 
 ## [2.8.0] - 2026-10-17
-O melhor do Odysseus que faltava, em seis ondas, e cada função testada de
+Seis ondas de funções novas, e cada função testada de
 verdade com um modelo pequeno (qwen3:4b) numa instância isolada. Código
 próprio, o Nous continua MIT.
 ### Novo
@@ -57,8 +57,8 @@ próprio, o Nous continua MIT.
 - Habilidades aprendidas ficavam específicas demais ("do João").
 
 ## [2.7.0] - 2026-10-16
-Funções inspiradas no Odysseus (PewDiePie), reescritas no estilo do Nous
-(o Odysseus é AGPL; nenhum código dele foi copiado e o Nous continua MIT).
+Agenda, tarefas, habilidades e utilidades novas, em código próprio (o Nous
+continua MIT).
 ### Novo
 - **Agenda** (`agenda/`, porta 8996): notas, lembretes com repetição,
   calendário com compromissos e aviso antes, importar/exportar `.ics` e
@@ -190,8 +190,8 @@ Rodada de correções para quem instala e usa o Nous pela primeira vez.
 ### Adicionado
 - **Conversa por voz 100% local em PT-BR** — fale com o Nous e ouça a resposta
   em português, sem internet, rodando até em CPU. O maior diferencial inédito
-  identificado na análise competitiva: nem o Odysseus (só STT, inglês) nem os
-  concorrentes entregam voz conversacional em PT-BR para leigos.
+  identificado na análise competitiva: os
+  concorrentes não entregam voz conversacional em PT-BR para leigos.
   - `voice/nous_tts_server.py`: servidor TTS local (porta 8994) compatível com
     a API OpenAI `/v1/audio/speech`, chamando o **Piper TTS** por baixo com voz
     `pt_BR-faber-medium`. Permite ao Open WebUI usar TTS local sem nenhuma

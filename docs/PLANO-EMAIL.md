@@ -2,8 +2,8 @@
 
 > Documento de planejamento para execução pelo Sonnet. Estudo feito em 2026-06-13.
 > Objetivo: triagem, resumo e rascunho de respostas de email com IA **local**
-> (Ollama), conectando à conta do usuário via IMAP/SMTP. Foi a feature mais
-> elogiada do Odysseus (ver memória `competitive-landscape`).
+> (Ollama), conectando à conta do usuário via IMAP/SMTP. É uma das features mais
+> pedidas em assistentes de IA (ver memória `competitive-landscape`).
 > ATENÇÃO: é o plano de MAIOR escopo e MAIOR superfície de segurança dos três
 > (guarda credenciais de email). Executar por ÚLTIMO, depois de Voz e Pesquisa.
 > Princípios do projeto valem: nunca mostrar terminal; idempotente; privado por
