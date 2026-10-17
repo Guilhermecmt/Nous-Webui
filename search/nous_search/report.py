@@ -178,9 +178,48 @@ def save(question, report_md, sources, model=None):
     d = library_dir()
     with open(os.path.join(d, rid + ".html"), "w", encoding="utf-8") as f:
         f.write(build_html(question, report_md, sources, meta))
+    # o Markdown e' o que vira Word/PDF (monitor /research/export)
+    body, _ = _split_sources(report_md or "")
+    fontes = "\n".join(f"{i}. [{s.get('title') or s.get('url') or 'Fonte'}]({s.get('url', '')})"
+                       for i, s in enumerate(sources, 1))
+    with open(os.path.join(d, rid + ".md"), "w", encoding="utf-8") as f:
+        f.write(f"# {question}\n\n{body}\n\n## Fontes\n\n{fontes}\n" if sources else f"# {question}\n\n{body}\n")
     with open(os.path.join(d, rid + ".json"), "w", encoding="utf-8") as f:
         json.dump(meta, f, ensure_ascii=False)
     return rid
+
+
+def como_markdown(rid):
+    """Markdown do relatorio. Os anteriores a v2.9 so' tem o HTML: tira o texto dele."""
+    base = os.path.join(library_dir(), _safe_id(rid))
+    if os.path.isfile(base + ".md"):
+        with open(base + ".md", encoding="utf-8") as f:
+            return f.read()
+    if not os.path.isfile(base + ".html"):
+        return None
+    from bs4 import BeautifulSoup
+    with open(base + ".html", encoding="utf-8") as f:
+        soup = BeautifulSoup(f.read(), "html.parser")
+    for tag in soup(["style", "aside", "footer"]):
+        tag.decompose()
+    for a in soup.select("a.cite"):
+        a.replace_with(f"[{a.get_text(strip=True)}]")
+    out = []
+    for el in soup.find_all(["h1", "h2", "h3", "p", "li", "a"]):
+        if el.name == "a" and "t" not in (el.get("class") or []):
+            continue  # so' o titulo dos cartoes de fonte
+        txt = re.sub(r"\s+([.,;:!?)])", r"\1", re.sub(r"\s+", " ", el.get_text(" "))).strip()
+        if not txt:
+            continue
+        if el.name in ("h1", "h2", "h3"):
+            out.append("#" * int(el.name[1]) + " " + txt)
+        elif el.name == "li":
+            out.append("- " + txt)
+        elif el.name == "a":
+            out.append(f"- [{txt}]({el.get('href', '')})")
+        elif not el.find_parent("div", class_="src"):
+            out.append(txt)
+    return "\n\n".join(out)
 
 
 def list_reports(limit=200):
@@ -208,7 +247,7 @@ def report_path(rid):
 
 
 def delete(rid):
-    for ext in (".html", ".json"):
+    for ext in (".html", ".md", ".json"):
         p = os.path.join(library_dir(), _safe_id(rid) + ext)
         if os.path.isfile(p):
             os.remove(p)

@@ -24,6 +24,7 @@ _PAINEIS = [
     ("editor", "o Editor de fotos", r"editor(?: de fotos| de imagens)?"),
     ("galeria", "a Galeria", r"galeria(?: de imagens| de fotos)?|imagens(?: geradas)?"),
     ("pdf", "os Formularios PDF", r"formul[aá]rios?(?: pdf)?|preencher (?:um )?pdf"),
+    ("documentos", "os Documentos", r"documentos?|meus textos|textos|editor de textos?"),
     ("loja", "a Loja de modelos", r"loja(?: de modelos)?|baixar modelos"),
     ("memoria", "o painel 'O que o Nous sabe'", r"mem[oó]rias?|o que (?:voc[eê]|o nous) sabe (?:de|sobre) mim"),
     ("diagnostico", "o Diagnostico", r"diagn[oó]stico|o que (?:est[aá] )?funcionando|status do nous"),

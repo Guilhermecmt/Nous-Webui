@@ -22,6 +22,14 @@ Expoe (em http://127.0.0.1:8990, so' para paginas locais - ver cors_mw):
   POST /pdf/fill           -> {pdf: base64, values, place?}; devolve o PDF preenchido/assinado
   POST /pdf/autofill       -> {fields, facts}; sugere valores a partir das memorias
   GET|POST /pdf/signature  -> assinatura desenhada (PNG em NousData); POST /pdf/signature/delete
+  GET  /docs, /docs/get?id=, /docs/version?id=&i=   Documentos (v2.9)
+  POST /docs/save {id?, titulo, texto, motivo?} | /docs/delete {id}
+  POST /docs/ai   {texto, instrucao, ini?, fim?, model?} -> sugestoes (diff) para aceitar/recusar
+  POST /docs/import?nome=  corpo = arquivo -> {titulo, texto}
+  POST /docs/export {titulo, texto, formato: docx|pdf|md} -> o arquivo
+  GET  /research/export?id=&formato=docx|pdf|md     relatorio da Pesquisa em Word/PDF
+  GET  /model/check?name=  qualquer modelo do Ollama/Hugging Face: tamanho e se cabe
+  GET  /catalog?vram_gb=&ram_gb=&gpu=  simulacao "e se eu tivesse outra maquina"
 
 GPU: lido dos contadores de desempenho do Windows (funcionam em PT-BR com os
 nomes em ingles) + tamanho real da VRAM via registro (qwMemorySize).
@@ -345,6 +353,13 @@ def _is_chat(name):
     return not any(k in n for k in _NOT_CHAT)
 
 
+def _local_chat(name):
+    """Modelo de conversa que roda aqui. A lista vem do proprio Ollama, entao
+    "usuario/modelo" e "hf.co/..." sao locais; so' os ":cloud" saem da maquina."""
+    n = (name or "").lower()
+    return _is_chat(n) and not re.search(r"[-:]cloud$", n)
+
+
 def _fit(model, hw):
     """recomendado = aproveita bem ESTA maquina; ok = roda; pesado = nao cabe."""
     if hw["tier"] == "cpu":
@@ -391,44 +406,71 @@ def _friendly_pull_error(msg):
     return "O download falhou: " + (msg or "erro desconhecido")
 
 
+class _Parado(Exception):
+    """Download sem avancar: os bytes nao mudam ha' _PARADO_S segundos."""
+
+
+_PARADO_S = 90       # sem nenhum byte novo por este tempo = travado
+_TENTATIVAS = 3      # o Ollama continua de onde parou, entao recomecar e' barato
+
+
+async def _pull_uma_vez(tag, st, digests):
+    """Uma passada pelo stream NDJSON do /api/pull. True = terminou."""
+    loop = asyncio.get_event_loop()
+    ultimo, quando = -1, loop.time()
+    # sock_read curto: o Ollama manda progresso varias vezes por segundo; o
+    # silencio total tambem conta como travado
+    timeout = aiohttp.ClientTimeout(total=None, connect=10, sock_read=_PARADO_S)
+    async with aiohttp.ClientSession(timeout=timeout) as s:
+        async with s.post(f"{OLLAMA}/api/pull", json={"name": tag, "stream": True}) as r:
+            async for raw in r.content:
+                raw = raw.strip()
+                if not raw:
+                    continue
+                try:
+                    d = json.loads(raw)
+                except Exception:
+                    continue
+                if d.get("error"):
+                    raise RuntimeError(d["error"])
+                if d.get("digest") and d.get("total"):
+                    digests[d["digest"]] = (int(d.get("completed") or 0), int(d["total"]))
+                    comp = sum(c for c, _ in digests.values())
+                    tot = sum(t for _, t in digests.values())
+                    if tot:
+                        st.update(pct=round(comp / tot, 4), completed_gb=round(comp / GB, 2),
+                                  total_gb=round(tot / GB, 2))
+                    if comp != ultimo:
+                        ultimo, quando = comp, loop.time()
+                        st["nota"] = None
+                    elif loop.time() - quando > _PARADO_S:
+                        raise _Parado()
+                if (d.get("status") or "") == "success":
+                    st.update(status="pronto", pct=1.0, nota=None)
+                    return True
+    return False
+
+
 async def _do_pull(tag):
-    """Consome o stream NDJSON do Ollama /api/pull agregando progresso por digest."""
+    """Baixa pelo Ollama; se travar ou a conexao cair, tenta de novo sozinho
+    (ate' _TENTATIVAS vezes) mostrando o aviso no card da Loja."""
     st = _pulls[tag]
     digests = {}
     try:
-        timeout = aiohttp.ClientTimeout(total=None, connect=10, sock_read=600)
-        async with aiohttp.ClientSession(timeout=timeout) as s:
-            async with s.post(f"{OLLAMA}/api/pull",
-                              json={"name": tag, "stream": True}) as r:
-                async for raw in r.content:
-                    raw = raw.strip()
-                    if not raw:
-                        continue
-                    try:
-                        d = json.loads(raw)
-                    except Exception:
-                        continue
-                    if d.get("error"):
-                        st.update(status="erro",
-                                  error=_friendly_pull_error(d["error"]))
-                        return
-                    if d.get("digest") and d.get("total"):
-                        digests[d["digest"]] = (int(d.get("completed") or 0),
-                                                int(d["total"]))
-                        comp = sum(c for c, _ in digests.values())
-                        tot = sum(t for _, t in digests.values())
-                        if tot:
-                            st.update(pct=round(comp / tot, 4),
-                                      completed_gb=round(comp / GB, 2),
-                                      total_gb=round(tot / GB, 2))
-                    if (d.get("status") or "") == "success":
-                        st.update(status="pronto", pct=1.0)
-                        return
-        if st["status"] == "baixando":
-            st.update(status="erro",
-                      error="O download foi interrompido. Tente de novo.")
+        for tentativa in range(1, _TENTATIVAS + 1):
+            try:
+                if await _pull_uma_vez(tag, st, digests):
+                    return
+                motivo = "O download foi interrompido."
+            except (_Parado, asyncio.TimeoutError, aiohttp.ClientError) as e:
+                motivo = ("O download parou de andar." if isinstance(e, (_Parado, asyncio.TimeoutError))
+                          else _friendly_pull_error(str(e)))
+            if tentativa < _TENTATIVAS:
+                st["nota"] = f"Conexao lenta: tentando de novo ({tentativa + 1}/{_TENTATIVAS})..."
+                await asyncio.sleep(3 * tentativa)
+        st.update(status="erro", nota=None, error=motivo + " Verifique a internet e tente de novo.")
     except Exception as e:
-        st.update(status="erro", error=_friendly_pull_error(str(e)))
+        st.update(status="erro", nota=None, error=_friendly_pull_error(str(e)))
     finally:
         _pull_tasks.pop(tag, None)
 
@@ -500,23 +542,125 @@ async def h_hardware(request):
     return web.json_response(await _hardware())
 
 
+def _simular(hw, q):
+    """?vram_gb=&ram_gb=&gpu= : "e se eu tivesse outra maquina?" (v2.9)."""
+    try:
+        vram = max(0.0, min(256.0, float(q.get("vram_gb", hw["vram_gb"]))))
+        ram = max(1.0, min(1024.0, float(q.get("ram_gb", hw["ram_gb"]) or 1)))
+    except (TypeError, ValueError):
+        return hw
+    gpu = (q.get("gpu") or "").strip()[:60]
+    tier = _tier(vram, ram)
+    return {"gpu_name": gpu or ("GPU com %g GB" % vram if vram else ""), "vram_gb": vram, "ram_gb": ram,
+            "tier": tier, "gpu_bw": _gpu_bandwidth(gpu, vram) if tier != "cpu" else 0,
+            "ram_bw": hw.get("ram_bw") or 50, "simulado": True}
+
+
+def _installed_match(tag, installed):
+    return bool(installed) and any(n == tag or n.startswith(tag + ":") or
+                                   (":" not in tag and n == tag + ":latest") for n in installed)
+
+
 async def h_catalog(request):
     hw, installed = await asyncio.gather(_hardware(), _installed_tags())
+    if "vram_gb" in request.query or "ram_gb" in request.query:
+        hw = _simular(hw, request.query)
     models = []
-    for m in _load_catalog():
+    catalog = _load_catalog()
+    for m in catalog:
         e = dict(m)
-        e["installed"] = bool(installed) and any(
-            n == m["tag"] or n.startswith(m["tag"] + ":")
-            for n in (installed or []))
+        e["installed"] = _installed_match(m["tag"], installed)
         e["fit"] = _fit(m, hw)
         e["speed"] = _speed(m, hw)
         pull = _pulls.get(m["tag"])
         if pull:
             e["pull"] = pull
         models.append(e)
+    # downloads de fora do catalogo (v2.9: "qualquer modelo"), com o progresso
+    tags = {m["tag"] for m in catalog} | _EXTRA_PULLABLE
+    outros = [{"tag": t, "pull": p, "download_gb": (_checked.get(t) or {}).get("gb"),
+               "installed": _installed_match(t, installed)}
+              for t, p in _pulls.items() if t not in tags]
     return web.json_response({"hardware": hw,
                               "ollama_online": installed is not None,
-                              "models": _sort_models(models, hw)})
+                              "models": _sort_models(models, hw),
+                              "outros": outros})
+
+
+# ------------------------------------------- Qualquer modelo (v2.9)
+# O usuario cola um nome do Ollama ("qwen3:8b"), um link do ollama.com ou um
+# repositorio GGUF do Hugging Face. Antes de baixar, o tamanho vem do registro
+# (manifesto, sem baixar nada) e o Nous diz se cabe na maquina e no disco.
+
+_checked = {}      # tag -> {"gb", "t"}: so' baixa o que foi conferido aqui
+_CHECK_TTL = 3600
+_MANIFEST = "application/vnd.docker.distribution.manifest.v2+json"
+_NOME_OK = re.compile(r"^(?:hf\.co/[\w.-]+/[\w.-]+|(?:[a-z0-9][\w.-]*/)?[a-z0-9][\w.-]*)(?::[\w.-]{1,80})?$", re.I)
+
+
+def _nome_modelo(raw):
+    """Texto colado -> nome que o Ollama entende (ou None)."""
+    s = (raw or "").strip().strip("'\"`")
+    s = re.sub(r"^ollama\s+(?:run|pull)\s+", "", s, flags=re.I).strip()
+    m = re.match(r"^https?://(?:www\.)?ollama\.com/(?:library/)?([\w.-]+(?:/[\w.-]+)?(?::[\w.-]+)?)/?$", s, re.I)
+    if m:
+        s = m.group(1)
+    m = re.match(r"^(?:https?://)?(?:www\.)?(?:huggingface\.co|hf\.co)/([\w.-]+/[\w.-]+)(?:/(?:tree|blob|resolve)/\S*)?/?(:[\w.-]+)?$",
+                 s, re.I)
+    if m:
+        s = "hf.co/" + m.group(1) + (m.group(2) or "")
+    if s.lower().startswith("huggingface.co/"):
+        s = "hf.co/" + s[15:]
+    return s if _NOME_OK.match(s) and len(s) <= 160 else None
+
+
+def _manifest_url(name):
+    base, _, tag = name.partition(":")
+    tag = tag or "latest"
+    if base.lower().startswith("hf.co/"):
+        return f"https://hf.co/v2/{base[6:]}/manifests/{tag}"
+    path = base if "/" in base else "library/" + base
+    return f"https://registry.ollama.ai/v2/{path}/manifests/{tag}"
+
+
+async def h_model_check(request):
+    name = _nome_modelo(request.query.get("name"))
+    if not name:
+        return web.json_response({"ok": False, "erro": "Nao entendi esse nome. Exemplos: qwen3:8b, "
+                                  "gemma3, ou um link do ollama.com ou do Hugging Face."})
+    try:
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=20)) as s:
+            async with s.get(_manifest_url(name), headers={"Accept": _MANIFEST}) as r:
+                if r.status in (401, 404):
+                    return web.json_response({"ok": False, "name": name, "erro": (
+                        "Nao achei esse modelo. Confira o nome (e o tamanho depois dos dois pontos)."
+                        if not name.lower().startswith("hf.co/") else
+                        "Nao achei esse modelo no Hugging Face. Ele precisa ter arquivos GGUF "
+                        "(procure repositorios com 'GGUF' no nome).")})
+                if r.status != 200:
+                    raise RuntimeError(f"HTTP {r.status}")
+                man = await r.json(content_type=None)
+    except Exception as e:
+        print(f"[Nous][loja] manifesto de {name}: {e}", file=sys.stderr)
+        return web.json_response({"ok": False, "name": name,
+                                  "erro": "Sem conexao com o catalogo de modelos. Verifique a internet."})
+    layers = man.get("layers") or []
+    total = sum(int(x.get("size") or 0) for x in layers) + int((man.get("config") or {}).get("size") or 0)
+    if not total:
+        return web.json_response({"ok": False, "name": name, "erro": "Esse modelo nao tem arquivos para baixar."})
+    gb = round(total / GB, 1)
+    hw, installed = await asyncio.gather(_hardware(), _installed_tags())
+    m = {"download_gb": gb, "min_vram_gb": round(gb * 1.1 + 1.0, 1), "min_ram_cpu_gb": round(gb * 1.5 + 4, 1)}
+    try:
+        free = round(shutil.disk_usage(str(_data_dir() if _data_dir().exists() else Path.home())).free / GB, 1)
+    except Exception:
+        free = None
+    _checked[name] = {"gb": gb, "t": asyncio.get_event_loop().time()}
+    return web.json_response({
+        "ok": True, "name": name, "download_gb": gb, "fit": _fit(m, hw), "speed": _speed(m, hw),
+        "vision": any("projector" in (x.get("mediaType") or "") for x in layers),
+        "installed": _installed_match(name, installed), "disk_free_gb": free,
+        "cabe_disco": free is None or free >= gb + 2, "hardware": hw})
 
 
 async def h_pull(request):
@@ -530,10 +674,19 @@ async def h_pull(request):
             {"started": False, "reason": "modelo nao informado"}, status=400)
     allowed = {m.get("tag") for m in _load_catalog()} | _EXTRA_PULLABLE
     if tag not in allowed:
-        # So' o catalogo da Loja: sem isto qualquer pagina local podia pedir um
-        # modelo de centenas de GB. Outros modelos: Painel Admin > Modelos.
-        return web.json_response(
-            {"started": False, "reason": "modelo fora do catalogo"}, status=400)
+        # Fora do catalogo, so' o que passou pelo /model/check ha' pouco (o
+        # usuario viu o tamanho) e cabe no disco: sem isto qualquer pagina
+        # local podia pedir um modelo de centenas de GB.
+        chk = _checked.get(tag)
+        if not chk or asyncio.get_event_loop().time() - chk["t"] > _CHECK_TTL:
+            return web.json_response(
+                {"started": False, "reason": "confira o modelo antes de baixar"}, status=400)
+        try:
+            free = shutil.disk_usage(str(_data_dir() if _data_dir().exists() else Path.home())).free / GB
+            if free < chk["gb"] + 2:
+                return web.json_response({"started": False, "reason": "sem espaco em disco"}, status=400)
+        except Exception:
+            pass
     cur = _pulls.get(tag)
     if cur and cur["status"] == "baixando":
         return web.json_response({"started": False, "reason": "em andamento"})
@@ -541,7 +694,7 @@ async def h_pull(request):
         # Já baixado nesta sessão: não refaz o download nem apaga o estado.
         return web.json_response({"started": False, "reason": "ja baixado"})
     _pulls[tag] = {"status": "baixando", "pct": 0.0,
-                   "completed_gb": 0.0, "total_gb": 0.0, "error": None}
+                   "completed_gb": 0.0, "total_gb": 0.0, "error": None, "nota": None}
     _pull_tasks[tag] = asyncio.get_event_loop().create_task(_do_pull(tag))
     return web.json_response({"started": True})
 
@@ -1008,12 +1161,17 @@ async def h_diag(request):
 # ------------------------------------------------- Formularios PDF (v2.8)
 # Preencher PDF preenchivel e carimbar a assinatura (documentos/pdf_tools.py).
 
-def _pdf_mod():
+def _doc_mod(name):
+    """Modulo de documentos/ (pdf_tools, escrita, exportar, textos)."""
+    import importlib
     p = str(Path(__file__).resolve().parent.parent / "documentos")
     if p not in sys.path:
         sys.path.insert(0, p)
-    import pdf_tools
-    return pdf_tools
+    return importlib.import_module(name)
+
+
+def _pdf_mod():
+    return _doc_mod("pdf_tools")
 
 
 async def h_pdf_fields(request):
@@ -1100,7 +1258,7 @@ async def h_pdf_autofill(request):
     prompt = _AUTOFILL_PROMPT.format(facts="\n".join(f"- {x}" for x in facts),
                                      fields="\n".join(f"{f['name']} :: {f.get('label', '')}" for f in flds))
     models = await _installed_tags() or []
-    chat = [m for m in models if _is_chat(m) and "/" not in m]
+    chat = [m for m in models if _local_chat(m)]
     if not chat:
         return web.json_response({"error": "nenhum modelo de conversa instalado"}, status=400)
     try:
@@ -1245,6 +1403,287 @@ async def h_compare_reset(request):
     return web.json_response({"placar": []})
 
 
+# --------------------------------------------------------------------------
+# Documentos (v2.9): escrever com a IA propondo mudancas (documentos/escrita.py)
+# e exportar para Word/PDF (documentos/exportar.py), tambem os relatorios.
+# --------------------------------------------------------------------------
+
+_DOC_LOCK = asyncio.Lock()
+
+
+async def _body_json(request):
+    try:
+        return await request.json() or {}
+    except Exception:
+        return {}
+
+
+async def _run(fn, *args):
+    return await asyncio.get_event_loop().run_in_executor(None, fn, *args)
+
+
+async def _pick_model(pedido):
+    """O modelo pedido (se instalado e local) ou o primeiro de conversa local."""
+    tags = await _installed_tags()
+    if tags is None:
+        raise RuntimeError("o motor de IA (Ollama) nao esta no ar")
+    chat = [m for m in tags if _local_chat(m)]
+    if pedido in chat:
+        return pedido
+    if not chat:
+        raise RuntimeError("nenhum modelo de conversa instalado (Recursos > Baixar modelos)")
+    return chat[0]
+
+
+def _download(data, nome, ctype):
+    """Resposta de arquivo com o nome certo (acentos via filename*)."""
+    nome = re.sub(r'[\\/:*?"<>|\r\n]+', " ", nome or "documento").strip()[:90] or "documento"
+    ascii_nome = nome.encode("ascii", "ignore").decode() or "documento"
+    cs = "utf-8" if ctype.startswith("text/") else None
+    return web.Response(body=data, content_type=ctype, charset=cs, headers={
+        "Content-Disposition": "attachment; filename=\"%s\"; filename*=UTF-8''%s"
+                               % (ascii_nome, urllib.parse.quote(nome))})
+
+
+_FORMATOS = {"docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+             "pdf": "application/pdf", "md": "text/markdown"}
+
+
+async def _exportar(titulo, md, formato):
+    if formato not in _FORMATOS:
+        return web.json_response({"error": "formato invalido"}, status=400)
+    if formato == "md":
+        data = md.encode("utf-8")
+    else:
+        ex = _doc_mod("exportar")
+        try:
+            data = await _run(getattr(ex, formato), titulo, md)
+        except Exception as e:
+            print(f"[Nous][docs] exportar {formato}: {e}", file=sys.stderr)
+            return web.json_response({"error": "nao consegui gerar o arquivo"}, status=500)
+    return _download(data, f"{titulo}.{formato}", _FORMATOS[formato])
+
+
+async def h_docs_list(request):
+    return web.json_response({"docs": await _run(_doc_mod("escrita").listar)})
+
+
+async def h_docs_get(request):
+    es = _doc_mod("escrita")
+    doc = es.ler(request.query.get("id"))
+    if not doc:
+        return web.json_response({"error": "documento nao encontrado"}, status=404)
+    return web.json_response(es.resumo(doc))
+
+
+async def h_docs_save(request):
+    b = await _body_json(request)
+    if "texto" not in b:  # pedido quebrado nao vira documento vazio
+        return web.json_response({"error": "pedido invalido"}, status=400)
+    es = _doc_mod("escrita")
+    doc = await _run(es.salvar, str(b.get("id") or ""), str(b.get("titulo") or ""),
+                     str(b.get("texto") or ""), str(b.get("motivo") or "")[:80])
+    return web.json_response(es.resumo(doc))
+
+
+async def h_docs_delete(request):
+    b = await _body_json(request)
+    _doc_mod("escrita").apagar(str(b.get("id") or ""))
+    return web.json_response({"ok": True})
+
+
+async def h_docs_version(request):
+    texto = _doc_mod("escrita").versao(request.query.get("id"), request.query.get("i"))
+    if texto is None:
+        return web.json_response({"error": "versao nao encontrada"}, status=404)
+    return web.json_response({"texto": texto})
+
+
+async def h_docs_ai(request):
+    """O modelo reescreve (tudo ou a selecao); volta o diff para o usuario revisar."""
+    b = await _body_json(request)
+    es = _doc_mod("escrita")
+    texto = str(b.get("texto") or "")
+    ini, fim = b.get("ini"), b.get("fim")
+    sel = isinstance(ini, int) and isinstance(fim, int) and fim > ini
+    try:
+        msgs, pre, alvo, suf = es.prompt(texto, str(b.get("instrucao") or ""),
+                                         ini if sel else None, fim if sel else None)
+        model = await _pick_model(str(b.get("model") or ""))
+    except (ValueError, RuntimeError) as e:
+        return web.json_response({"error": str(e)}, status=400)
+    pensa = await _pensa_sempre(model)
+    if not pensa:
+        msgs = es.sem_pensar(msgs, model)
+    payload = {"model": model, "stream": True, "think": pensa, "keep_alive": "5m", "messages": msgs,
+               "options": {"temperature": 0.3, "num_ctx": int(os.environ.get("NOUS_NUM_CTX", "16384"))}}
+    t0 = asyncio.get_event_loop().time()
+    # stream: NDJSON {"d": pedaco} enquanto o modelo escreve (o painel mostra
+    # ao vivo) e no fim {"fim": {...}} ou {"erro": "..."}. Se o usuario cancela,
+    # a conexao cai, o laco para e o Ollama para de gerar.
+    resp = None
+    if b.get("stream"):
+        resp = web.StreamResponse(headers={"Content-Type": "application/x-ndjson", "Cache-Control": "no-store",
+                                           **_cors_headers(request.headers.get("Origin"))})
+        await resp.prepare(request)
+
+    async def manda(obj):
+        if resp is not None:
+            await resp.write((json.dumps(obj, ensure_ascii=False) + "\n").encode("utf-8"))
+
+    partes, erro, status_erro, pensou = [], None, 502, 0
+    async with _DOC_LOCK:
+        try:
+            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=420, sock_read=180)) as s:
+                for tentativa in (1, 2):
+                    async with s.post(f"{OLLAMA}/api/chat", json=payload) as r:
+                        if r.status != 200:
+                            d = await r.json(content_type=None)
+                            if tentativa == 1 and "think" in str(d.get("error", "")).lower():
+                                payload.pop("think", None)  # modelo sem modo de pensar
+                                continue
+                            erro = str(d.get("error") or "falhou")[:300]
+                            break
+                        async for raw in r.content:
+                            raw = raw.strip()
+                            if not raw:
+                                continue
+                            try:
+                                d = json.loads(raw)
+                            except Exception:
+                                continue
+                            if d.get("error"):
+                                erro = str(d["error"])[:300]
+                                break
+                            msg = d.get("message") or {}
+                            if msg.get("thinking"):
+                                # o painel mostra "pensando..." com a contagem, nao o raciocinio
+                                antes, pensou = pensou, pensou + len(msg["thinking"])
+                                if pensou // 300 != antes // 300:
+                                    await manda({"p": pensou})
+                            pedaco = msg.get("content") or ""
+                            if pedaco:
+                                partes.append(pedaco)
+                                await manda({"d": pedaco})
+                            if d.get("done"):
+                                break
+                    break
+        except ConnectionResetError:  # o usuario cancelou (o aiohttp herda dela)
+            return resp
+        except asyncio.TimeoutError:
+            erro, status_erro = "o modelo demorou demais (7 min). Tente com um trecho menor.", 504
+        except Exception as e:
+            print(f"[Nous][docs] ia: {e}", file=sys.stderr)
+            erro = "o motor de IA nao respondeu"
+    if not erro:
+        novo = es.limpar("".join(partes), alvo)
+        if not novo.strip():
+            erro = "o modelo devolveu um texto vazio. Tente de novo."
+    if erro:
+        if resp is None:
+            return web.json_response({"error": erro}, status=status_erro)
+        await manda({"erro": erro})
+        await resp.write_eof()
+        return resp
+    segs = es.diff(alvo, novo, pre, suf)
+    fim = {"segs": segs, "model": model, "mudancas": sum(1 for x in segs if x["t"] == "~"),
+           "secs": round(asyncio.get_event_loop().time() - t0, 1)}
+    if resp is None:
+        return web.json_response(fim)
+    await manda({"fim": fim})
+    await resp.write_eof()
+    return resp
+
+
+_PENSA = {}   # modelo -> sempre pensa? (cache do /api/show)
+
+
+async def _pensa_sempre(model):
+    """Modelos como o qwen3 2507 "thinking" abrem o <think> no proprio molde:
+    com think=False o raciocinio vaza para a resposta. Para esses o pedido vai
+    com think=True, e o Ollama separa o raciocinio (message.thinking)."""
+    if model not in _PENSA:
+        try:
+            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=8)) as s:
+                async with s.post(f"{OLLAMA}/api/show", json={"model": model}) as r:
+                    d = await r.json(content_type=None)
+            tpl = d.get("template") or ""
+            _PENSA[model] = "thinking" in (d.get("capabilities") or []) and "assistant\n<think>" in tpl
+        except Exception:
+            return False
+    return _PENSA[model]
+
+
+async def h_docs_porque(request):
+    """{antes, depois, contexto?, model?} -> {motivo}: uma frase explicando a sugestao."""
+    b = await _body_json(request)
+    antes, depois = str(b.get("antes") or "")[:2000], str(b.get("depois") or "")[:2000]
+    if not antes.strip() and not depois.strip():
+        return web.json_response({"error": "nada para explicar"}, status=400)
+    es = _doc_mod("escrita")
+    regra = es.porque_regra(antes, depois)
+    if regra:
+        return web.json_response({"motivo": regra, "fonte": "regra"})
+    try:
+        model = await _pick_model(str(b.get("model") or ""))
+    except RuntimeError as e:
+        return web.json_response({"error": str(e)}, status=400)
+    prompt = es.prompt_porque(antes, depois, str(b.get("contexto") or "")[:1500])
+    payload = {"model": model, "stream": False, "think": await _pensa_sempre(model), "keep_alive": "5m",
+               "format": {"type": "object", "required": ["motivo"], "properties": {"motivo": {"type": "string"}}},
+               "messages": es.sem_pensar([{"role": "user", "content": prompt}], model),
+               "options": {"temperature": 0.2, "num_ctx": int(os.environ.get("NOUS_NUM_CTX", "16384"))}}
+    try:
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=120)) as s:
+            status, d = await _cmp_chat(s, payload)
+            if status != 200 and "think" in str(d.get("error", "")).lower():
+                payload.pop("think")
+                status, d = await _cmp_chat(s, payload)
+        motivo = json.loads((d.get("message") or {}).get("content") or "{}").get("motivo") or ""
+    except Exception:
+        return web.json_response({"error": "o modelo nao respondeu"}, status=502)
+    motivo = re.sub(r"\s+", " ", motivo).strip()[:300]
+    return web.json_response({"motivo": motivo or "O modelo nao soube explicar esta mudanca.", "fonte": "ia"})
+
+
+async def h_docs_diff(request):
+    """{a, b} -> {segs}: o que mudou entre duas versoes (a = antes)."""
+    b = await _body_json(request)
+    segs = await _run(_doc_mod("escrita").diff, str(b.get("a") or "")[:500000], str(b.get("b") or "")[:500000])
+    return web.json_response({"segs": segs, "mudancas": sum(1 for x in segs if x["t"] == "~")})
+
+
+async def h_docs_import(request):
+    data = await request.read()
+    nome = request.query.get("nome") or "arquivo.txt"
+    try:
+        texto, aviso = await _run(_doc_mod("textos").extrair, nome, data)
+    except ValueError as e:
+        return web.json_response({"error": str(e)}, status=400)
+    except Exception as e:
+        print(f"[Nous][docs] importar {nome}: {e}", file=sys.stderr)
+        return web.json_response({"error": "nao consegui ler este arquivo"}, status=400)
+    return web.json_response({"titulo": os.path.splitext(os.path.basename(nome))[0][:120],
+                              "texto": texto, "aviso": aviso})
+
+
+async def h_docs_export(request):
+    b = await _body_json(request)
+    return await _exportar(str(b.get("titulo") or "Documento")[:120], str(b.get("texto") or ""),
+                           str(b.get("formato") or ""))
+
+
+async def h_research_export(request):
+    rep = _report_mod()
+    rid = request.query.get("id")
+    md = rep.como_markdown(rid)
+    if md is None:
+        return web.json_response({"error": "relatorio nao encontrado"}, status=404)
+    meta = next((r for r in rep.list_reports() if r.get("id") == rid), {})
+    titulo = (meta.get("question") or "Pesquisa").strip()[:100]
+    return await _exportar(titulo, md, request.query.get("formato") or "pdf")
+
+
 def build_app():
     app = web.Application(middlewares=[cors_mw], client_max_size=_MAX_IMG + 1024)
     app.add_routes([web.get("/stats", h_stats),
@@ -1252,6 +1691,7 @@ def build_app():
                     web.get("/health", h_health),
                     web.get("/hardware", h_hardware),
                     web.get("/catalog", h_catalog),
+                    web.get("/model/check", h_model_check),
                     web.get("/installed", h_installed),
                     web.post("/pull", h_pull),
                     web.get("/pull/status", h_pull_status),
@@ -1276,7 +1716,18 @@ def build_app():
                     web.post("/compare/run", h_compare_run),
                     web.post("/compare/vote", h_compare_vote),
                     web.get("/compare/score", h_compare_score),
-                    web.post("/compare/reset", h_compare_reset)])
+                    web.post("/compare/reset", h_compare_reset),
+                    web.get("/docs", h_docs_list),
+                    web.get("/docs/get", h_docs_get),
+                    web.get("/docs/version", h_docs_version),
+                    web.post("/docs/save", h_docs_save),
+                    web.post("/docs/delete", h_docs_delete),
+                    web.post("/docs/ai", h_docs_ai),
+                    web.post("/docs/porque", h_docs_porque),
+                    web.post("/docs/diff", h_docs_diff),
+                    web.post("/docs/import", h_docs_import),
+                    web.post("/docs/export", h_docs_export),
+                    web.get("/research/export", h_research_export)])
     return app
 
 

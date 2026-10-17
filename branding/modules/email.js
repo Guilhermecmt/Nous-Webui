@@ -227,11 +227,13 @@
 		var web = links.filter(function (l) { return /^https?:/i.test(l); })[0];
 		var link = mail || web;
 		if (!link) return;
-		if (!confirm('Descadastrar de "' + sender + '"?' + (mail ? '\n\nO Nous vai enviar um e-mail de descadastro em seu nome.' : '\n\nVai abrir a pagina de descadastro do remetente.'))) return;
-		api('POST', '/unsubscribe', { link: link }).then(function (d) {
-			if (d.how === 'link') window.open(d.url, '_blank', 'noopener');
-			else alert(d.message);
-		}).catch(function (e) { alert(e.message); });
+		window.NousUI.pede('Descadastrar de "' + sender + '"?' + (mail ? '\n\nO Nous vai enviar um e-mail de descadastro em seu nome.' : '\n\nVai abrir a pagina de descadastro do remetente.')).then(function (sim) {
+			if (!sim) return;
+			api('POST', '/unsubscribe', { link: link }).then(function (d) {
+				if (d.how === 'link') window.open(d.url, '_blank', 'noopener');
+				else window.NousUI.aviso(d.message);
+			}).catch(function (e) { window.NousUI.aviso(e.message, 'erro'); });
+		});
 	}
 
 	/* ---------------------------------------------------------- Escrever */
@@ -265,10 +267,12 @@
 			});
 			box().querySelector('#nous-em-send').addEventListener('click', function () {
 				var p = payload();
-				if (!confirm('Enviar este e-mail para ' + p.to + '?')) return;
-				save().then(function (dr) { return api('POST', '/drafts/send', { id: dr.id }); })
-					.then(function () { badge(); box().innerHTML = '<div class="nous-em-empty nous-em-ok">✓ E-mail enviado.</div>'; })
-					.catch(function (e) { box().querySelector('#nous-em-cm').innerHTML = '<span class="nous-em-bad">' + esc(e.message) + '</span>'; });
+				window.NousUI.pede('Enviar este e-mail para ' + p.to + '?').then(function (sim) {
+					if (!sim) return;
+					save().then(function (dr) { return api('POST', '/drafts/send', { id: dr.id }); })
+						.then(function () { badge(); box().innerHTML = '<div class="nous-em-empty nous-em-ok">✓ E-mail enviado.</div>'; })
+						.catch(function (e) { box().querySelector('#nous-em-cm').innerHTML = '<span class="nous-em-bad">' + esc(e.message) + '</span>'; });
+				});
 			});
 		});
 	}
@@ -300,10 +304,12 @@
 			box().querySelectorAll('[data-send]').forEach(function (b) {
 				b.addEventListener('click', function () {
 					var x = byId[b.getAttribute('data-send')];
-					if (!confirm('Enviar para ' + x.to + '?\n\nAssunto: ' + x.subject)) return;
-					b.disabled = true;
-					api('POST', '/drafts/send', { id: x.id }).then(function () { badge(); renderDrafts(); })
-						.catch(function (e) { alert(e.message); renderDrafts(); });
+					window.NousUI.pede('Enviar para ' + x.to + '?\n\nAssunto: ' + x.subject).then(function (sim) {
+						if (!sim) return;
+						b.disabled = true;
+						api('POST', '/drafts/send', { id: x.id }).then(function () { badge(); renderDrafts(); })
+							.catch(function (e) { window.NousUI.aviso(e.message, 'erro'); renderDrafts(); });
+					});
 				});
 			});
 			box().querySelectorAll('[data-edit]').forEach(function (b) {
@@ -313,13 +319,15 @@
 				b.addEventListener('click', function () {
 					var id = b.getAttribute('data-sched'), v = box().querySelector('[data-when="' + id + '"]').value;
 					api('POST', '/drafts/schedule', { id: id, send_at: Math.floor(new Date(v).getTime() / 1000) })
-						.then(function () { badge(); renderDrafts(); }).catch(function (e) { alert(e.message); });
+						.then(function () { badge(); renderDrafts(); }).catch(function (e) { window.NousUI.aviso(e.message, 'erro'); });
 				});
 			});
 			box().querySelectorAll('[data-del]').forEach(function (b) {
 				b.addEventListener('click', function () {
-					if (!confirm('Apagar este rascunho?')) return;
-					api('POST', '/drafts/delete', { id: b.getAttribute('data-del') }).then(function () { badge(); renderDrafts(); });
+					window.NousUI.pede('Apagar este rascunho?').then(function (sim) {
+						if (!sim) return;
+						api('POST', '/drafts/delete', { id: b.getAttribute('data-del') }).then(function () { badge(); renderDrafts(); });
+					});
 				});
 			});
 		}).catch(fail);
@@ -372,19 +380,19 @@
 			if (query) { cq.focus(); cq.setSelectionRange(cq.value.length, cq.value.length); }
 			box().querySelector('#nous-em-cadd').addEventListener('click', function () {
 				api('POST', '/contacts', { name: box().querySelector('#nous-em-cn').value, email: box().querySelector('#nous-em-ce').value })
-					.then(function () { renderContacts(query); }).catch(function (e) { alert(e.message); });
+					.then(function () { renderContacts(query); }).catch(function (e) { window.NousUI.aviso(e.message, 'erro'); });
 			});
 			box().querySelector('#nous-em-cimp').addEventListener('change', function (ev) {
 				var f = ev.target.files && ev.target.files[0];
 				if (f) f.text().then(function (txt) { return api('POST', '/contacts/import', { vcf: txt }); })
-					.then(function (r) { alert(r.imported + ' contato(s) importado(s).'); renderContacts(); });
+					.then(function (r) { window.NousUI.aviso(r.imported + ' contato(s) importado(s).'); renderContacts(); });
 			});
 			box().querySelectorAll('[data-write]').forEach(function (b) {
 				b.addEventListener('click', function () { compose({ to: b.getAttribute('data-write'), to_name: b.getAttribute('data-n') }); });
 			});
 			box().querySelectorAll('[data-cdel]').forEach(function (b) {
 				b.addEventListener('click', function () {
-					if (confirm('Apagar este contato?')) api('POST', '/contacts/delete', { id: +b.getAttribute('data-cdel') }).then(function () { renderContacts(query); });
+					window.NousUI.pede('Apagar este contato?').then(function (sim) { if (sim) api('POST', '/contacts/delete', { id: +b.getAttribute('data-cdel') }).then(function () { renderContacts(query); }); });
 				});
 			});
 		}).catch(fail);
@@ -422,8 +430,10 @@
 		});
 		box().querySelectorAll('[data-rm]').forEach(function (b) {
 			b.addEventListener('click', function () {
-				if (!confirm('Remover a conta ' + b.getAttribute('data-rm') + ' do Nous?')) return;
-				api('POST', '/disconnect', { account: b.getAttribute('data-rm') }).then(function () { account = null; open('contas'); });
+				window.NousUI.pede('Remover a conta ' + b.getAttribute('data-rm') + ' do Nous?').then(function (sim) {
+					if (!sim) return;
+					api('POST', '/disconnect', { account: b.getAttribute('data-rm') }).then(function () { account = null; open('contas'); });
+				});
 			});
 		});
 	}

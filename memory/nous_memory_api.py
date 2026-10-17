@@ -12,6 +12,10 @@ Memorias:
   POST /memories/{id}/pin                 { user_id, pinned } -> fixa (entra em toda conversa)
   POST /memories/tidy                     { user_id, persona? } -> PROPOE juntar repetidas/contradicoes
   POST /memories/tidy/apply               { user_id, grupos:[{ids, texto}] } -> aplica o que o usuario aprovou
+  GET  /memories/export?user_id=...       todas as memorias em JSON (backup / levar para outro PC)
+  POST /memories/import/extract?user_id=&nome=   corpo = arquivo (.txt .md .docx .pdf .html .json)
+                                          ou JSON {user_id, texto}: PROPOE fatos (o usuario escolhe)
+  POST /memories/import/apply             { user_id, persona?, fatos:[{text, pinned?}] } -> salva os escolhidos
 
 Personas:
   GET  /personas                          dicionario de todas as personas
@@ -300,6 +304,132 @@ def tidy_apply(user_id, grupos):
         cx.close()
 
 
+# ---- importar / exportar (v2.9) ---------------------------------------------
+# Importar: o modelo PROPOE fatos tirados de um arquivo (curriculo, "sobre mim",
+# memorias copiadas do ChatGPT...) e o usuario marca quais guardar. Um backup
+# do proprio Nous (JSON exportado) volta direto, sem passar pelo modelo.
+
+IMPORT_CHUNK = 6000      # caracteres por pedido ao modelo
+IMPORT_MAX_CHUNKS = 8    # ~48 mil caracteres (umas 15 paginas); o resto e' avisado
+_FACTS_SCHEMA = {"type": "object", "required": ["fatos"],
+                 "properties": {"fatos": {"type": "array", "items": {"type": "string"}}}}
+_IMPORT_PROMPT = """Este texto foi escrito pelo usuario ou e' sobre ele (curriculo, apresentacao,
+anotacoes pessoais, memorias de outro assistente). Extraia o que vale a pena LEMBRAR sobre o
+usuario em conversas futuras: nome, onde mora, trabalho e formacao, familia, gostos, metas,
+restricoes (saude, alimentacao), jeito de escrever e preferencias.
+
+Regras:
+- comece pelo nome do usuario, se aparecer ("O usuario se chama ...");
+- se o texto ja' for uma lista de fatos (memorias de outro assistente, mesmo em ingles),
+  traduza CADA linha para uma frase (ex.: "Prefers concise answers" -> "O usuario prefere respostas curtas");
+- uma frase curta e COMPLETA por fato, em portugues, comecando com "O usuario" (ex.: "O usuario mora em Recife");
+  nunca termine com "...";
+- dado de outra pessoa fica na frase dela: "A filha do usuario, Lia, tem 6 anos" (e nao "O usuario tem 6 anos");
+- como o usuario quer as respostas tambem conta: "O usuario prefere respostas curtas";
+- so' o que o texto diz; nada de suposicoes; nada de fatos gerais do mundo;
+- no maximo 25 fatos; se nao houver nada pessoal, devolva a lista vazia.
+
+TEXTO:
+<<<
+{texto}
+>>>
+
+Responda so' com JSON: {{"fatos": [...]}}"""
+
+
+def export_memories(user_id):
+    return {"app": "Nous", "tipo": "memorias", "versao": 1,
+            "exportado_em": time.strftime("%Y-%m-%d %H:%M"),
+            "memorias": [{"text": m["text"], "persona": m["persona"], "pinned": m["pinned"],
+                          "created_at": m["created_at"]} for m in list_memories(user_id, "all")]}
+
+
+def _textos_mod():
+    import sys
+    p = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "documentos")
+    if p not in sys.path:
+        sys.path.insert(0, p)
+    import textos
+    return textos
+
+
+def _chunks(texto):
+    """Pedacos de ate' IMPORT_CHUNK, cortando em fim de paragrafo quando da'."""
+    out, i = [], 0
+    while i < len(texto) and len(out) < IMPORT_MAX_CHUNKS:
+        fim = min(len(texto), i + IMPORT_CHUNK)
+        if fim < len(texto):
+            corte = texto.rfind("\n", i + IMPORT_CHUNK // 2, fim)
+            fim = corte if corte > 0 else fim
+        out.append(texto[i:fim])
+        i = fim
+    return out, i < len(texto)
+
+
+def import_extract(user_id, nome=None, dados=None, texto=None):
+    """{fatos:[{text, pinned, persona?, ja}], truncado, origem}. Nao grava nada."""
+    import requests
+    existentes = {_normalize(m["text"]) for m in list_memories(user_id, "all")}
+    if dados is not None and (nome or "").lower().endswith(".json"):
+        try:
+            d = json.loads(dados.decode("utf-8-sig"))
+        except Exception:
+            d = None
+        if isinstance(d, dict) and d.get("tipo") == "memorias" and isinstance(d.get("memorias"), list):
+            fatos = []
+            for m in d["memorias"][:2000]:
+                t = str((m or {}).get("text") or "").strip()[:500]
+                if t:
+                    fatos.append({"text": t, "pinned": bool(m.get("pinned")), "persona": str(m.get("persona") or "default")[:60],
+                                  "ja": _normalize(t) in existentes})
+            return {"fatos": fatos, "truncado": False, "origem": "backup"}
+    if texto is None:
+        texto, aviso = _textos_mod().extrair(nome, dados)
+        if not texto:
+            raise ValueError(aviso or "o arquivo nao tem texto")
+    texto = (texto or "").strip()
+    if not texto:
+        raise ValueError("nada para ler")
+    model = _local_model()
+    if not model:
+        raise RuntimeError("nenhum modelo de conversa instalado")
+    partes, truncado = _chunks(texto)
+    fatos, vistos = [], set()
+    for parte in partes:
+        r = requests.post(f"{OLLAMA_URL}/api/generate", timeout=240,
+                          json={"model": model, "stream": False, "think": False, "format": _FACTS_SCHEMA,
+                                "prompt": _IMPORT_PROMPT.format(texto=parte), "keep_alive": "5m",
+                                "options": {"temperature": 0, "num_ctx": NUM_CTX}})
+        try:
+            lista = json.loads(r.json().get("response") or "{}").get("fatos") or []
+        except Exception:
+            lista = []
+        for f in lista:
+            f = re.sub(r"\s+", " ", str(f)).strip()[:300]
+            n = _normalize(f)
+            # "O usuario se chama ..." = o modelo preencheu o molde sem ter o dado
+            if len(f) < 8 or n in vistos or "..." in f or "…" in f:
+                continue
+            vistos.add(n)
+            fatos.append({"text": f, "pinned": False, "ja": n in existentes})
+    return {"fatos": fatos, "truncado": truncado, "origem": "modelo"}
+
+
+def import_apply(user_id, persona, fatos):
+    n = 0
+    for f in fatos[:2000]:
+        t = str((f or {}).get("text") or "").strip()[:500]
+        if not t:
+            continue
+        mid = add_memory(user_id, t, str(f.get("persona") or persona or "default")[:60])
+        if mid is None:
+            continue  # repetida
+        n += 1
+        if f.get("pinned"):
+            set_pinned(mid, user_id, True)
+    return n
+
+
 def add_memory(user_id, text, persona="default"):
     db = _db()
     if not os.path.isfile(db):
@@ -460,6 +590,45 @@ async def h_tidy_apply(request):
     return web.json_response({"ok": True, "aplicados": tidy_apply(uid, body.get("grupos") or [])})
 
 
+async def h_export(request):
+    uid = request.rel_url.query.get("user_id")
+    if not uid:
+        return web.json_response({"error": "user_id required"}, status=400)
+    data = json.dumps(export_memories(uid), ensure_ascii=False, indent=1).encode("utf-8")
+    return web.Response(body=data, content_type="application/json", charset="utf-8", headers={
+        "Content-Disposition": 'attachment; filename="memorias-nous-%s.json"' % time.strftime("%Y-%m-%d")})
+
+
+async def h_import_extract(request):
+    import asyncio
+    q = request.rel_url.query
+    if (request.content_type or "").startswith("application/json"):
+        body = await _json_body(request) or {}
+        uid, nome, dados, texto = body.get("user_id"), None, None, str(body.get("texto") or "")[:200000]
+    else:
+        uid, nome, dados, texto = q.get("user_id"), q.get("nome") or "arquivo.txt", await request.read(), None
+    if not uid:
+        return web.json_response({"error": "user_id required"}, status=400)
+    try:
+        res = await asyncio.get_event_loop().run_in_executor(None, import_extract, uid, nome, dados, texto)
+    except ValueError as e:
+        return web.json_response({"error": str(e)}, status=400)
+    except Exception as e:
+        print(f"[Nous][memoria] importar: {e}")
+        msg = str(e) if "modelo" in str(e) else "O modelo nao respondeu. Tente de novo."
+        return web.json_response({"error": msg}, status=502)
+    return web.json_response(res)
+
+
+async def h_import_apply(request):
+    body = await _json_body(request) or {}
+    uid = body.get("user_id")
+    if not uid:
+        return web.json_response({"error": "user_id required"}, status=400)
+    n = import_apply(uid, body.get("persona") or "default", body.get("fatos") or [])
+    return web.json_response({"ok": True, "salvas": n})
+
+
 async def h_personas(request):
     return web.json_response(get_personas())
 
@@ -545,7 +714,8 @@ async def cors_mw(request, handler):
 
 
 def build_app():
-    app = web.Application(middlewares=[cors_mw])
+    # 21 MB: importar memorias de um arquivo (o padrao do aiohttp e' 1 MB)
+    app = web.Application(middlewares=[cors_mw], client_max_size=21 * 1024 * 1024)
     app.add_routes([
         web.get("/health",          h_health),
         web.get("/memories",        h_list),
@@ -555,6 +725,9 @@ def build_app():
         web.post("/memories/{id}/pin", h_pin),
         web.post("/memories/tidy", h_tidy),
         web.post("/memories/tidy/apply", h_tidy_apply),
+        web.get("/memories/export", h_export),
+        web.post("/memories/import/extract", h_import_extract),
+        web.post("/memories/import/apply", h_import_apply),
         web.get("/personas",        h_personas),
         web.get("/persona",         h_get_active),
         web.post("/persona",        h_set_active),

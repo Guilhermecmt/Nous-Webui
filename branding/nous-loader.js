@@ -413,6 +413,7 @@
 	var _activePer = 'default';
 	var _personas  = {};
 	var _editingId = null;
+	var _memBusy   = false;
 
 	/* Obtem user_id via API do Open WebUI (token em localStorage) */
 	function loadUserId(cb) {
@@ -513,7 +514,15 @@
 			'border-bottom:1px solid rgba(255,255,255,.06);cursor:pointer}' +
 			'.nous-tidy-g i{opacity:.5;font-style:normal}' +
 			'.nous-tidy-row{display:flex;gap:6px;margin-top:8px}.nous-tidy-row button{flex:1;padding:6px;border-radius:8px;' +
-			'cursor:pointer;border:1px solid rgba(200,150,46,.4);background:rgba(200,150,46,.18);color:#e7c069;font-size:12px}';
+			'cursor:pointer;border:1px solid rgba(200,150,46,.4);background:rgba(200,150,46,.18);color:#e7c069;font-size:12px}' +
+			'#nous-mem-find{width:100%;box-sizing:border-box;margin:2px 0 6px;padding:5px 8px;background:rgba(255,255,255,.07);' +
+			'border:1px solid rgba(255,255,255,.15);border-radius:7px;color:#eee;font-size:12px;outline:none}#nous-mem-find:focus{border-color:#c8962e}' +
+			'.nous-tidy-row button:disabled{opacity:.45;cursor:default}' +
+			'#nous-mem-head span{font-family:Cinzel,Georgia,serif;letter-spacing:.06em;font-weight:600}' +
+			'.nous-imp-file{display:block;text-align:center;padding:6px;margin:4px 0;border:1px dashed rgba(200,150,46,.45);' +
+			'border-radius:8px;color:#e7c069;cursor:pointer;font-size:12px}.nous-imp-file:hover{background:rgba(200,150,46,.12)}' +
+			'.nous-imp-txt{width:100%;box-sizing:border-box;min-height:90px;margin-top:6px;padding:6px 8px;resize:vertical;' +
+			'background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);border-radius:8px;color:#eee;font-size:12px}';
 		var st = document.createElement('style');
 		st.id = 'nous-mem-style';
 		st.textContent = css;
@@ -616,6 +625,7 @@
 
 	function closeMemPanel() {
 		memOpen = false;
+		_memBusy = false;
 		if (memPanelEl) memPanelEl.classList.add('nous-hidden');
 	}
 
@@ -682,16 +692,20 @@
 	}
 
 	/* ---- Memorias ---- */
+	/* _memBusy: "Organizar" ou "Importar" na tela; um recarregar atrasado
+	 * (troca de persona, abrir o painel) nao apaga o que o usuario esta vendo. */
+	function memDone() { _memBusy = false; loadMemories(); }
+
 	function loadMemories() {
-		if (!_nousUid) return;
+		if (!_nousUid || _memBusy) return;
 		var list = memPanelEl.querySelector('#nous-mem-list');
 		list.innerHTML = '<div class="nous-mem-loading">Carregando...</div>';
 		fetch(MEM_URL + '/memories?user_id=' + encodeURIComponent(_nousUid) +
 			'&persona=' + encodeURIComponent(_activePer), { cache: 'no-store' })
 			.then(function(r) { return r.json(); })
-			.then(function(mems) { renderMemories(mems); })
+			.then(function(mems) { if (!_memBusy) renderMemories(mems); })
 			.catch(function() {
-				list.innerHTML = '<div class="nous-mem-empty">API offline — inicie o Nous normalmente.</div>';
+				if (!_memBusy) list.innerHTML = '<div class="nous-mem-empty">API offline — inicie o Nous normalmente.</div>';
 			});
 	}
 
@@ -699,10 +713,36 @@
 		var list = memPanelEl.querySelector('#nous-mem-list');
 		_editingId = null;
 		if (!mems || !mems.length) {
-			list.innerHTML = '<div class="nous-mem-empty">Nenhuma memoria nesta persona.</div>';
+			list.innerHTML = '<div class="nous-mem-empty">Nenhuma memoria nesta persona.<br>' +
+				'Ja escreveu sobre voce em algum lugar (curriculo, "sobre mim", memorias do ChatGPT)? Importe abaixo.</div>';
+			memIO(list);
 			return;
 		}
 		list.innerHTML = '';
+		if (mems.length >= 8) {
+			var find = document.createElement('input');
+			find.type = 'search';
+			find.id = 'nous-mem-find';
+			find.placeholder = '🔎 Procurar entre ' + mems.length + ' memorias';
+			find.setAttribute('aria-label', 'Procurar memoria');
+			find.addEventListener('input', function() {
+				var q = _sem(find.value.trim()), vis = 0;
+				list.querySelectorAll('.nous-mem-item').forEach(function(it) {
+					var ok = !q || _sem(it.textContent).indexOf(q) >= 0;
+					it.style.display = ok ? '' : 'none';
+					if (ok) vis++;
+				});
+				var nada = list.querySelector('#nous-mem-none');
+				if (nada) nada.style.display = vis ? 'none' : '';
+			});
+			list.appendChild(find);
+			var none = document.createElement('div');
+			none.id = 'nous-mem-none';
+			none.className = 'nous-mem-empty';
+			none.style.display = 'none';
+			none.textContent = 'Nenhuma memoria com esse texto.';
+			list.appendChild(none);
+		}
 		mems.forEach(function(m) {
 			var item = document.createElement('div');
 			item.className = 'nous-mem-item';
@@ -718,7 +758,7 @@
 				'</div>';
 			item.querySelector('.nous-mem-pin').addEventListener('click', function() { pinMem(m.id, !m.pinned); });
 			item.querySelector('.nous-mem-edit').addEventListener('click', function() { startEdit(item, m); });
-			item.querySelector('.nous-mem-del').addEventListener('click', function() { deleteMem(m.id); });
+			item.querySelector('.nous-mem-del').addEventListener('click', function() { deleteMem(m.id, m); });
 			list.appendChild(item);
 		});
 		if (mems.length >= 2) {
@@ -730,6 +770,114 @@
 			tidy.addEventListener('click', tidyMemories);
 			list.appendChild(tidy);
 		}
+		memIO(list);
+	}
+
+	/* ---- Importar / exportar (v2.9) ---- */
+	function memIO(list) {
+		var row = document.createElement('div');
+		row.className = 'nous-tidy-row';
+		row.innerHTML = '<button type="button" id="nous-mem-imp" title="Trazer fatos de um arquivo ou texto: o Nous propoe, voce escolhe">⬆ Importar</button>' +
+			'<button type="button" id="nous-mem-exp" title="Baixar todas as memorias (backup ou outro computador)">⬇ Exportar</button>';
+		row.querySelector('#nous-mem-imp').addEventListener('click', importStart);
+		row.querySelector('#nous-mem-exp').addEventListener('click', exportMemories);
+		list.appendChild(row);
+	}
+
+	function exportMemories() {
+		if (!_nousUid) return;
+		fetch(MEM_URL + '/memories/export?user_id=' + encodeURIComponent(_nousUid), { cache: 'no-store' })
+			.then(function(r) { if (!r.ok) throw new Error(); return r.blob(); })
+			.then(function(blob) { return blob.text().then(function(t) { return [blob, JSON.parse(t).memorias.length]; }); })
+			.then(function(par) {
+				var blob = par[0];
+				if (window.NousUI && window.NousUI.toast) window.NousUI.toast(par[1] ? par[1] + ' memoria(s) exportada(s).' : 'Nenhuma memoria para exportar.');
+				if (!par[1]) return;
+				var a = document.createElement('a');
+				a.href = URL.createObjectURL(blob);
+				a.download = 'memorias-nous-' + new Date().toISOString().slice(0, 10) + '.json';
+				document.body.appendChild(a);
+				a.click();
+				setTimeout(function() { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
+			}).catch(function() {
+				if (window.NousUI && window.NousUI.toast) window.NousUI.toast('Nao consegui exportar. A API de memoria esta no ar?', { tipo: 'erro' });
+			});
+	}
+
+	function importStart() {
+		_memBusy = true;
+		var list = memPanelEl.querySelector('#nous-mem-list');
+		list.innerHTML =
+			'<div class="nous-mem-empty" style="text-align:left">Escolha um arquivo (.txt, .md, .docx, .pdf ou um backup .json do Nous) ' +
+			'ou cole um texto sobre voce. O Nous propoe os fatos e voce escolhe o que guardar.</div>' +
+			'<label class="nous-imp-file">📂 Escolher arquivo<input type="file" accept=".txt,.md,.markdown,.docx,.pdf,.html,.htm,.json" style="display:none"></label>' +
+			'<textarea class="nous-imp-txt" placeholder="...ou cole aqui. Dica: no ChatGPT, Configuracoes > Personalizacao > Memoria > Gerenciar: copie a lista e cole."></textarea>' +
+			'<div class="nous-tidy-row"><button type="button" id="nous-imp-read">Ler o texto</button>' +
+			'<button type="button" id="nous-imp-no">Cancelar</button></div>';
+		list.querySelector('#nous-imp-no').addEventListener('click', memDone);
+		list.querySelector('input[type=file]').addEventListener('change', function(e) {
+			var f = e.target.files && e.target.files[0];
+			if (f) importExtract(MEM_URL + '/memories/import/extract?user_id=' + encodeURIComponent(_nousUid) +
+				'&nome=' + encodeURIComponent(f.name), { method: 'POST', body: f });
+		});
+		list.querySelector('#nous-imp-read').addEventListener('click', function() {
+			var t = list.querySelector('.nous-imp-txt').value.trim();
+			if (t) importExtract(MEM_URL + '/memories/import/extract', { method: 'POST',
+				headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user_id: _nousUid, texto: t }) });
+		});
+	}
+
+	function importExtract(url, opts) {
+		var list = memPanelEl.querySelector('#nous-mem-list');
+		list.innerHTML = '<div class="nous-mem-loading">Lendo... (um texto longo pode levar alguns minutos)</div>';
+		fetch(url, opts).then(function(r) { return r.json(); }).then(function(d) {
+			if (d.error) throw new Error(d.error);
+			var fs = d.fatos || [], novos = fs.filter(function(f) { return !f.ja; }).length;
+			if (!fs.length) throw new Error('Nao achei nada sobre voce neste texto.');
+			if (!novos) throw new Error('Nada novo: o Nous ja sabe tudo o que esta neste texto.');
+			list.innerHTML = '<div class="nous-mem-empty" style="text-align:left">' +
+				(d.origem === 'backup' ? 'Backup do Nous: ' : 'O Nous encontrou: ') + novos + ' fato(s) novo(s). Desmarque o que estiver errado.' +
+				(d.truncado ? '<br>O texto era longo: li so\' o comeco.' : '') + '</div>' +
+				fs.map(function(f, i) {
+					return '<label class="nous-tidy-g"><input type="checkbox" data-f="' + i + '"' + (f.ja ? ' disabled' : ' checked') + '>' +
+						'<span>' + _esc(f.text) + (f.ja ? ' <i>(ja sei)</i>' : '') + (f.pinned ? ' <i>📌</i>' : '') + '</span></label>';
+				}).join('') +
+				'<div class="nous-tidy-row"><button type="button" id="nous-imp-all">Marcar todas</button>' +
+				'<button type="button" id="nous-imp-none">Nenhuma</button></div>' +
+				'<div class="nous-tidy-row"><button type="button" id="nous-imp-ok">Guardar marcadas</button>' +
+				'<button type="button" id="nous-imp-no2">Cancelar</button></div>';
+			function conta() {
+				var n = list.querySelectorAll('[data-f]:checked:not(:disabled)').length;
+				var ok = list.querySelector('#nous-imp-ok');
+				ok.textContent = n ? 'Guardar ' + n : 'Nada marcado';
+				ok.disabled = !n;
+			}
+			list.querySelectorAll('[data-f]').forEach(function(cb) { cb.addEventListener('change', conta); });
+			['all', 'none'].forEach(function(k) {
+				list.querySelector('#nous-imp-' + k).addEventListener('click', function() {
+					list.querySelectorAll('[data-f]:not(:disabled)').forEach(function(cb) { cb.checked = k === 'all'; });
+					conta();
+				});
+			});
+			conta();
+			list.querySelector('#nous-imp-no2').addEventListener('click', memDone);
+			list.querySelector('#nous-imp-ok').addEventListener('click', function() {
+				var sel = [];
+				list.querySelectorAll('[data-f]').forEach(function(cb) { if (cb.checked && !cb.disabled) sel.push(fs[+cb.getAttribute('data-f')]); });
+				if (!sel.length) { memDone(); return; }
+				fetch(MEM_URL + '/memories/import/apply', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ user_id: _nousUid, persona: _activePer, fatos: sel })
+				}).then(function(r) { return r.json(); }).then(function(d) {
+					if (window.NousUI && window.NousUI.toast) window.NousUI.toast((d.salvas || 0) + ' memoria(s) guardada(s).');
+					memDone();
+				}, memDone);
+			});
+		}).catch(function(e) {
+			list.innerHTML = '<div class="nous-mem-empty">' + _esc(e.message || 'Nao consegui ler agora.') + '</div>';
+			setTimeout(memDone, 4000);
+		});
 	}
 
 	function pinMem(id, pinned) {
@@ -743,6 +891,7 @@
 
 	/* Faxina: o modelo PROPOE, o usuario marca o que aceita e aplica. */
 	function tidyMemories() {
+		_memBusy = true;
 		var list = memPanelEl.querySelector('#nous-mem-list');
 		list.innerHTML = '<div class="nous-mem-loading">Lendo as memorias... (pode levar um minuto)</div>';
 		fetch(MEM_URL + '/memories/tidy', {
@@ -754,7 +903,7 @@
 			var gs = d.grupos || [];
 			if (!gs.length) {
 				list.innerHTML = '<div class="nous-mem-empty">Tudo em ordem: nada repetido nem contraditorio.</div>';
-				setTimeout(loadMemories, 2500);
+				setTimeout(memDone, 2500);
 				return;
 			}
 			list.innerHTML = '<div class="nous-mem-empty" style="text-align:left">Marque o que pode juntar:</div>' +
@@ -765,7 +914,7 @@
 				}).join('') +
 				'<div class="nous-tidy-row"><button type="button" id="nous-tidy-ok">Aplicar</button>' +
 				'<button type="button" id="nous-tidy-no">Cancelar</button></div>';
-			list.querySelector('#nous-tidy-no').addEventListener('click', loadMemories);
+			list.querySelector('#nous-tidy-no').addEventListener('click', memDone);
 			list.querySelector('#nous-tidy-ok').addEventListener('click', function() {
 				var sel = [];
 				list.querySelectorAll('[data-g]').forEach(function(cb) {
@@ -775,11 +924,11 @@
 					method: 'POST',
 					headers: { 'Content-Type': 'application/json' },
 					body: JSON.stringify({ user_id: _nousUid, grupos: sel })
-				}).then(loadMemories, loadMemories);
+				}).then(memDone, memDone);
 			});
 		}).catch(function(e) {
 			list.innerHTML = '<div class="nous-mem-empty">' + _esc(e.message || 'Nao consegui organizar agora.') + '</div>';
-			setTimeout(loadMemories, 4000);
+			setTimeout(memDone, 4000);
 		});
 	}
 
@@ -825,11 +974,22 @@
 		}).then(function() { loadMemories(); }).catch(loadMemories);
 	}
 
-	function deleteMem(id) {
+	/* Apaga na hora e oferece Desfazer (recria a memoria com o mesmo texto,
+	 * persona e alfinete) em vez de perguntar "tem certeza?". */
+	function deleteMem(id, m) {
 		if (!_nousUid) return;
 		fetch(MEM_URL + '/memories/' + id + '?user_id=' + encodeURIComponent(_nousUid), {
 			method: 'DELETE'
-		}).then(function() { loadMemories(); }).catch(loadMemories);
+		}).then(function() {
+			loadMemories();
+			if (m && window.NousUI && window.NousUI.toast) window.NousUI.toast('Memoria apagada.', { acao: function() {
+				fetch(MEM_URL + '/memories/import/apply', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ user_id: _nousUid, persona: m.persona || _activePer, fatos: [{ text: m.text, pinned: m.pinned, persona: m.persona }] })
+				}).then(function() { loadMemories(); });
+			} });
+		}).catch(loadMemories);
 	}
 
 	function addMemory() {
@@ -846,6 +1006,8 @@
 		}).catch(function() {});
 	}
 
+	function _sem(s) { return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); }
+
 	function _esc(s) {
 		return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 	}
@@ -857,6 +1019,8 @@
 	 * e reabrir o painel sem perder nada.
 	 * ==================================================================== */
 	var storeEl = null, storeOpen = false, storeTimer = null;
+	var storeSim = null;   /* {vram_gb, ram_gb, gpu}: "e se eu tivesse outra maquina?" */
+	var storeFilt = '', storeData = null, _pullPrev = {};   /* filtro escolhido, ultimo /catalog, status anterior dos downloads */
 	var CAT_LABEL = {
 		leve: 'Leve e rapido', conversa: 'Conversa e escrita',
 		raciocinio: 'Raciocinio', programacao: 'Programacao'
@@ -904,7 +1068,31 @@
 			'.nous-store-prog{flex:1;display:flex;flex-direction:column;gap:4px}' +
 			'.nous-store-ptxt{font-size:11px;opacity:.75;font-variant-numeric:tabular-nums}' +
 			'.nous-store-err{font-size:11px;color:#e08080;flex:1}' +
-			'.nous-store-empty{opacity:.6;text-align:center;padding:22px 10px;font-size:12px;line-height:1.5}';
+			'.nous-store-empty{opacity:.6;text-align:center;padding:22px 10px;font-size:12px;line-height:1.5}' +
+			/* v2.9: qualquer modelo + simulacao */
+			'#nous-store-tools{padding:10px 12px 4px;border-bottom:1px solid rgba(255,255,255,.07)}' +
+			'.nous-store-any{display:flex;gap:6px}' +
+			'#nous-store-name,#nous-sim-gpu,#nous-store-sim select{box-sizing:border-box;padding:6px 9px;background:rgba(255,255,255,.07);' +
+			'border:1px solid rgba(200,150,46,.28);border-radius:8px;color:#eee;font-size:12px;outline:none;color-scheme:dark}' +
+			'#nous-store-name{flex:1;min-width:0}#nous-store-name:focus{border-color:#c8962e}' +
+			'#nous-store-res{margin-top:8px}#nous-store-res .nous-store-card{margin-bottom:4px}' +
+			'.nous-store-note{font-size:11px;opacity:.75;margin:2px 0 6px}.nous-store-res .nous-store-err{display:block}' +
+			'.nous-store-links{display:flex;flex-wrap:wrap;gap:4px 14px;padding:6px 0 4px}' +
+			'#nous-store-simbtn,#nous-store-anybtn{background:none;border:none;color:#c8962e;cursor:pointer;font-size:11px;padding:2px 0}' +
+			'#nous-store-simbtn:hover,#nous-store-anybtn:hover{text-decoration:underline}' +
+			'#nous-store-anybox{padding:2px 0 4px}#nous-store-anybox.nous-hidden{display:none}#nous-store-anybox .nous-store-note{margin-top:5px}' +
+			'#nous-store-chips{display:flex;flex-wrap:wrap;gap:5px}' +
+			'.nous-store-chip{padding:3px 10px;border-radius:99px;border:1px solid rgba(200,150,46,.35);background:transparent;' +
+			'color:#e7c069;font-size:11px;cursor:pointer}.nous-store-chip small{opacity:.6}' +
+			'.nous-store-chip:hover{background:rgba(200,150,46,.14)}.nous-store-chip.on{background:rgba(200,150,46,.3);border-color:rgba(200,150,46,.7)}' +
+			'.nous-store-mem{margin:-4px 0 7px;font-size:11px;opacity:.6}.nous-store-mem b{color:#e08080}' +
+			'.nous-store-warn{color:#e7c069;opacity:1}' +
+			'#nous-store-head span{font-family:Cinzel,Georgia,serif;letter-spacing:.06em}' +
+			'#nous-store-sim{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:4px 0 8px;font-size:11px}' +
+			'#nous-store-sim.nous-hidden{display:none}#nous-store-sim label{display:flex;gap:5px;align-items:center;opacity:.9}' +
+			'#nous-sim-gpu{flex:1;min-width:140px}' +
+			'#nous-store-hw.nous-store-simon{color:#e7c069;opacity:1}' +
+			'.nous-store-btn:disabled{opacity:.4;cursor:default}';
 		var st = document.createElement('style');
 		st.id = 'nous-store-style';
 		st.textContent = css;
@@ -923,6 +1111,28 @@
 			'<div id="nous-store-head"><span>Modelos de IA</span>' +
 			'<button id="nous-store-close" type="button" aria-label="Fechar">&#x2715;</button></div>' +
 			'<div id="nous-store-hw">Analisando sua maquina...</div>' +
+			'<div id="nous-store-tools">' +
+			'<div id="nous-store-chips" role="group" aria-label="Filtrar modelos"></div>' +
+			'<div class="nous-store-links"><button id="nous-store-anybtn" type="button" aria-expanded="false">🔎 Procurar outro modelo</button>' +
+			'<button id="nous-store-simbtn" type="button">🔧 E se eu tivesse outra maquina?</button></div>' +
+			'<div id="nous-store-anybox" class="nous-hidden"><div class="nous-store-any"><input id="nous-store-name" type="text" spellcheck="false" ' +
+			'aria-label="Nome ou link do modelo" placeholder="Nome (qwen3:8b) ou link do ollama.com / Hugging Face">' +
+			'<button class="nous-store-btn" id="nous-store-chk" type="button">Conferir</button></div>' +
+			'<div class="nous-store-note">O Nous confere o tamanho e se cabe na sua maquina antes de baixar. ' +
+			'Do Hugging Face, use repositorios com "GGUF" no nome.</div></div>' +
+			'<div id="nous-store-res"></div>' +
+			'<div id="nous-store-sim" class="nous-hidden">' +
+			'<label>Placa de video <select id="nous-sim-vram">' +
+			[[0, 'sem placa (so processador)'], [4, '4 GB'], [6, '6 GB'], [8, '8 GB'], [10, '10 GB'], [12, '12 GB'], [16, '16 GB'],
+				[20, '20 GB'], [24, '24 GB'], [32, '32 GB'], [48, '48 GB']].map(function (o) {
+				return '<option value="' + o[0] + '">' + o[1] + '</option>';
+			}).join('') + '</select></label>' +
+			'<label>Memoria RAM <select id="nous-sim-ram">' + [8, 16, 32, 64, 128].map(function (g) {
+				return '<option value="' + g + '">' + g + ' GB</option>';
+			}).join('') + '</select></label>' +
+			'<input id="nous-sim-gpu" type="text" placeholder="Modelo da placa (opcional, ex.: RTX 4070)">' +
+			'<button class="nous-store-btn" id="nous-sim-go" type="button">Simular</button></div>' +
+			'</div>' +
 			'<div id="nous-store-list"><div class="nous-store-empty">Carregando catalogo...</div></div>' +
 			'</div>';
 		document.body.appendChild(storeEl);
@@ -930,6 +1140,75 @@
 			if (e.target === storeEl) closeStore();
 		});
 		storeEl.querySelector('#nous-store-close').addEventListener('click', closeStore);
+		storeEl.querySelector('#nous-store-chk').addEventListener('click', checkModel);
+		storeEl.querySelector('#nous-store-name').addEventListener('keydown', function (e) {
+			if (e.key === 'Enter') checkModel();
+		});
+		storeEl.querySelector('#nous-store-simbtn').addEventListener('click', function () {
+			if (storeSim) { storeSim = null; storeRefresh(); return; }
+			storeEl.querySelector('#nous-store-sim').classList.toggle('nous-hidden');
+		});
+		storeEl.querySelector('#nous-store-anybtn').addEventListener('click', function () {
+			var box = storeEl.querySelector('#nous-store-anybox'), abre = box.classList.contains('nous-hidden');
+			box.classList.toggle('nous-hidden', !abre);
+			this.setAttribute('aria-expanded', abre ? 'true' : 'false');
+			if (abre) storeEl.querySelector('#nous-store-name').focus();
+		});
+		storeEl.querySelector('#nous-store-chips').addEventListener('click', function (e) {
+			var b = e.target.closest('[data-filt]');
+			if (!b || !storeData) return;
+			storeFilt = b.getAttribute('data-filt');
+			renderStore(storeData);
+		});
+		storeEl.querySelector('#nous-store-list').addEventListener('click', function (e) {
+			var b = e.target.closest('[data-filt-reset]');
+			if (b && storeData) { storeFilt = ''; renderStore(storeData); }
+		});
+		storeEl.querySelector('#nous-sim-go').addEventListener('click', function () {
+			storeSim = { vram_gb: storeEl.querySelector('#nous-sim-vram').value,
+				ram_gb: storeEl.querySelector('#nous-sim-ram').value,
+				gpu: storeEl.querySelector('#nous-sim-gpu').value.trim() };
+			storeEl.querySelector('#nous-store-sim').classList.add('nous-hidden');
+			storeRefresh();
+		});
+	}
+
+	/* ---- Qualquer modelo (v2.9): confere tamanho e se cabe ANTES de baixar ---- */
+	function checkModel() {
+		var inp = storeEl.querySelector('#nous-store-name'), res = storeEl.querySelector('#nous-store-res');
+		var name = inp.value.trim();
+		if (!name) return;
+		res.innerHTML = '<div class="nous-store-note">Conferindo no catalogo do Ollama...</div>';
+		fetch(MON_URL + '/model/check?name=' + encodeURIComponent(name), { cache: 'no-store' })
+			.then(function (r) { return r.json(); })
+			.then(function (d) {
+				if (!d.ok) { res.innerHTML = '<div class="nous-store-note nous-store-err">' + _esc(d.erro || 'Nao achei esse modelo.') + '</div>'; return; }
+				var badge = d.installed ? '<span class="nous-store-badge nous-b-inst">Instalado</span>' :
+					d.fit === 'recomendado' ? '<span class="nous-store-badge nous-b-rec">Bom para sua maquina</span>' :
+					d.fit === 'ok' ? '<span class="nous-store-badge nous-b-ok">Roda na sua maquina</span>' :
+					'<span class="nous-store-badge nous-b-heavy">Pesado para sua maquina</span>';
+				if (d.vision) badge += '<span class="nous-store-badge nous-b-vis">Entende imagens</span>';
+				var aviso = !d.cabe_disco ? '<div class="nous-store-err">Falta espaco: precisa de ~' + (d.download_gb + 2) +
+					' GB livres e o disco tem ' + d.disk_free_gb + ' GB.</div>' :
+					d.fit === 'pesado' ? '<div class="nous-store-err">Pode nao abrir ou ficar muito lento nesta maquina.</div>' : '';
+				res.innerHTML = '<div class="nous-store-card"><div class="nous-store-top"><span class="nous-store-name">' +
+					_esc(d.name) + '</span>' + badge + '</div>' + _speedTxt(d) + aviso +
+					'<div class="nous-store-row"><span class="nous-store-size">~' + d.download_gb + ' GB de download</span>' +
+					(d.installed ? '' : '<button class="nous-store-btn" type="button" id="nous-store-anyget"' +
+						(d.cabe_disco ? '' : ' disabled') + '>Baixar</button>') + '</div></div>';
+				var b = res.querySelector('#nous-store-anyget');
+				if (b) b.addEventListener('click', function () {
+					confirmarPesado(d.fit, d.name).then(function (sim) {
+						if (!sim) return;
+						b.disabled = true;
+						startPull(d.name).then(function (ok) {
+							if (ok) { res.innerHTML = ''; inp.value = ''; }
+							else { b.disabled = false; res.insertAdjacentHTML('beforeend', '<div class="nous-store-err">Nao consegui iniciar o download. Confira de novo.</div>'); }
+						});
+					});
+				});
+			})
+			.catch(function () { res.innerHTML = '<div class="nous-store-note nous-store-err">A loja esta indisponivel. Abra o Nous pelo atalho.</div>'; });
 	}
 
 	function openStore() {
@@ -942,13 +1221,16 @@
 
 	function closeStore() {
 		storeOpen = false;
+		storeSim = null;  /* reabrir mostra sempre a maquina de verdade */
 		if (storeEl) storeEl.classList.add('nous-hidden');
 		if (storeTimer) { clearTimeout(storeTimer); storeTimer = null; }
 	}
 
 	function storeRefresh() {
 		if (!storeOpen || !storeEl) return;
-		fetch(MON_URL + '/catalog', { cache: 'no-store' })
+		var q = storeSim ? '?vram_gb=' + encodeURIComponent(storeSim.vram_gb) + '&ram_gb=' + encodeURIComponent(storeSim.ram_gb) +
+			'&gpu=' + encodeURIComponent(storeSim.gpu || '') : '';
+		fetch(MON_URL + '/catalog' + q, { cache: 'no-store' })
 			.then(function (r) { return r.json(); })
 			.then(renderStore)
 			.catch(function () {
@@ -961,6 +1243,10 @@
 
 	function _hwLine(hw) {
 		if (!hw) return '';
+		if (hw.simulado) {
+			return '🔧 Simulacao: ' + (hw.tier === 'cpu' ? 'sem placa de video' : _esc(hw.gpu_name) + ' · ' + hw.vram_gb + ' GB de VRAM') +
+				' · ' + hw.ram_gb + ' GB de RAM (nao e\' a sua maquina)';
+		}
 		if (hw.tier === 'cpu') {
 			return 'Sua maquina: sem GPU dedicada — modo CPU' +
 				(hw.ram_gb ? ' · ' + hw.ram_gb + ' GB de RAM' : '');
@@ -980,11 +1266,51 @@
 			' palavras/s)' + onde + '</div>';
 	}
 
+	/* "Ocupa ~7 GB dos 16 GB da placa": o selo explicado em numeros */
+	function _memTxt(m, hw) {
+		if (!hw || !m.min_vram_gb) return '';
+		if (hw.tier !== 'cpu' && hw.vram_gb) {
+			return '<div class="nous-store-mem">Ocupa ~' + m.min_vram_gb + ' GB dos ' + hw.vram_gb + ' GB da placa' +
+				(m.min_vram_gb > hw.vram_gb ? ' — <b>nao cabe</b>' : '') + '</div>';
+		}
+		return hw.ram_gb ? '<div class="nous-store-mem">Precisa de ~' + m.min_ram_cpu_gb + ' GB de RAM (a maquina tem ' + hw.ram_gb + ' GB)</div>' : '';
+	}
+
+	function confirmarPesado(fit, nome) {
+		if (fit !== 'pesado') return Promise.resolve(true);
+		var txt = nome + ' e\' pesado para a sua maquina: pode nao abrir ou responder muito devagar.';
+		if (window.NousUI && window.NousUI.confirmar) return window.NousUI.confirmar(txt, { titulo: 'Baixar mesmo assim?', ok: 'Baixar mesmo assim' });
+		return Promise.resolve(window.confirm(txt + ' Baixar mesmo assim?'));
+	}
+
+	var FILTROS = [['', 'Todos'], ['cabe', 'Cabem aqui'], ['leve', 'Leves'], ['conversa', 'Conversa'],
+		['raciocinio', 'Raciocinio'], ['programacao', 'Programacao'], ['visao', 'Entendem imagens']];
+
+	function _passa(m, f) {
+		if (!f) return true;
+		if (f === 'cabe') return m.fit !== 'pesado';
+		if (f === 'visao') return !!m.vision;
+		return m.category === f;
+	}
+
 	function renderStore(data) {
 		if (!storeOpen || !storeEl) return;
+		storeData = data;
+		/* aviso quando um download termina (o painel acompanha a cada 2 s) */
+		(data.models || []).concat(data.outros || []).forEach(function (m) {
+			var tag = m.tag, st = m.pull && m.pull.status;
+			if (_pullPrev[tag] === 'baixando' && st && st !== 'baixando' && window.NousUI && window.NousUI.toast) {
+				if (st === 'pronto') window.NousUI.toast((m.name || tag) + ' pronto. Escolha no seletor de modelos, no topo do chat.');
+				else window.NousUI.toast('O download de ' + (m.name || tag) + ' falhou.', { tipo: 'erro' });
+			}
+			if (st) _pullPrev[tag] = st;
+		});
 		var hwEl = storeEl.querySelector('#nous-store-hw');
 		var list = storeEl.querySelector('#nous-store-list');
-		if (hwEl) hwEl.textContent = _hwLine(data.hardware);
+		var sim = !!(data.hardware && data.hardware.simulado);
+		var qual = sim ? 'esta' : 'sua';
+		if (hwEl) { hwEl.innerHTML = _hwLine(data.hardware); hwEl.classList.toggle('nous-store-simon', sim); }
+		storeEl.querySelector('#nous-store-simbtn').textContent = sim ? '↩ Voltar para a minha maquina' : '🔧 E se eu tivesse outra maquina?';
 		if (!data.ollama_online) {
 			list.innerHTML =
 				'<div class="nous-store-empty">O motor de IA (Ollama) nao esta no ar.<br>' +
@@ -999,16 +1325,50 @@
 			list.innerHTML = '<div class="nous-store-empty">Catalogo vazio.</div>';
 			return;
 		}
+		var chips = storeEl.querySelector('#nous-store-chips');
+		chips.innerHTML = FILTROS.map(function (f) {
+			var n = models.filter(function (m) { return _passa(m, f[0]); }).length;
+			if (f[0] && !n) return '';
+			return '<button type="button" class="nous-store-chip' + (storeFilt === f[0] ? ' on' : '') + '" data-filt="' + f[0] + '"' +
+				' aria-pressed="' + (storeFilt === f[0]) + '">' + f[1] + ' <small>' + n + '</small></button>';
+		}).join('');
+		var todos = models;
+		models = models.filter(function (m) { return _passa(m, storeFilt); });
 		list.innerHTML = '';
-		var anyPulling = false;
+		var anyPulling = todos.some(function (m) { return m.pull && m.pull.status === 'baixando'; });
+		if (!models.length) {
+			list.innerHTML = '<div class="nous-store-empty">Nenhum modelo com esse filtro.<br>' +
+				'<button class="nous-store-btn" type="button" data-filt-reset="1" style="margin-top:8px">Ver todos</button></div>';
+		}
+		/* downloads de fora do catalogo ("Outro modelo"), com o progresso */
+		(data.outros || []).forEach(function (o) {
+			var p = o.pull || {}, row;
+			if (p.status === 'baixando') {
+				anyPulling = true;
+				var pc = Math.round((p.pct || 0) * 100);
+				row = '<div class="nous-store-prog"><div class="nous-mon-track"><div class="nous-mon-fill" style="width:' + pc + '%"></div></div>' +
+					'<span class="nous-store-ptxt">Baixando... ' + pc + '%' + (p.total_gb ? ' · ' + p.completed_gb + ' / ' + p.total_gb + ' GB' : '') + '</span>' +
+					(p.nota ? '<span class="nous-store-ptxt nous-store-warn">' + _esc(p.nota) + '</span>' : '') + '</div>';
+			} else if (p.status === 'erro') {
+				row = '<span class="nous-store-err">' + _esc(p.error || 'O download falhou.') + '</span>';
+			} else {
+				row = '<span class="nous-store-size">pronto para usar — selecione no topo da tela</span>';
+			}
+			var c = document.createElement('div');
+			c.className = 'nous-store-card';
+			c.innerHTML = '<div class="nous-store-top"><span class="nous-store-name">' + _esc(o.tag) + '</span>' +
+				(o.installed ? '<span class="nous-store-badge nous-b-inst">Instalado</span>' : '') + '</div>' +
+				'<div class="nous-store-row">' + row + '</div>';
+			list.appendChild(c);
+		});
 		models.forEach(function (m) {
 			var card = document.createElement('div');
 			card.className = 'nous-store-card' + (m.fit === 'recomendado' ? ' nous-rec' : '');
 			var badges = '';
 			if (m.installed) badges += '<span class="nous-store-badge nous-b-inst">Instalado</span>';
-			else if (m.fit === 'recomendado') badges += '<span class="nous-store-badge nous-b-rec">Recomendado para sua maquina</span>';
-			else if (m.fit === 'ok') badges += '<span class="nous-store-badge nous-b-ok">Roda na sua maquina</span>';
-			else badges += '<span class="nous-store-badge nous-b-heavy">Pesado para sua maquina</span>';
+			else if (m.fit === 'recomendado') badges += '<span class="nous-store-badge nous-b-rec">Recomendado para ' + qual + ' maquina</span>';
+			else if (m.fit === 'ok') badges += '<span class="nous-store-badge nous-b-ok">Roda ' + (sim ? 'nesta' : 'na sua') + ' maquina</span>';
+			else badges += '<span class="nous-store-badge nous-b-heavy">Pesado para ' + qual + ' maquina</span>';
 			if (m.vision) badges += '<span class="nous-store-badge nous-b-vis">Entende imagens</span>';
 			var pull = m.pull;
 			var rowHtml;
@@ -1020,7 +1380,7 @@
 					'<div class="nous-mon-track"><div class="nous-mon-fill" style="width:' + pct + '%"></div></div>' +
 					'<span class="nous-store-ptxt">Baixando... ' + pct + '%' +
 					(pull.total_gb ? ' · ' + pull.completed_gb + ' / ' + pull.total_gb + ' GB' : '') +
-					'</span></div>';
+					'</span>' + (pull.nota ? '<span class="nous-store-ptxt nous-store-warn">' + _esc(pull.nota) + '</span>' : '') + '</div>';
 			} else if (pull && pull.status === 'erro') {
 				rowHtml =
 					'<span class="nous-store-err">' + _esc(pull.error || 'O download falhou.') + '</span>' +
@@ -1028,6 +1388,10 @@
 			} else if (m.installed) {
 				rowHtml = '<span class="nous-store-size">~' + m.download_gb +
 					' GB · pronto para usar — selecione no topo da tela</span>';
+			} else if (sim) {
+				/* simulacao: so' mostra; baixar e' para a maquina de verdade */
+				rowHtml = '<span class="nous-store-size">~' + m.download_gb + ' GB de download · ' +
+					(CAT_LABEL[m.category] || m.category) + '</span>';
 			} else {
 				rowHtml = '<span class="nous-store-size">~' + m.download_gb + ' GB de download · ' +
 					(CAT_LABEL[m.category] || m.category) + '</span>' +
@@ -1037,12 +1401,20 @@
 				'<div class="nous-store-top"><span class="nous-store-name">' + _esc(m.name) + '</span>' +
 				badges + '</div>' +
 				'<div class="nous-store-desc">' + _esc(m.desc) + '</div>' +
-				_speedTxt(m) +
+				_speedTxt(m) + _memTxt(m, data.hardware) +
 				'<div class="nous-store-row">' + rowHtml + '</div>';
 			list.appendChild(card);
 		});
 		list.querySelectorAll('[data-pull]').forEach(function (b) {
-			b.addEventListener('click', function () { startPull(b.getAttribute('data-pull')); });
+			b.addEventListener('click', function () {
+				var tag = b.getAttribute('data-pull'), m = todos.filter(function (x) { return x.tag === tag; })[0] || {};
+				confirmarPesado(m.fit, m.name || tag).then(function (sim) {
+					if (!sim) return;
+					b.disabled = true;
+					b.textContent = 'Iniciando...';
+					startPull(tag);
+				});
+			});
 		});
 		if (storeTimer) clearTimeout(storeTimer);
 		if (anyPulling) storeTimer = setTimeout(storeRefresh, 2000);
@@ -1765,8 +2137,10 @@
 			});
 			card.querySelector('.nous-gal-btn-del').addEventListener('click', function (e) {
 				e.stopPropagation();
-				if (!confirm('Apagar permanentemente esta imagem?\nEsta ação não pode ser desfeita.')) return;
-				deleteImage(img.id, true, card);
+				window.NousUI.pede('Apagar permanentemente esta imagem?\nEsta ação não pode ser desfeita.').then(function (sim) {
+					if (!sim) return;
+					deleteImage(img.id, true, card);
+				});
 			});
 			grid.appendChild(card);
 		});
@@ -1797,12 +2171,12 @@
 				}
 			} else {
 				if (card) { card.style.opacity = '1'; card.style.pointerEvents = ''; }
-				alert('Não foi possível apagar a imagem: ' + (res.error || 'erro desconhecido'));
+				window.NousUI.aviso('Não foi possível apagar a imagem: ' + (res.error || 'erro desconhecido'));
 			}
 		})
 		.catch(function () {
 			if (card) { card.style.opacity = '1'; card.style.pointerEvents = ''; }
-			alert('Erro de comunicação com o monitor. Tente de novo.');
+			window.NousUI.aviso('Erro de comunicação com o monitor. Tente de novo.');
 		});
 	}
 

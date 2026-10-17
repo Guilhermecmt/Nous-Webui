@@ -344,7 +344,7 @@
 	/* Poe o texto na caixa de mensagem do chat (editor do Open WebUI). */
 	function toChat(text) {
 		var box = document.getElementById('chat-input') || document.querySelector('#chat-input, textarea');
-		if (!box) { alert('Abra uma conversa primeiro.'); return; }
+		if (!box) { window.NousUI.aviso('Abra uma conversa primeiro.'); return; }
 		close();
 		box.focus();
 		if (box.tagName === 'TEXTAREA') {
@@ -457,9 +457,11 @@
 			});
 			box.querySelectorAll('[data-del]').forEach(function (b) {
 				b.addEventListener('click', function () {
-					if (!confirm('Apagar esta nota?')) return;
-					api('POST', '/notes/delete', { id: b.getAttribute('data-del') })
-						.then(function () { renderNotes(box, query); });
+					window.NousUI.pede('Apagar esta nota?').then(function (sim) {
+						if (!sim) return;
+						api('POST', '/notes/delete', { id: b.getAttribute('data-del') })
+							.then(function () { renderNotes(box, query); });
+					});
 				});
 			});
 		}).catch(function () { offline(box); });
@@ -571,14 +573,18 @@
 		});
 		box.querySelectorAll('[data-edel]').forEach(function (b) {
 			b.addEventListener('click', function () {
-				if (!confirm('Apagar este compromisso (e as repeticoes)?')) return;
-				api('POST', '/events/delete', { id: b.getAttribute('data-edel') }).then(function () { renderCal(box); });
+				window.NousUI.pede('Apagar este compromisso (e as repeticoes)?').then(function (sim) {
+					if (!sim) return;
+					api('POST', '/events/delete', { id: b.getAttribute('data-edel') }).then(function () { renderCal(box); });
+				});
 			});
 		});
 		box.querySelectorAll('[data-sdel]').forEach(function (b) {
 			b.addEventListener('click', function () {
-				if (!confirm('Remover este calendario do Nous?')) return;
-				api('POST', '/subs/delete', { id: b.getAttribute('data-sdel') }).then(function () { renderCal(box); });
+				window.NousUI.pede('Remover este calendario do Nous?').then(function (sim) {
+					if (!sim) return;
+					api('POST', '/subs/delete', { id: b.getAttribute('data-sdel') }).then(function () { renderCal(box); });
+				});
 			});
 		});
 		box.querySelector('#nous-ag-eb').addEventListener('click', function () {
@@ -615,9 +621,9 @@
 			f.text().then(function (txt) {
 				return api('POST', '/ics/import', { ics: txt });
 			}).then(function (d) {
-				alert(d.imported + ' compromisso(s) importado(s).');
+				window.NousUI.aviso(d.imported + ' compromisso(s) importado(s).');
 				renderCal(box);
-			}).catch(function (err) { alert('Nao consegui importar: ' + err.message); });
+			}).catch(function (err) { window.NousUI.aviso('Nao consegui importar: ' + err.message); });
 		});
 	}
 
@@ -716,7 +722,7 @@
 		box.querySelectorAll('[data-ton]').forEach(function (b) {
 			b.addEventListener('click', function () {
 				api('POST', '/tasks/update', { id: b.getAttribute('data-ton'), enabled: b.getAttribute('data-v') === '1' })
-					.then(function () { renderTasks(box); }).catch(function (e) { alert(e.message); });
+					.then(function () { renderTasks(box); }).catch(function (e) { window.NousUI.aviso(e.message, 'erro'); });
 			});
 		});
 		box.querySelectorAll('[data-trun]').forEach(function (b) {
@@ -729,8 +735,10 @@
 		});
 		box.querySelectorAll('[data-tdel]').forEach(function (b) {
 			b.addEventListener('click', function () {
-				if (!confirm('Apagar esta tarefa?')) return;
-				api('POST', '/tasks/delete', { id: b.getAttribute('data-tdel') }).then(function () { renderTasks(box); });
+				window.NousUI.pede('Apagar esta tarefa?').then(function (sim) {
+					if (!sim) return;
+					api('POST', '/tasks/delete', { id: b.getAttribute('data-tdel') }).then(function () { renderTasks(box); });
+				});
 			});
 		});
 	}

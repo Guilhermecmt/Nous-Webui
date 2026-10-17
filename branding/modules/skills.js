@@ -140,8 +140,10 @@
 			});
 			b.querySelectorAll('[data-del]').forEach(function (el) {
 				el.addEventListener('click', function () {
-					if (!confirm('Apagar esta habilidade? O Nous deixa de usa-la.')) return;
-					api('POST', '/skills/delete', { id: el.getAttribute('data-del') }).then(renderList);
+					window.NousUI.pede('Apagar esta habilidade? O Nous deixa de usa-la.').then(function (sim) {
+						if (!sim) return;
+						api('POST', '/skills/delete', { id: el.getAttribute('data-del') }).then(renderList);
+					});
 				});
 			});
 		}).catch(function () {

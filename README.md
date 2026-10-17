@@ -6,10 +6,10 @@
 
 **Your own private AI — beautiful, local, and yours.**
 
-Chat · Agenda · Email · Vision · Images · Research — 100% on your PC.  
+Chat · Documents · Agenda · Email · Vision · Images · Research — 100% on your PC.  
 No cloud. No subscription. Your conversations never leave your machine.
 
-[![version](https://img.shields.io/badge/version-2.8.0-c8962e)](CHANGELOG.md)
+[![version](https://img.shields.io/badge/version-2.9.0-c8962e)](CHANGELOG.md)
 [![license](https://img.shields.io/badge/license-MIT-black)](LICENSE)
 [![platform](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6)](#requirements)
 [![local](https://img.shields.io/badge/100%25-local%20%26%20private-2ea44f)](#why-nous)
@@ -34,6 +34,7 @@ What you get over an ordinary AI chat:
 - **Built-in Model Store.** Nous analyzes your hardware, recommends the ideal model and downloads it in one click — inside the app, with a progress bar.
 - **Vision and images.** Drop a screenshot and ask about it; type *"create an image of…"* and it appears in the chat (ComfyUI + Flux, optional).
 - **Optional web search** via DuckDuckGo, no API key.
+- **Documents with AI at your side.** Write a letter, a résumé or a school paper and ask to *fix*, *make it formal*, *shorter* or *turn bullets into prose*: every change shows up struck through for you to accept or reject. Downloads as Word or PDF.
 - **Deep Research.** Select "Pesquisa Profunda (Nous)" in the model dropdown — Nous plans, searches the web in multiple steps, downloads the relevant pages and writes a full report with numbered citations and a source list. 100% local.
 - **Blind model comparison.** The same question to 2–4 models, vote before the names are revealed, and a leaderboard of which one suits you best.
 - **Email assistant (optional).** Connect your inbox and Nous triage, summarizes and drafts replies — all on your machine. Your emails only reach the local Ollama model, never the cloud. Sending always requires explicit confirmation.
@@ -44,18 +45,15 @@ What you get over an ordinary AI chat:
 - **Resource panel.** Live VRAM, loaded models, a one-click button to free your GPU, and a **Diagnostics** view that tells you what is working.
 - **No terminal windows.** Opens from a shortcut, runs in the background, stops with "Parar Nous".
 
-### What's new in 2.8
+### What's new in 2.9
 
-- **Smarter memory:** key facts stay pinned and **🧹 Organize memories** merges duplicates.
-- **Agenda:** checklists, reminders on your phone (ntfy) or by email, **↩ Undo** in the chat, and chained tasks.
-- **Email:** multiple accounts, attachments, learned contacts, and *"send Ana an email…"* straight from the chat (always as a draft).
-- **Image and boleto reading** and **PDF forms** with signature.
-- **Light agent mode:** buttons in replies and chat commands (in Portuguese) such as *"abre minha agenda"* (open my agenda) or *"tema escuro"* (dark theme).
-- **First steps:** Diagnostics, a short tip the first time you open each panel, and sensitive data blurred on screen.
-- **Gallery** with favorites and albums, **"Tell it what to do"** in the Editor, and **Compare models** with a leaderboard.
-- **Faster on small models:** 16k context (replies in 5–25 s instead of minutes) and file search with granite-embedding.
+- **📝 Documents:** write next to the chat and ask the AI to fix, formalize, shorten, organize or continue. It **only suggests** — each change appears struck through/underlined for you to accept or reject. Select a passage to change just that part. Autosaves, keeps versions and downloads as **Word, PDF or Markdown**.
+- **Replies:** **✂ Mais curto** (shorter), **🙂 Mais simples** (simpler) and **📝 Documento** (open the reply to edit and download) buttons.
+- **Memory:** **⬆ Import** facts from a résumé, an "about me" text or your ChatGPT memories (you pick what to keep) and **⬇ Export** everything to a file.
+- **Model Store:** download **any model** from Ollama or Hugging Face by name or link — Nous checks the size and whether it fits your machine first — and **"What if I had another machine?"** shows what would run on a different GPU.
+- **Deep Research:** reports download as **PDF or Word**.
 
-Full details in the [CHANGELOG](CHANGELOG.md).
+Earlier versions in the [CHANGELOG](CHANGELOG.md).
 
 ---
 
@@ -118,7 +116,9 @@ You can keep several models installed and switch between them in the selector at
 | 12–16 GB GPU | Qwen 3 14B | ~9.3 GB | Better reasoning, longer context |
 | 20 GB+ GPU | Qwen 3 32B | ~20 GB | Quality on par with large cloud models |
 
-Power users can install **any** model from [ollama.com/library](https://ollama.com/library) through the admin panel (Admin Panel → Settings → Models).
+For **any other model**, type its name (`qwen3:8b`) or paste a link from [ollama.com](https://ollama.com/library) or a Hugging Face GGUF repository into the Store's **"Outro modelo"** field and click **Conferir**: Nous reads the size from the registry (nothing is downloaded), tells you whether it fits your GPU and disk, and only then offers **Baixar**.
+
+Thinking about a new computer? **"E se eu tivesse outra máquina?"** simulates another GPU and amount of RAM and shows what would run, and how fast.
 
 ---
 
@@ -129,6 +129,8 @@ Power users can install **any** model from [ollama.com/library](https://ollama.c
 As you chat, Nous identifies durable facts — name, city, work, preferences — and recalls them in later conversations. The **"O que o Nous sabe"** panel (brain button, bottom-right) lets you view, edit and delete every memory, and create **personas** with separate memory sets (work, studies, personal). Everything lives in `NousData`, on your disk.
 
 Identity and health facts (name, allergies, medication) are **pinned** and join every conversation; pin others with 📌. Past 30 memories, Nous brings only the pinned ones, the most recent and those related to the question. **🧹 Organizar memórias** finds duplicates and proposes merging them — nothing changes without your OK.
+
+**⬆ Importar** brings in what you have already written about yourself: a résumé, an "about me" text (.txt, .md, .docx, .pdf) or the list of ChatGPT memories pasted into the box. Nous proposes the facts, flags the ones it already knew, and you choose what to keep. **⬇ Exportar** downloads every memory to a file (backup or another computer), which Import brings back exactly, pinned ones included.
 
 ### Files — Nous reads your notes
 
@@ -165,7 +167,7 @@ Select **"Pesquisa Profunda (Nous)"** in the model dropdown and ask any research
 2. Searches the web (SearXNG, running locally) for each sub-question.
 3. Downloads the most relevant pages and reads them.
 4. Writes a structured markdown report with inline citations `[n]` and a **Fontes** (Sources) section with clickable URLs.
-5. Saves a **visual report** (table of contents, clickable citations, source cards, print-ready) to the **Recursos › Relatórios** library, linked at the end of the answer.
+5. Saves a **visual report** (table of contents, clickable citations, source cards) to the **Recursos › Relatórios** library, linked at the end of the answer. Each report there also downloads as **PDF** or **Word**.
 
 With small models (up to ~10B) it searches less and answers directly when the question is simple; vague questions get suggestion buttons, and you can follow up on the last report (*"e no Brasil?"*).
 
@@ -223,6 +225,16 @@ In **Agenda › Tarefas**: a morning briefing with today's agenda and emails, a 
 
 After getting something right in a conversation, say **"aprenda isso"** ("learn this"). Nous distills the procedure into a skill (a readable `.md` file in `NousData\skills`) and applies it to similar requests later. **Recursos › 🧠 Habilidades** lets you review, edit, create and import `SKILL.md` files from a GitHub link. **✍ Ensinar meu jeito de escrever** reads samples of your writing and stores your style, applied whenever you ask Nous to write something.
 
+### Documents — write with AI at your side
+
+**Recursos › 📝 Documentos** (or *"abre meus documentos"* in the chat). Write a letter, a résumé, a school paper or a post — or open a `.docx`, `.pdf`, `.txt` or `.md` file. Below the text are one-click requests: **Corrigir português** (fix), **Mais formal**, **Mais simples**, **Mais curto**, **Tópicos em texto** (bullets to prose), **Organizar com títulos** and **Continuar escrevendo**, plus a box to ask in your own words.
+
+Empty document? Pick a **ready template** (formal letter, résumé, work email, complaint, meeting minutes) or **✨ Escrever com a IA**: describe what you need and review the draft.
+
+The AI never writes straight into the document: each change appears **struck through (before) and underlined (after)** with ✓ and ✕. Review shows *"suggestion 2 of 7"*; **Enter** accepts, **Delete** rejects and Nous moves to the next one — or use **Accept all** / **Reject all**. After applying, the notice offers **Undo**. While the AI works you watch the text arrive **live**; during review, **❓ Por quê?** (or the **?** key) explains the suggestion. In **🕘 Versões**, clicking a version shows what would change before you go back. If you **select a passage** first, only that part changes. Before each accepted change Nous keeps a **version** (also every 10 minutes of writing), and you can go back to any of them.
+
+Documents autosave to `NousData\documentos`. **⬇ Baixar** produces **Word (.docx)**, **PDF** or **Markdown**; **💬 Usar no chat** takes the text into the conversation. In chat replies, the **📝 Documento** button goes the other way. Everything runs on the local model.
+
 ### Chat utilities
 
 - **YouTube:** paste a link and ask for a summary — Nous reads the captions and answers with timestamps.
@@ -230,6 +242,7 @@ After getting something right in a conversation, say **"aprenda isso"** ("learn 
 - **Read images and bills:** send a photo of a document, a screenshot or a Brazilian *boleto* — Nous reads the text locally (OCR), even with a model without vision. Boletos come out with bank, amount and due date, checked against the check digit.
 - **PDF forms** (**Recursos › 📄 Formulários**): lists the fields of a fillable PDF, suggests what it already knows about you and signs with your saved signature.
 - **Long conversations:** when a chat outgrows the model's context, Nous summarizes the beginning on its own and keeps the details.
+- **Tailored replies:** under each reply, **✂ Mais curto** and **🙂 Mais simples** ask for a shorter or simpler rewrite, and **📝 Documento** opens the reply in Documents.
 - **Chat control:** *"abre minha agenda"*, *"tema escuro"*, *"libera a placa de vídeo"*, *"abre a galeria"*. When there are choices, the reply shows **buttons**; and Nous checks that what the model claims to have done (*"anotei"*, *"rascunho pronto"*) really happened.
 
 ### Photo editor and Gallery
@@ -240,7 +253,7 @@ The **Gallery** collects generated images: favorites ★, albums 📁, zoom, rec
 
 ### Resource panel and diagnostics
 
-The **Recursos** card (bottom-left) shows live VRAM, the models loaded in memory, and the **"Parar modelos"** (frees the GPU instantly) and **"Baixar modelos"** (opens the Store, now with an **estimated speed** per model on your GPU) buttons, plus shortcuts to Agenda, Email, Skills, Reports, Gallery, Editor, PDF forms and Compare models.
+The **Recursos** card (bottom-left) shows live VRAM, the models loaded in memory, and the **"Parar modelos"** (frees the GPU instantly) and **"Baixar modelos"** (opens the Store, now with an **estimated speed** per model on your GPU) buttons, plus shortcuts to Agenda, Email, Skills, Reports, Documents, Gallery, Editor, PDF forms and Compare models.
 
 **🩺 Diagnóstico** answers *"what is working?"*: every part of Nous with ✓/✗ and what to do. It also holds **on-screen privacy** (CPF, card numbers, passwords and keys are blurred in chats until clicked) and **"Ver as dicas de novo"** — each panel shows a short tip the first time it opens.
 
@@ -303,7 +316,7 @@ Nous WebUI/
 ├─ agenda/      notes, reminders, calendar and scheduled tasks (port 8996)
 ├─ skills/      skills: chat filter + panel API (port 8997)
 ├─ utilidades/  chat filters: YouTube, weather, OCR/boletos, compaction, commands, guard
-├─ documentos/  PDF forms: fields, filling and signature
+├─ documentos/  Documents (AI suggestions, versions, Word/PDF) and PDF forms
 ├─ ajustes/     Open WebUI defaults for Nous (Portuguese, embeddings, hidden natives)
 ├─ tools/       capability check, backup, password reset, health check
 └─ docs/        roadmap, screenshots

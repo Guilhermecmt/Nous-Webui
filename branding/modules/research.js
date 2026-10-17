@@ -1,7 +1,8 @@
 /* =====================================================================
    Nous - Relatorios (v2.7). Botao "Relatorios" no card Recursos -> a
    biblioteca da Pesquisa Profunda (relatorios visuais salvos pelo monitor,
-   127.0.0.1:8990/research). Cada um abre numa aba propria.
+   127.0.0.1:8990/research). Cada um abre numa aba propria; desde a v2.9
+   tambem baixa em PDF ou Word (/research/export).
    ===================================================================== */
 (function () {
 	'use strict';
@@ -20,11 +21,12 @@
 			'#nous-reports-open:hover{background:' + g + '.12)}' +
 			'#nous-rp-ov{position:fixed;inset:0;z-index:10001;background:rgba(0,0,0,.55);display:flex;' +
 			'align-items:center;justify-content:center;backdrop-filter:blur(3px)}#nous-rp-ov.nous-hidden{display:none}' +
-			'#nous-rp{width:520px;max-width:95vw;max-height:80vh;display:flex;flex-direction:column;font-family:Inter,system-ui,sans-serif;' +
+			'#nous-rp{width:600px;max-width:95vw;max-height:80vh;display:flex;flex-direction:column;font-family:Inter,system-ui,sans-serif;' +
 			'font-size:13px;color:#eee;background:rgba(18,18,22,.97);border:1px solid ' + g + '.4);border-radius:16px;' +
 			'box-shadow:0 16px 48px rgba(0,0,0,.55);overflow:hidden}' +
 			'#nous-rp-head{display:flex;align-items:center;padding:14px 16px 10px;border-bottom:1px solid ' + g + '.15)}' +
-			'#nous-rp-head span{flex:1;font-weight:700;font-size:15px;color:#e7c069}' +
+			'#nous-rp-head span{flex:1;font:600 15px Cinzel,Georgia,serif;letter-spacing:.05em;color:#e7c069}' +
+			'.nous-rp-acts{display:flex;flex-wrap:wrap;gap:4px;justify-content:flex-end;align-self:center;max-width:52%}' +
 			'#nous-rp-close{background:none;border:none;color:#888;cursor:pointer;font-size:19px}' +
 			'#nous-rp-body{overflow-y:auto;padding:12px 16px 16px}' +
 			'.nous-rp-item{display:flex;gap:8px;align-items:flex-start;padding:9px 10px;border-radius:10px;' +
@@ -32,6 +34,8 @@
 			'.nous-rp-item a{flex:1;color:#eee;text-decoration:none}.nous-rp-item a:hover b{color:#e7c069}' +
 			'.nous-rp-sub{font-size:11px;opacity:.6;margin-top:3px}' +
 			'.nous-rp-del{background:none;border:none;color:#888;cursor:pointer}.nous-rp-del:hover{color:#f08080}' +
+			'.nous-rp-exp{align-self:center;padding:3px 8px;border:1px solid ' + g + '.35);border-radius:7px;background:transparent;' +
+			'color:#e7c069;font-size:11px;font-weight:600;cursor:pointer}.nous-rp-exp:hover{background:' + g + '.16)}' +
 			'.nous-rp-empty{opacity:.6;text-align:center;padding:18px 8px;font-size:12px;line-height:1.6}';
 		var st = document.createElement('style');
 		st.id = 'nous-rp-style';
@@ -80,15 +84,74 @@
 					encodeURIComponent(r.id) + '"><b>' + esc(r.question) + '</b><div class="nous-rp-sub">' +
 					dt.toLocaleDateString('pt-BR') + ' ' + dt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) +
 					' · ' + r.n_sources + ' fontes' + (r.domains && r.domains.length ? ' · ' + esc(r.domains.slice(0, 3).join(', ')) : '') +
-					'</div></a><button class="nous-rp-del" type="button" title="Apagar" data-id="' + esc(r.id) + '">🗑</button></div>';
+					'</div></a><span class="nous-rp-acts">' +
+					'<button class="nous-rp-exp" type="button" title="Conversar com a IA sobre este relatorio" data-exp="chat" data-rid="' + esc(r.id) + '">💬 Conversar</button>' +
+					'<button class="nous-rp-exp" type="button" title="Baixar em PDF" data-exp="pdf" data-rid="' + esc(r.id) + '">PDF</button>' +
+					'<button class="nous-rp-exp" type="button" title="Baixar em Word" data-exp="docx" data-rid="' + esc(r.id) + '">Word</button>' +
+					'<button class="nous-rp-exp" type="button" title="Abrir nos Documentos para editar" data-exp="doc" data-rid="' + esc(r.id) + '">✎ Editar</button>' +
+					'<button class="nous-rp-exp" type="button" title="Copiar o texto com as fontes" data-exp="copiar" data-rid="' + esc(r.id) + '">📋</button>' +
+					'<button class="nous-rp-del" type="button" title="Apagar" aria-label="Apagar relatorio" data-id="' + esc(r.id) + '">🗑</button></span></div>';
 			}).join('');
+			function toast(t, op) { if (UI.toast) UI.toast(t, op); else if (op && op.tipo === 'erro') window.alert(t); }
+			box.querySelectorAll('[data-exp]').forEach(function (b) {
+				b.addEventListener('click', function () {
+					var fmt = b.getAttribute('data-exp'), rid = b.getAttribute('data-rid'), old = b.textContent;
+					var q = (list.filter(function (x) { return x.id === rid; })[0] || {}).question || 'Pesquisa';
+					var md = fmt === 'doc' || fmt === 'copiar' || fmt === 'chat';
+					b.disabled = true;
+					b.textContent = '...';
+					fetch(MON + '/research/export?id=' + encodeURIComponent(rid) + '&formato=' + (md ? 'md' : fmt))
+						.then(function (r) {
+							if (r.ok) return md ? r.text() : r.blob();
+							return r.json().then(function (d) { throw new Error(d.error || 'falhou'); });
+						}).then(function (res) {
+							if (fmt === 'doc') {
+								if (!window.NousDocs) throw new Error('os Documentos nao carregaram');
+								ov.classList.add('nous-hidden');
+								window.NousDocs.novo(q.slice(0, 100), res);
+								return;
+							}
+							if (fmt === 'chat') {
+								var box = document.getElementById('chat-input');
+								if (!box) throw new Error('abra uma conversa primeiro');
+								ov.classList.add('nous-hidden');
+								var m = 'Quero conversar sobre esta pesquisa que o Nous fez:\n\n' + res + '\n\nMinha pergunta: ';
+								box.focus();
+								if (box.tagName === 'TEXTAREA') {
+									box.value = m;
+									box.dispatchEvent(new Event('input', { bubbles: true }));
+								} else {
+									document.execCommand('selectAll', false, null);
+									document.execCommand('insertText', false, m);
+								}
+								toast('O relatorio foi para o chat: escreva a sua pergunta no fim e envie.', { tipo: 'info' });
+								return;
+							}
+							if (fmt === 'copiar') {
+								return navigator.clipboard.writeText(res).then(function () { toast('Relatorio copiado, com as fontes.'); });
+							}
+							var a = document.createElement('a');
+							a.href = URL.createObjectURL(res);
+							a.download = q.slice(0, 80).replace(/[\\/:*?"<>|]+/g, ' ').trim() + '.' + fmt;
+							document.body.appendChild(a);
+							a.click();
+							setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
+							toast('Baixado em ' + (fmt === 'pdf' ? 'PDF' : 'Word') + '.');
+						}).catch(function (e) { toast('Nao consegui: ' + e.message, { tipo: 'erro' }); })
+						.then(function () { b.disabled = false; b.textContent = old; });
+				});
+			});
 			box.querySelectorAll('[data-id]').forEach(function (b) {
 				b.addEventListener('click', function () {
-					if (!confirm('Apagar este relatorio?')) return;
-					fetch(MON + '/research/delete', {
-						method: 'POST', headers: { 'Content-Type': 'application/json' },
-						body: JSON.stringify({ id: b.getAttribute('data-id') })
-					}).then(render);
+					var pede = UI.confirmar ? UI.confirmar('O relatorio some da biblioteca e do computador.',
+						{ titulo: 'Apagar relatorio?', ok: 'Apagar', perigo: true }) : Promise.resolve(window.confirm('Apagar este relatorio?'));
+					pede.then(function (sim) {
+						if (!sim) return;
+						fetch(MON + '/research/delete', {
+							method: 'POST', headers: { 'Content-Type': 'application/json' },
+							body: JSON.stringify({ id: b.getAttribute('data-id') })
+						}).then(function () { toast('Relatorio apagado.'); render(); });
+					});
 				});
 			});
 		}).catch(function () {
