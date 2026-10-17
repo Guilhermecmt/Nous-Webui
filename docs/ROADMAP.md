@@ -64,10 +64,13 @@ sem conhecimento tecnico, com tudo acontecendo em segundo plano.
   privada" (chat temporario que o filtro de memoria ignora).
 - Painel "Seu Nous" a' direita no lugar do card Recursos e dos botoes
   flutuantes: anel de uso da placa, agenda, memorias e ferramentas.
-- Nous Code: agente de programacao local (code/, Node sem dependencias),
-  aprovacao com diff, desfazer, feito para modelos pequenos. Proximos passos:
-  modo plano (so' le e propoe), varias chamadas por resposta para modelos
-  maiores, LSP/diagnosticos depois de editar, instalar o Node pelo instalador.
+- Nous Code: IDE com agente de programacao local (code/), aprovacao com diff,
+  desfazer, feito para modelos pequenos. O harness adapta o DeepSeek Harness
+  (MIT): contrato das ferramentas, modo plano, objetivo com rodadas, jobs,
+  compactacao, skills, LSP, MCP, lembretes e provedores compativeis com
+  OpenAI (LM Studio, llama.cpp, vLLM). Proximos passos: diagnosticos do LSP
+  depois de editar, worktrees do Git para tarefas isoladas, subagente que
+  tambem edita, instalar o Node pelo instalador.
 
 ### v2.6 — Correcoes para o primeiro acesso
 - Instalador que nao trava nem mente ("Pronto!" so' quando deu certo), app em

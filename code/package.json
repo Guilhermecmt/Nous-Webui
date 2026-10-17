@@ -1,8 +1,8 @@
 {
   "name": "nous-code",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "private": true,
-  "description": "Nous Code: agente de programacao com IA local (Ollama), usado pelo painel Codigo do Nous.",
+  "description": "Nous Code: IDE com agente de programacao com IA local (Ollama, LM Studio, llama.cpp), usado pelo Nous.",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -14,8 +14,7 @@
   },
   "devDependencies": {
     "@types/node": "^24.19.2",
-    "@types/ws": "^8.18.2",
-    "typescript": "5.9"
+    "@types/ws": "^8.18.2"
   },
   "dependencies": {
     "@lydell/node-pty": "^1.2.0-beta.15",
@@ -23,5 +22,10 @@
     "@xterm/xterm": "^6.0.0",
     "monaco-editor": "^0.57.0",
     "ws": "^8.22.0"
+  },
+  "optionalDependencies": {
+    "pyright": "^1.1.414",
+    "typescript": "5.9",
+    "typescript-language-server": "^6.0.2"
   }
 }

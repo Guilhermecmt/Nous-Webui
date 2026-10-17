@@ -419,8 +419,9 @@ if ($nodeCmd) {
 }
 $codeDir = Join-Path $REPO "code"
 if ($nodeOk -and (Test-Path (Join-Path $codeDir "package.json"))) {
-    if (-not (Test-Path (Join-Path $codeDir "node_modules\monaco-editor"))) {
-        Info "Nous Code: baixando as pecas do editor (~40 MB)..."
+    # tambem quando falta o language server (instalacao de antes do lsp)
+    if (-not (Test-Path (Join-Path $codeDir "node_modules\monaco-editor")) -or -not (Test-Path (Join-Path $codeDir "node_modules\typescript-language-server"))) {
+        Info "Nous Code: baixando as pecas do editor e da navegacao de codigo (~100 MB)..."
         Push-Location $codeDir
         & npm ci --omit=dev --no-audit --no-fund 2>&1 | Out-Null
         $npmOk = $LASTEXITCODE -eq 0

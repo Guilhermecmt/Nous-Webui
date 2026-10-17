@@ -43,6 +43,45 @@ O Nous abre como um programa do computador: sem tela de login.
   diferente, empurra quando o modelo anuncia e para, e encerra quando ele
   anda em círculo. Com o qwen2.5-coder:14b, achou e corrigiu dois bugs com os
   testes em cerca de 30 s.
+- **Nous Code no nível do DeepSeek Harness** (comparado função por função com o
+  `dsh`, ficando de fora só o que é plataforma ou não serve para modelo pequeno):
+  modo plano com `exit_plan_mode` e revisão do plano; permissões em quatro
+  níveis aplicadas no servidor (`POLICY_DENIED`); ler antes de editar e recusar
+  arquivo que mudou desde a leitura; comandos que passam do tempo viram jobs em
+  segundo plano (`job_output`, `job_list`, `job_kill`); `web_search` e `web_fetch`
+  com permissão por conversa; `glob`; `todo_write`; `ask_user`; objetivo
+  persistente; ajudante só leitura (`task`); skills `SKILL.md` e `/nome-da-skill`;
+  instruções em cadeia (global, raiz e subpastas); compactação em duas etapas com
+  medidor de tokens e `/compactar`; raciocínio configurável; aviso de repetição
+  na 3ª e 5ª vez, parada na 8ª; comandos `/` e `@arquivo` com autocompletar;
+  renomear, duplicar a partir de um pedido, exportar e buscar conversas; inspetor
+  do contexto; títulos automáticos. Testado com o qwen2.5-coder:14b: o modo plano
+  propôs, foi aprovado e implementou; a busca na web pediu permissão e citou a
+  fonte. 25 testes do núcleo e das políticas, com um Ollama de mentira.
+- **Nous Code com o harness do DeepSeek Harness** (MIT, creditado em
+  `code/THIRD_PARTY_NOTICES.md`): o agente agora fala o mesmo contrato de
+  ferramentas (`read`, `write`, `edit`, `glob`, `grep`, `pwsh`, jobs, web,
+  `ask_user_question`, objetivo, `skill`, `subagent`, `lsp`, `present`,
+  `schedule_*`) com os mesmos textos, formatos e mensagens de erro; os nomes
+  antigos continuam aceitos. Novidades que vieram junto: **navegação de código
+  por LSP** (TypeScript/JavaScript e Python, servidores instalados junto);
+  **servidores MCP** no formato do `.mcp.json` do Claude Code, com permissão
+  para os de projeto; **lembretes** (`schedule_create`: depois de N segundos,
+  data, intervalo, diário, semanal ou cron, com fuso) que rodam a conversa
+  sozinhos; **objetivo com rodadas automáticas** e mensagem de fechamento;
+  **LM Studio, llama.cpp e vLLM** pela API compatível com a OpenAI; contexto de
+  execução e hora como mensagem (o prompt de sistema fica fixo e o cache do
+  Ollama é reaproveitado); compactação com checkpoint de 8 seções; jobs que
+  avisam ao terminar e `job_output` que lê só o novo; saída grande guardada em
+  arquivo legível pelo agente; instruções em cadeia (`AGENTS.md`, `CLAUDE.md`,
+  `*.local.md`); catálogo de skills e `/skill`; várias chamadas por passo.
+  Tela: perguntas com várias opções, cartões de MCP e de arquivos entregues,
+  lembretes no painel, objetivo com Pausar e Retomar, `/mcp` e `/lembretes`.
+  42 testes do núcleo e das políticas e 16 verificações da tela.
+- **Terminal do Nous Code em UTF-8:** a saída do Node e do npm (✔, ℹ, acentos)
+  chegava embaralhada no PowerShell do terminal.
+- **README:** reescrito nas duas línguas, com prints novos da 2.10 feitos numa
+  instância de demonstração.
 - **Casca:** marca maior na barra lateral, estrela ao lado do modelo no lugar
   de "Definir como padrão" e primeiro nome no lugar do nome inteiro cortado.
 ### Corrigido

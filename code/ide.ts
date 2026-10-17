@@ -184,6 +184,20 @@ export async function gitDescartar(raiz: string, caminho: string, novo: boolean)
 
 /* ------------------------------------------------------------ janela */
 /* Abre o IDE numa janela propria (modo app do Edge; Chrome se nao houver Edge). */
+/* Abre um arquivo do projeto no programa padrao do Windows (entregas do agente). */
+export function abrirNoSistema(raiz: string, caminho: string) {
+  const abs = F.resolver(raiz, caminho);
+  if (!fs.existsSync(abs) || !fs.statSync(abs).isFile()) throw new Error('arquivo nao encontrado: ' + caminho);
+  spawn('explorer.exe', [abs], { detached: true, stdio: 'ignore', windowsHide: true }).unref();
+}
+
+/* Avisos do servidor para todas as janelas abertas (ex.: um lembrete rodou a conversa). */
+const clientes = new Set<WebSocket>();
+export function avisarTodos(m: object) {
+  const t = JSON.stringify(m);
+  for (const ws of clientes) if (ws.readyState === ws.OPEN) ws.send(t);
+}
+
 export function abrirJanela(porta: number, pasta?: string) {
   const url = `http://127.0.0.1:${porta}/` + (pasta ? '?pasta=' + encodeURIComponent(pasta) : '');
   const cands = [
@@ -207,6 +221,7 @@ export function ligarWs(servidor: http.Server, origemOk: (o?: string) => boolean
   });
 
   function conexao(ws: WebSocket) {
+    clientes.add(ws);
     const terms = new Map<string, pty.IPty>();
     let vigia: fs.FSWatcher | null = null;
     let pend = new Set<string>(), relogio: NodeJS.Timeout | null = null;
@@ -229,7 +244,9 @@ export function ligarWs(servidor: http.Server, origemOk: (o?: string) => boolean
           });
         } else if (m.t === 'term-abrir') {
           const raiz = pastaValida(String(m.raiz));
-          const p = pty.spawn('powershell.exe', ['-NoLogo'], {
+          // UTF-8 dos dois lados: sem isto a saida do Node/npm (✔, ℹ, acentos) chega embaralhada
+          const p = pty.spawn('powershell.exe', ['-NoLogo', '-NoExit', '-Command',
+            '[Console]::InputEncoding = [Console]::OutputEncoding = $OutputEncoding = New-Object System.Text.UTF8Encoding $false; Clear-Host'], {
             name: 'xterm-256color', cols: Number(m.cols) || 100, rows: Number(m.rows) || 24, cwd: raiz,
             env: { ...process.env, TERM_PROGRAM: 'NousCode' } as Record<string, string>,
           });
@@ -244,6 +261,7 @@ export function ligarWs(servidor: http.Server, origemOk: (o?: string) => boolean
       }
     });
     ws.on('close', () => {
+      clientes.delete(ws);
       vigia?.close();
       for (const p of terms.values()) { try { p.kill(); } catch { /* ja saiu */ } }
     });

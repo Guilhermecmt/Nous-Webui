@@ -182,13 +182,16 @@
       '<button type="button" id="nc-term-x" title="Fechar o painel">' + ic('fechar', 'p') + '</button></div><div id="nc-term-corpo"></div></section></main>' +
       '<aside id="nc-agente" aria-label="Agente">' +
       '<div id="nc-ag-cab"><b>Agente</b><select id="nc-ag-conv" aria-label="Conversa"></select>' +
+      '<button class="nc-bt" type="button" id="nc-ag-menu" title="Opções da conversa" aria-label="Opções da conversa">⋯</button>' +
       '<button class="nc-bt" type="button" id="nc-ag-nova" title="Nova conversa">' + ic('mais', 'p') + '</button></div>' +
-      '<div id="nc-ag-opcoes"><select id="nc-ag-modelo" aria-label="Modelo"></select>' +
-      '<button class="nc-modo" id="nc-ag-modo" type="button" role="switch" aria-checked="false" title="Ligado: o agente muda os arquivos sem perguntar (comandos continuam pedindo OK)">' +
-      '<span class="sw"></span>Editar sem perguntar</button></div>' +
-      '<div id="nc-trilha" aria-live="polite"></div><div id="nc-ag-mud" class="oculto"></div>' +
+      '<div id="nc-ag-opcoes"><select id="nc-ag-modelo" aria-label="Modelo"></select><select id="nc-ag-perm" aria-label="Permissões" title="O que o agente pode fazer sem perguntar"></select>' +
+      '<select id="nc-ag-rac" aria-label="Raciocínio" class="oculto"></select>' +
+      '<button class="nc-bt borda" id="nc-ag-plano" type="button" aria-pressed="false">Planejar</button></div>' +
+      '<div id="nc-ag-ctx"><div class="barra"><i></i></div><span></span><button type="button" id="nc-ag-compactar" title="Resumir a conversa para liberar contexto">compactar</button></div>' +
+      '<div id="nc-ag-obj" class="oculto"></div><div id="nc-ag-tarefas" class="oculto"></div>' +
+      '<div id="nc-trilha" aria-live="polite"></div><div id="nc-ag-jobs" class="oculto"></div><div id="nc-ag-lem" class="oculto"></div><div id="nc-ag-mud" class="oculto"></div>' +
       '<div id="nc-ag-caixa"><div class="caixa"><textarea id="nc-ag-txt" rows="1" placeholder="Peça ao agente: corrija os testes, explique este arquivo…" aria-label="Pedido ao agente"></textarea>' +
-      '<button id="nc-ag-env" type="button">Enviar</button></div><div id="nc-ag-dica">Enter envia, Shift+Enter quebra a linha</div></div></aside>' +
+      '<button id="nc-ag-env" type="button">Enviar</button></div><div id="nc-ag-dica">Enter envia, / para comandos, @ para anexar arquivo</div></div></aside>' +
       '<footer id="nc-status"><button type="button" id="nc-st-ramo" title="Git">' + ic('git', 'p') + '<span></span></button>' +
       '<span class="sp"></span><span id="nc-st-pos"></span><span id="nc-st-eol"></span><span id="nc-st-ling"></span>' +
       '<span id="nc-st-modelo" title="Modelo do agente"></span><span title="Servico do Nous Code"><i class="ponto" id="nc-st-ponto"></i></span></footer>';
@@ -735,6 +738,12 @@
       else if (m.t === 'term-saida' && m.id === st.termId) st.term.write(m.d);
       else if (m.t === 'term-fim' && m.id === st.termId) { st.term.write('\r\n\x1b[90m[o terminal fechou; clique em + para abrir outro]\x1b[0m\r\n'); st.termId = null; }
       else if (m.t === 'erro') toast(m.texto, true);
+      else if (m.t === 'lembrete') toast('Lembrete: ' + (m.titulos || []).join(', '));
+      else if (m.t === 'sessao-mudou' || m.t === 'sessao-rodando') {
+        // um lembrete rodou a conversa sem a janela: mostra o que aconteceu
+        if (st.sessao && m.id === st.sessao.id && !st.rodandoCtrl) recarregarSessao();
+        else if (st.raiz && m.t === 'sessao-mudou') listarConversas();
+      }
     };
     ws.onclose = () => { $('#nc-st-ponto') && $('#nc-st-ponto').classList.add('off'); setTimeout(conectarWs, 1500); };
   }
@@ -783,56 +792,261 @@
   function fecharTerminal() { if (st.termId && st.ws.readyState === 1) st.ws.send(JSON.stringify({ t: 'term-fechar', id: st.termId })); st.termId = null; }
 
   /* ============================================================ agente */
+  const PERM = [['leitura', 'Somente leitura'], ['perguntar', 'Pedir antes de mudar'], ['editar', 'Editar sem perguntar'], ['total', 'Acesso total']];
+  const RACIOCINIO = [['auto', 'Raciocínio: automático'], ['desligado', 'Raciocínio: desligado'], ['baixo', 'Raciocínio: baixo'], ['medio', 'Raciocínio: médio'], ['alto', 'Raciocínio: alto']];
+  const COMANDOS = [
+    ['plano', 'Liga o modo plano: o agente investiga e propõe antes de mudar', '[pedido]'],
+    ['objetivo', 'Define um objetivo: o agente segue até cumprir', '<texto>'],
+    ['compactar', 'Resume a conversa para liberar contexto', ''],
+    ['modelo', 'Troca o modelo desta conversa', '<nome>'],
+    ['modo', 'Permissões: leitura, perguntar, editar ou total', '<modo>'],
+    ['internet', 'Libera ou bloqueia a internet nesta conversa', ''],
+    ['contexto', 'Mostra o que o modelo está vendo', ''],
+    ['mcp', 'Servidores MCP deste projeto: ver e permitir', ''],
+    ['lembretes', 'Mostra os lembretes desta conversa', ''],
+    ['renomear', 'Renomeia a conversa', '<título>'],
+    ['duplicar', 'Copia a conversa para seguir por outro caminho', ''],
+    ['exportar', 'Baixa a conversa em Markdown', ''],
+    ['nova', 'Começa uma conversa nova', ''],
+    ['ajuda', 'Lista os comandos', ''],
+  ];
+  let skillsCache = null, pensamento = null;
+
+  const ajustar = (corpo) => api('POST', '/sessao/ajustes', Object.assign({ id: st.sessao.id }, corpo)).then((d) => { Object.assign(st.sessao, d); pintarOpcoes(); return d; });
+
   function ligarAgente() {
     const txt = $('#nc-ag-txt');
-    txt.addEventListener('input', () => { txt.style.height = 'auto'; txt.style.height = Math.min(180, txt.scrollHeight) + 'px'; });
-    txt.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); enviar(); } });
+    txt.addEventListener('input', () => { txt.style.height = 'auto'; txt.style.height = Math.min(180, txt.scrollHeight) + 'px'; autocompletar(); });
+    txt.addEventListener('keydown', (e) => {
+      if (teclaAutocompletar(e)) return;
+      if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); enviar(); }
+    });
+    txt.addEventListener('blur', () => setTimeout(fecharAc, 150));
     $('#nc-ag-env').addEventListener('click', () => (st.rodandoCtrl ? parar() : enviar()));
-    $('#nc-ag-nova').addEventListener('click', () => api('POST', '/sessoes', { pasta: st.raiz }).then((d) => api('GET', '/sessao?id=' + d.id)).then(carregarSessao));
+    $('#nc-ag-nova').addEventListener('click', novaConversa);
+    $('#nc-ag-menu').addEventListener('click', (e) => menuConversa(e.currentTarget));
     $('#nc-ag-conv').addEventListener('change', function () { if (!st.rodandoCtrl) api('GET', '/sessao?id=' + this.value).then(carregarSessao); });
-    $('#nc-ag-modelo').addEventListener('change', function () {
-      api('POST', '/sessao/ajustes', { id: st.sessao.id, modelo: this.value }).then((d) => { st.sessao.modelo = d.modelo; $('#nc-st-modelo').textContent = d.modelo; });
+    $('#nc-ag-modelo').addEventListener('change', function () { ajustar({ modelo: this.value }).then((d) => { $('#nc-st-modelo').textContent = d.modelo; }); });
+    $('#nc-ag-perm').addEventListener('change', function () { ajustar({ modo: this.value }); });
+    $('#nc-ag-rac').addEventListener('change', function () { ajustar({ raciocinio: this.value }); });
+    $('#nc-ag-plano').addEventListener('click', () => ajustar({ planejando: !st.sessao.planejando }));
+    $('#nc-ag-compactar').addEventListener('click', compactarAgora);
+    $('#nc-trilha').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-abre]'); if (b) abrirArquivo(b.dataset.abre);
+      const d = e.target.closest('[data-duplicar]'); if (d) duplicar(+d.dataset.duplicar);
     });
-    $('#nc-ag-modo').addEventListener('click', () => {
-      const novo = st.sessao.modo === 'editar' ? 'perguntar' : 'editar';
-      api('POST', '/sessao/ajustes', { id: st.sessao.id, modo: novo }).then((d) => { st.sessao.modo = d.modo; $('#nc-ag-modo').setAttribute('aria-checked', String(d.modo === 'editar')); });
-    });
-    $('#nc-trilha').addEventListener('click', (e) => { const b = e.target.closest('[data-abre]'); if (b) abrirArquivo(b.dataset.abre); });
-    api('GET', '/modelos').then((d) => { st.modelos = d.modelos || []; pintarModelos(); }).catch(() => {});
+    api('GET', '/modelos').then((d) => { st.modelos = d.modelos || []; pintarOpcoes(); }).catch(() => {});
   }
 
-  function pintarModelos() {
-    const sel = $('#nc-ag-modelo');
-    if (!sel || !st.sessao) return;
-    let l = st.modelos.length ? st.modelos : [{ nome: st.sessao.modelo, ferramentas: true }];
-    if (!l.some((m) => m.nome === st.sessao.modelo)) l = [{ nome: st.sessao.modelo, ferramentas: true }].concat(l);
-    sel.innerHTML = l.map((m) => '<option value="' + esc(m.nome) + '"' + (m.nome === st.sessao.modelo ? ' selected' : '') + '>' + esc(m.nome) + '</option>').join('');
-    $('#nc-st-modelo').textContent = st.sessao.modelo;
+  function novaConversa() { return api('POST', '/sessoes', { pasta: st.raiz }).then((d) => api('GET', '/sessao?id=' + d.id)).then(carregarSessao); }
+
+  function pintarOpcoes() {
+    const s = st.sessao;
+    if (!s || !$('#nc-ag-modelo')) return;
+    let l = st.modelos.length ? st.modelos : [{ nome: s.modelo, ferramentas: true }];
+    if (!l.some((m) => m.nome === s.modelo)) l = [{ nome: s.modelo, ferramentas: true }].concat(l);
+    $('#nc-ag-modelo').innerHTML = l.map((m) => '<option value="' + esc(m.nome) + '"' + (m.nome === s.modelo ? ' selected' : '') + '>' +
+      esc(m.provedor ? m.nome.replace('::', ' › ') : m.nome) + (m.ferramentas === false ? ' (sem ferramentas)' : '') + '</option>').join('');
+    $('#nc-ag-perm').innerHTML = PERM.map(([v, t]) => '<option value="' + v + '"' + (v === s.modo ? ' selected' : '') + '>' + t + '</option>').join('');
+    const pensa = (st.modelos.find((m) => m.nome === s.modelo) || {}).pensa;
+    $('#nc-ag-rac').classList.toggle('oculto', !pensa);
+    $('#nc-ag-rac').innerHTML = RACIOCINIO.map(([v, t]) => '<option value="' + v + '"' + (v === s.raciocinio ? ' selected' : '') + '>' + t + '</option>').join('');
+    const pb = $('#nc-ag-plano');
+    pb.setAttribute('aria-pressed', String(!!s.planejando));
+    pb.classList.toggle('on', !!s.planejando);
+    pb.title = s.planejando ? 'Modo plano ligado: o agente só investiga e propõe um plano. Clique para desligar.' : 'Modo plano: o agente investiga e propõe um plano antes de mudar qualquer coisa';
+    $('#nc-st-modelo').textContent = s.modelo;
+    $('#nc-agente').classList.toggle('planejando', !!s.planejando);
+    pintarObjetivo(s.objetivo);
+    pintarTarefas(s.tarefas);
+    pintarContexto(s.tokens, s.limite);
+    pintarJobs(s.jobs);
+    pintarLembretes(s.lembretes);
+  }
+
+  function pintarContexto(tokens, limite) {
+    limite = limite || 16384;
+    const box = $('#nc-ag-ctx');
+    if (!box) return;
+    const f = Math.min(1, (tokens || 0) / limite);
+    $('i', box).style.width = (f * 100).toFixed(1) + '%';
+    $('i', box).className = f > 0.75 ? 'alto' : '';
+    const k = (n) => (n >= 1000 ? (n / 1000).toFixed(1).replace('.', ',') + ' mil' : String(n || 0));
+    $('span', box).textContent = 'Contexto: ' + k(tokens) + ' de ' + k(limite) + ' tokens';
+  }
+
+  function pintarObjetivo(o) {
+    const box = $('#nc-ag-obj');
+    if (!o) { box.classList.add('oculto'); return; }
+    box.classList.remove('oculto');
+    const texto = o.objective || o.texto || '';
+    const fase = o.phase || (o.estado === 'feito' ? 'complete' : 'paused');
+    const rodada = o.roundsStarted ? ', rodada ' + o.roundsStarted + ' de ' + o.maxGoalRounds : '';
+    const rotulo = { complete: '✓ Objetivo cumprido', paused: 'Objetivo pausado', blocked: 'Objetivo bloqueado' }[fase] ||
+      (o.armado ? 'Objetivo' + rodada : 'Objetivo parado' + rodada);
+    const pode = fase === 'active' && o.armado ? 'pausar' : fase !== 'complete' ? 'retomar' : '';
+    box.className = 'fase-' + fase;
+    box.innerHTML = '<span class="' + (fase === 'complete' ? 'ok' : fase === 'blocked' ? 'mau' : '') + '">' + esc(rotulo) + '</span>' + esc(texto) +
+      (o.blockedReason ? '<small>' + esc(o.blockedReason.message) + '</small>' : '') +
+      (pode ? '<button type="button" class="acao" data-acao="' + pode + '" title="' + (pode === 'pausar' ? 'Para as rodadas automáticas' : 'O agente volta a trabalhar no objetivo no próximo pedido') + '">' +
+        (pode === 'pausar' ? 'Pausar' : 'Retomar') + '</button>' : '') +
+      '<button type="button" class="x" title="Tirar o objetivo">×</button>';
+    $('.x', box).addEventListener('click', () => ajustar({ objetivo: '' }));
+    const ac = $('.acao', box);
+    if (ac) ac.addEventListener('click', () => ajustar({ objetivoAcao: ac.dataset.acao }).then(() => {
+      if (ac.dataset.acao === 'retomar') toast('Objetivo retomado: o agente segue nele no próximo pedido (por exemplo, "continue").');
+    }));
+  }
+
+  function pintarLembretes(l) {
+    const box = $('#nc-ag-lem');
+    if (!box) return;
+    l = l || [];
+    box.classList.toggle('oculto', !l.length);
+    const quando = (iso) => {
+      const d = new Date(iso), hoje = new Date();
+      const h = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+      return d.toDateString() === hoje.toDateString() ? 'hoje, ' + h : d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) + ', ' + h;
+    };
+    const tipo = { every: 'repete', daily: 'todo dia', weekly: 'toda semana', cron: 'repete' };
+    box.innerHTML = l.map((x) => '<div class="l"><i>⏰</i><b>' + esc(x.title) + '</b><span>' + esc(quando(x.scheduledAt)) +
+      (tipo[x.kind] ? ' (' + tipo[x.kind] + ')' : '') + '</span><button type="button" data-lem="' + esc(x.id) + '" title="Apagar o lembrete">×</button></div>').join('');
+    $$('[data-lem]', box).forEach((b) => b.addEventListener('click', () => api('POST', '/lembretes/apagar', { id: st.sessao.id, lembrete: b.dataset.lem })
+      .then(() => api('GET', '/sessao?id=' + st.sessao.id)).then((s) => pintarLembretes(s.lembretes))));
+  }
+
+  function recarregarSessao() {
+    const t2 = $('#nc-trilha'), embaixo = t2.scrollHeight - t2.scrollTop - t2.clientHeight < 40;
+    return api('GET', '/sessao?id=' + st.sessao.id).then((s) => { carregarSessao(s); if (!embaixo) t2.scrollTop = 0; });
+  }
+
+  function pintarTarefas(l) {
+    const box = $('#nc-ag-tarefas');
+    l = l || [];
+    if (!l.length) { box.classList.add('oculto'); return; }
+    box.classList.remove('oculto');
+    const feitas = l.filter((t) => t.status === 'completed').length;
+    box.innerHTML = '<div class="tt">Tarefas <span>' + feitas + ' de ' + l.length + '</span></div>' + l.map((t) =>
+      '<div class="t ' + t.status + '"><i>' + (t.status === 'completed' ? '✓' : t.status === 'in_progress' ? '›' : '') + '</i>' + esc(t.content) + '</div>').join('');
+  }
+
+  function pintarJobs(l) {
+    const box = $('#nc-ag-jobs');
+    l = (l || []).filter((j) => j.rodando);
+    box.classList.toggle('oculto', !l.length);
+    box.innerHTML = l.map((j) => '<div class="l"><i class="ponto"></i><code title="' + esc(j.comando) + '">' + esc(j.descricao || j.comando) + '</code><span>' + j.id + '</span>' +
+      '<button type="button" data-job="' + j.id + '">Parar</button></div>').join('');
+    $$('[data-job]', box).forEach((b) => b.addEventListener('click', () => api('POST', '/jobs/parar', { id: st.sessao.id, job: b.dataset.job })
+      .then(() => api('GET', '/sessao?id=' + st.sessao.id)).then((s) => pintarJobs(s.jobs))));
   }
 
   function carregarSessao(s) {
     st.sessao = s;
-    st.vivo = null;
-    $('#nc-ag-modo').setAttribute('aria-checked', String(s.modo === 'editar'));
-    pintarModelos();
-    api('GET', '/sessoes?' + qs({ pasta: st.raiz })).then((l) => {
-      $('#nc-ag-conv').innerHTML = l.map((x) => '<option value="' + x.id + '"' + (x.id === s.id ? ' selected' : '') + '>' + esc(x.titulo) + '</option>').join('');
-    });
+    st.vivo = null; pensamento = null;
+    pintarOpcoes();
+    listarConversas();
     const tr = $('#nc-trilha');
     tr.innerHTML = '';
-    s.eventos.forEach((e) => evento(e, true));
+    s.eventos.forEach((e, i) => evento(e, true, i));
     if (!s.eventos.length) tr.innerHTML = '<div class="nc-nota" data-vazio>Peça o que quiser sobre este projeto. Exemplos:<br>' +
       '"explique como este projeto está organizado"<br>"rode os testes e corrija o que falhar"<br>' +
+      '<b>/plano</b> antes do pedido faz o agente propor um plano primeiro. <b>@</b> anexa um arquivo.<br>' +
       'Selecione um trecho no editor e aperte Ctrl+L para perguntar sobre ele.</div>';
     pintarMudancas(s.mudancas);
     estadoEnvio(s.rodando);
     tr.scrollTop = tr.scrollHeight;
   }
 
+  function listarConversas() {
+    return api('GET', '/sessoes?' + qs({ pasta: st.raiz })).then((l) => {
+      $('#nc-ag-conv').innerHTML = l.map((x) => '<option value="' + x.id + '"' + (x.id === st.sessao.id ? ' selected' : '') + '>' + esc(x.titulo) + '</option>').join('');
+    });
+  }
+
+  function menuConversa(btn) {
+    const r = btn.getBoundingClientRect();
+    menu(r.left - 150, r.bottom + 4, [
+      ['Renomear', renomearConversa], ['Duplicar a conversa', () => duplicar()], ['Exportar em Markdown', exportarConversa],
+      ['Ver o que o modelo está vendo', inspetor], ['Buscar nas conversas', buscarConversas], ['Compactar agora', compactarAgora], '-',
+      ['Apagar a conversa', apagarConversa]]);
+  }
+  async function renomearConversa(titulo) {
+    const t = typeof titulo === 'string' && titulo ? titulo : await dialogo('Nome da conversa', st.sessao.titulo);
+    if (!t) return;
+    api('POST', '/sessao/renomear', { id: st.sessao.id, titulo: t }).then(() => { st.sessao.titulo = t; listarConversas(); });
+  }
+  function duplicar(ate) {
+    api('POST', '/sessao/duplicar', { id: st.sessao.id, ate }).then((d) => api('GET', '/sessao?id=' + d.id)).then((s) => {
+      carregarSessao(s); toast(ate === undefined ? 'Conversa duplicada.' : 'Nova conversa a partir deste pedido: o que veio depois ficou na original.');
+    }).catch((e) => toast(e.message, true));
+  }
+  function exportarConversa() {
+    const a = document.createElement('a');
+    a.href = '/sessao/exportar?id=' + st.sessao.id; a.download = ''; document.body.appendChild(a); a.click(); a.remove();
+  }
+  async function apagarConversa() {
+    if (!(await dialogo('Apagar a conversa "' + st.sessao.titulo + '"? Os arquivos do projeto não mudam.', null, 'Apagar'))) return;
+    api('POST', '/sessao/apagar', { id: st.sessao.id }).then(() => api('GET', '/sessoes?' + qs({ pasta: st.raiz })))
+      .then((l) => (l.length ? api('GET', '/sessao?id=' + l[0].id).then(carregarSessao) : novaConversa())).catch((e) => toast(e.message, true));
+  }
+  function compactarAgora() {
+    if (st.rodandoCtrl) return toast('Espere o agente terminar para compactar.', true);
+    toast('Compactando a conversa…');
+    api('POST', '/compactar', { id: st.sessao.id }).then((d) => {
+      if (d.evento) { evento(d.evento); pintarContexto(d.evento.depois, d.evento.limite); } else toast('A conversa ainda é curta: nada para compactar.');
+    }).catch((e) => toast(e.message, true));
+  }
+  function modal(titulo, html) {
+    const d = document.createElement('div');
+    d.id = 'nc-modal';
+    d.innerHTML = '<div><div class="cab"><b>' + esc(titulo) + '</b><button type="button" aria-label="Fechar">×</button></div><div class="corpo">' + html + '</div></div>';
+    document.body.appendChild(d);
+    const fechar = () => d.remove();
+    $('.cab button', d).addEventListener('click', fechar);
+    d.addEventListener('mousedown', (e) => { if (e.target === d) fechar(); });
+    d.addEventListener('keydown', (e) => { if (e.key === 'Escape') fechar(); });
+    $('.cab button', d).focus();
+    return d;
+  }
+  function inspetor() {
+    api('GET', '/sessao/contexto?id=' + st.sessao.id).then((c) => {
+      modal('O que o modelo está vendo (' + (c.tokens || 0) + ' de ' + c.limite + ' tokens no último passo)',
+        '<details open><summary>Prompt de sistema</summary><pre>' + esc(c.sistema) + '</pre></details>' +
+        c.mensagens.map((m, i) => '<details' + (i >= c.mensagens.length - 4 ? ' open' : '') + '><summary>' + (i + 1) + '. ' + esc(m.role) +
+          (m.ferramenta ? ' (' + esc(m.ferramenta) + ')' : '') + ' <small>' + m.content.length + ' caracteres</small></summary><pre>' + esc(m.content) + '</pre></details>').join(''));
+    }).catch((e) => toast(e.message, true));
+  }
+  /* Servidores MCP do projeto (.mcp.json) e globais (~/.nous/mcp.json). Os do
+   * projeto rodam programas de quem fez o projeto: so' ligam com permissao. */
+  function servidoresMcp() {
+    api('GET', '/mcp?' + qs({ pasta: st.raiz })).then((l) => {
+      const d = modal('Servidores MCP', l.length ? '<p class="nc-nota">As ferramentas destes servidores entram no agente como <code>mcp__servidor__ferramenta</code>. ' +
+        'Os do projeto só ligam depois que você permite; se o arquivo mudar, a permissão cai.</p>' +
+        l.map((x) => '<div class="nc-mcp"><b>' + esc(x.nome) + '</b><small>' + (x.origem === 'global' ? 'seu (~/.nous/mcp.json)' : 'do projeto') + '</small>' +
+          '<code>' + esc(x.comando) + '</code>' + (x.origem === 'global' ? '<span class="ok">ligado</span>'
+            : '<button class="nc-bt ' + (x.aprovado ? 'borda' : 'ouro') + '" type="button" data-mcp="' + esc(x.nome) + '" data-sim="' + (x.aprovado ? '0' : '1') + '">' +
+              (x.aprovado ? 'Desligar' : 'Permitir') + '</button>') + '</div>').join('')
+        : '<p class="nc-vazio">Nenhum servidor MCP. Crie um <code>.mcp.json</code> na pasta do projeto (o mesmo formato do Claude Code) ou <code>~/.nous/mcp.json</code> para todos os projetos:</p>' +
+          '<pre>{\n  "mcpServers": {\n    "nome": { "command": "npx", "args": ["-y", "pacote-do-servidor"] }\n  }\n}</pre>');
+      $$('[data-mcp]', d).forEach((b) => b.addEventListener('click', () => api('POST', '/mcp/aprovar', { pasta: st.raiz, nome: b.dataset.mcp, sim: b.dataset.sim === '1' })
+        .then(() => { d.remove(); servidoresMcp(); toast(b.dataset.sim === '1' ? 'Permitido: as ferramentas entram no próximo pedido.' : 'Desligado.'); })));
+    }).catch((e) => toast(e.message, true));
+  }
+
+  async function buscarConversas() {
+    const q = await dialogo('Procurar nas conversas deste projeto', '');
+    if (!q) return;
+    api('GET', '/sessoes/buscar?' + qs({ q, pasta: st.raiz })).then((l) => {
+      const d = modal('Conversas com "' + q + '"', l.length ? l.map((x) => '<button type="button" class="nc-rec" data-s="' + x.id + '"><b>' + esc(x.titulo) +
+        '</b><small>' + esc(x.trecho || '') + '</small></button>').join('') : '<p class="nc-vazio">Nada encontrado.</p>');
+      $$('[data-s]', d).forEach((b) => b.addEventListener('click', () => { d.remove(); api('GET', '/sessao?id=' + b.dataset.s).then(carregarSessao); }));
+    });
+  }
+
   function perguntarSobre(caminho) {
     alternarAgente(true);
     const t = $('#nc-ag-txt');
-    t.value = 'Sobre o arquivo ' + caminho + ': ';
+    t.value = 'Sobre @' + caminho + ' ';
     t.focus(); t.setSelectionRange(t.value.length, t.value.length);
   }
   function comSelecao() {
@@ -843,12 +1057,116 @@
       if (sel && !sel.isEmpty()) {
         const trecho = a.modelo.getValueInRange(sel);
         t.value = 'Em ' + a.caminho + ' (linhas ' + sel.startLineNumber + '-' + sel.endLineNumber + '):\n```\n' + trecho.slice(0, 3000) + '\n```\n';
-      } else if (!t.value.trim()) t.value = 'Sobre o arquivo ' + a.caminho + ': ';
+      } else if (!t.value.trim()) t.value = 'Sobre @' + a.caminho + ' ';
       t.dispatchEvent(new Event('input'));
     }
     t.focus(); t.setSelectionRange(t.value.length, t.value.length);
   }
 
+  /* ---------------- autocompletar: /comandos e @arquivos */
+  let ac = null;  // {tipo, ini, itens, sel}
+  function fecharAc() { $('#nc-ac')?.remove(); ac = null; }
+  function autocompletar() {
+    const t = $('#nc-ag-txt');
+    const antes = t.value.slice(0, t.selectionStart);
+    const mc = antes.match(/^\/([\w.-]*)$/);
+    const ma = antes.match(/(?:^|\s)@([\w./\\-]*)$/);
+    if (mc) {
+      const q = mc[1].toLowerCase();
+      const carrega = skillsCache ? Promise.resolve(skillsCache) : api('GET', '/skills?' + qs({ pasta: st.raiz })).then((l) => (skillsCache = l)).catch(() => []);
+      carrega.then((sk) => {
+        const itens = COMANDOS.map(([n, d, a]) => ({ v: '/' + n + ' ', t: '/' + n, d: d + (a ? ' ' + a : '') }))
+          .concat(sk.filter((x) => x.usuario).map((x) => ({ v: '/' + x.nome + ' ', t: '/' + x.nome, d: 'Skill: ' + x.descricao })))
+          .filter((x) => x.t.slice(1).toLowerCase().startsWith(q));
+        mostrarAc('cmd', 0, itens);
+      });
+    } else if (ma) {
+      const q = ma[1].toLowerCase().replace(/\\/g, '/');
+      const carrega = cacheArquivos ? Promise.resolve(cacheArquivos) : api('GET', '/fs/arquivos?' + qs({ raiz: st.raiz })).then((l) => (cacheArquivos = l));
+      carrega.then((l) => {
+        const itens = l.filter((c) => !q || c.toLowerCase().includes(q)).sort((a, b) => (base(a).toLowerCase().startsWith(q) ? -1 : 0) - (base(b).toLowerCase().startsWith(q) ? -1 : 0))
+          .slice(0, 12).map((c) => ({ v: '@' + c + ' ', t: base(c), d: pai(c) }));
+        mostrarAc('arq', antes.length - ma[1].length - 1, itens);
+      });
+    } else fecharAc();
+  }
+  function mostrarAc(tipo, ini, itens) {
+    if (!itens.length) { fecharAc(); return; }
+    ac = { tipo, ini, itens, sel: 0 };
+    let el = $('#nc-ac');
+    if (!el) { el = document.createElement('div'); el.id = 'nc-ac'; $('#nc-ag-caixa').appendChild(el); }
+    el.innerHTML = itens.map((x, i) => '<div class="nc-op' + (i === 0 ? ' on' : '') + '" data-i="' + i + '"><b>' + esc(x.t) + '</b><small>' + esc(x.d) + '</small></div>').join('');
+    el.onmousedown = (e) => { const o = e.target.closest('[data-i]'); if (o) { e.preventDefault(); escolherAc(+o.dataset.i); } };
+  }
+  function teclaAutocompletar(e) {
+    if (!ac) return false;
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      ac.sel = (ac.sel + (e.key === 'ArrowDown' ? 1 : -1) + ac.itens.length) % ac.itens.length;
+      $$('#nc-ac .nc-op').forEach((o, i) => o.classList.toggle('on', i === ac.sel));
+      return true;
+    }
+    if (e.key === 'Tab' || (e.key === 'Enter' && !e.shiftKey)) { e.preventDefault(); escolherAc(ac.sel); return true; }
+    if (e.key === 'Escape') { fecharAc(); return true; }
+    return false;
+  }
+  function escolherAc(i) {
+    const t = $('#nc-ag-txt');
+    const it = ac.itens[i];
+    const pos = t.selectionStart;
+    if (ac.tipo === 'cmd') t.value = it.v + t.value.slice(pos);
+    else t.value = t.value.slice(0, ac.ini) + it.v + t.value.slice(pos);
+    const fim = ac.tipo === 'cmd' ? it.v.length : ac.ini + it.v.length;
+    fecharAc();
+    t.focus(); t.setSelectionRange(fim, fim);
+  }
+
+  /* ---------------- comandos de barra */
+  function comando(texto) {
+    const m = texto.match(/^\/([\w.-]+)\s*([\s\S]*)$/);
+    if (!m) return false;
+    const [, nome, resto] = m;
+    const arg = resto.trim();
+    switch (nome.toLowerCase()) {
+      case 'plano': ajustar({ planejando: true }).then(() => { if (arg) enviarTexto(arg); else toast('Modo plano ligado: o próximo pedido vira um plano para você aprovar.'); }); return true;
+      case 'objetivo':
+        if (!arg) { toast('Escreva o objetivo depois do comando, por exemplo: /objetivo todos os testes passando', true); return true; }
+        ajustar({ objetivo: arg }).then(() => enviarTexto('Objetivo: ' + arg)); return true;
+      case 'compactar': compactarAgora(); return true;
+      case 'modelo':
+        if (!arg) { $('#nc-ag-modelo').focus(); return true; }
+        ajustar({ modelo: arg }).then(() => toast('Modelo: ' + arg)); return true;
+      case 'modo': {
+        const v = { leitura: 'leitura', perguntar: 'perguntar', editar: 'editar', total: 'total' }[arg.toLowerCase()];
+        if (!v) { toast('Use /modo leitura, perguntar, editar ou total.', true); return true; }
+        ajustar({ modo: v }).then(() => toast('Permissões: ' + PERM.find((p) => p[0] === v)[1])); return true;
+      }
+      case 'internet': {
+        const novo = st.sessao.internet !== true;
+        ajustar({ internet: novo }).then(() => toast(novo ? 'Internet liberada nesta conversa.' : 'Internet bloqueada nesta conversa.')); return true;
+      }
+      case 'contexto': inspetor(); return true;
+      case 'mcp': servidoresMcp(); return true;
+      case 'lembretes': {
+        const l = st.sessao.lembretes || [];
+        if (!l.length) toast('Nenhum lembrete nesta conversa. Peça, por exemplo: "me lembre amanhã às 9h de rodar os testes".');
+        else $('#nc-ag-lem').scrollIntoView({ block: 'nearest' });
+        return true;
+      }
+      case 'renomear': renomearConversa(arg); return true;
+      case 'duplicar': duplicar(); return true;
+      case 'exportar': exportarConversa(); return true;
+      case 'nova': novaConversa(); return true;
+      case 'ajuda':
+        modal('Comandos', '<div class="nc-atalho" style="grid-template-columns:auto 1fr">' + COMANDOS.map(([n, d, a]) =>
+          '<span><code>/' + n + (a ? ' ' + esc(a) : '') + '</code></span><span>' + esc(d) + '</span>').join('') +
+          '<span><code>@arquivo</code></span><span>Anexa o arquivo ao pedido</span><span><code>/nome-da-skill</code></span><span>Usa uma skill do projeto (.nous/skills)</span></div>');
+        return true;
+    }
+    return false;  // /skill: vai para o agente, que injeta as instrucoes
+  }
+
+  /* ---------------- trilha */
   function trilha() { return $('#nc-trilha'); }
   function add(html) {
     const t = trilha();
@@ -866,7 +1184,7 @@
   function md(texto) {
     return String(texto || '').split(/```[a-zA-Z0-9_-]*\n?/).map((p, i) => {
       if (i % 2) return '<pre><code>' + esc(p.replace(/\n$/, '')) + '</code></pre>';
-      const h = esc(p).replace(/`([^`\n]+)`/g, '<code>$1</code>').replace(/\*\*([^*\n]+)\*\*/g, '<b>$1</b>');
+      const h = esc(p).replace(/`([^`\n]+)`/g, '<code>$1</code>').replace(/\*\*([^*\n]+)\*\*/g, '<b>$1</b>').replace(/^#{1,4} (.+)$/gm, '<b>$1</b>');
       return h.split(/\n{2,}/).map((bl) => {
         let out = '', texto = [], itens = [];
         const solta = () => {
@@ -895,60 +1213,210 @@
   }
   function semVivo() { const v = $('#nc-vivo', trilha()); if (v) v.remove(); }
   function semTexto() { if (st.vivo) { st.vivo.remove(); st.vivo = null; } }
+  function fecharPensamento() { if (pensamento) { pensamento.open = false; pensamento = null; } }
 
-  function evento(e, historico) {
+  function evento(e, historico, indice) {
     const t = trilha();
     const vz = $('[data-vazio]', t); if (vz) vz.remove();
     switch (e.t) {
-      case 'voce': add('<div class="nc-voce">' + esc(e.texto) + '</div>'); break;
-      case 'pensando': vivo('Pensando' + (e.passo > 1 ? ', passo ' + e.passo : '')); break;
-      case 'texto': if (!st.vivo) st.vivo = add('<div class="nc-resp"></div>'); st.vivo.textContent += e.d; break;
+      case 'voce': {
+        if (e.origem === 'lembrete') { add('<div class="nc-lembrete"><b>⏰ Lembrete</b>' + esc(textoLembrete(e.texto)) + '</div>'); break; }
+        // bolha + "Duplicar daqui" no mesmo bloco: o botao nao some quando o mouse desce ate' ele
+        const el = add('<div class="nc-voce-w"><div class="nc-voce">' + esc(e.texto) + '</div></div>');
+        if (historico && indice !== undefined && typeof e.msg === 'number') {
+          const b = document.createElement('button'); b.type = 'button'; b.className = 'dup'; b.dataset.duplicar = indice;
+          b.title = 'Começa uma conversa nova a partir daqui (para tentar outro caminho)'; b.textContent = 'Duplicar daqui';
+          el.appendChild(b);
+        }
+        break;
+      }
+      case 'pensando': fecharPensamento(); vivo('Pensando' + (e.passo > 1 ? ', passo ' + e.passo : '')); break;
+      case 'pensamento':
+        if (!pensamento) { pensamento = add('<details class="nc-pens"><summary>Raciocínio</summary><div></div></details>'); }
+        $('div', pensamento).textContent += e.d;
+        break;
+      case 'passo':
+        pintarContexto(e.tokens, e.limite);
+        $('#nc-vivo i') && ($('#nc-vivo').title = e.segundos + ' s, ' + e.tokens + ' tokens');
+        break;
+      case 'texto': fecharPensamento(); if (!st.vivo) st.vivo = add('<div class="nc-resp"></div>'); st.vivo.textContent += e.d; break;
       case 'limpar': semTexto(); break;
       case 'nota': semTexto(); add('<div class="nc-nota">' + esc(e.texto) + '</div>'); break;
-      case 'resposta': semTexto(); add('<div class="nc-resp">' + md(e.texto) + '</div>'); semVivo(); break;
+      case 'resposta': semTexto(); fecharPensamento(); add('<div class="nc-resp">' + md(e.texto) + '</div>'); semVivo(); break;
       case 'ferramenta': {
-        semTexto();
+        semTexto(); fecharPensamento();
         const g = grupoPassos();
         const p = document.createElement('div');
         p.className = 'nc-passo';
         p.dataset.id = e.id;
-        const arq = e.args && e.args.path && /read_file|edit_file|write_file/.test(e.nome) ? String(e.args.path).replace(/^[\\/.]+/, '').replace(/\\/g, '/') : '';
         p.innerHTML = '<button class="cab" type="button"><b>' + esc(e.resumo) + '</b><span class="r"></span></button>';
+        const alvo = e.args && (e.args.file_path || e.args.path);
+        const arq = alvo && /^(read|edit|write|lsp|read_file|edit_file|write_file)$/.test(e.nome) ? String(alvo).replace(/^[\\/.]+/, '').replace(/\\/g, '/') : '';
         if (arq) { const b = document.createElement('button'); b.className = 'abre'; b.type = 'button'; b.dataset.abre = arq; b.textContent = 'abrir'; $('.cab', p).appendChild(b); }
         g.appendChild(p);
-        $('.cab b', p).parentElement.addEventListener('click', (ev) => { if (!ev.target.closest('.abre')) saida(p); });
+        $('.cab', p).addEventListener('click', (ev) => { if (!ev.target.closest('.abre')) saida(p); });
+        break;
+      }
+      case 'sub': {
+        const p = $('.nc-passo[data-id="' + e.id + '"]', t); if (!p) break;
+        let l = $('.subs', p); if (!l) { l = document.createElement('div'); l.className = 'subs'; p.insertBefore(l, $('pre', p)); }
+        const d = document.createElement('div'); d.textContent = e.resumo; l.appendChild(d);
         break;
       }
       case 'resultado': {
         const el = $('.nc-passo[data-id="' + e.id + '"]', t); if (!el) break;
         el.classList.add(e.ok ? 'ok' : 'falhou');
-        $('.r', el).textContent = e.resumo;
+        $('.r', el).textContent = e.resumo + (e.ms > 1500 ? ', ' + (e.ms / 1000).toFixed(1) + ' s' : '');
         el._saida = e.saida; el._diff = e.diff;
-        if (e.diff || (!e.ok && e.resumo !== 'recusado')) saida(el, true);
+        if (e.diff || (!e.ok && !/^recusado|^bloqueado/.test(e.resumo))) saida(el, true);
         break;
       }
-      case 'pede': {
-        semTexto();
-        const titulo = e.tipo === 'comando' ? 'Rodar este comando?' : (e.novo ? 'Criar ' : 'Mudar ') + esc(e.arquivo) + '?';
-        const det = e.tipo === 'comando' ? '<pre>' + esc(e.comando) + '</pre>' : '<pre class="nc-diff">' + diffHtml(e.diff) + '</pre>';
-        const card = add('<div class="nc-pede" data-pede="' + e.id + '"><div class="t">' + titulo + (e.tipo === 'arquivo' ? '<span>+' + e.mais + ' −' + e.menos + '</span>' : '') + '</div>' + det +
-          '<div class="bt"><button class="nc-bt ouro" type="button" data-s>' + (e.tipo === 'comando' ? 'Rodar' : 'Aplicar') + '</button>' +
-          (e.tipo === 'comando' ? '<button class="nc-bt borda" type="button" data-sempre>Rodar sempre nesta conversa</button>' : '') +
-          '<button class="nc-bt borda" type="button" data-n>Recusar</button></div></div>');
-        $('[data-s]', card).addEventListener('click', () => responder(e.id, true, false));
-        $('[data-n]', card).addEventListener('click', () => responder(e.id, false, false));
-        const s = $('[data-sempre]', card); if (s) s.addEventListener('click', () => responder(e.id, true, true));
-        semVivo();
-        if (!historico) { $('[data-s]', card).focus(); if ($('#nc').classList.contains('sem-agente')) alternarAgente(true); }
+      case 'tarefas': pintarTarefas(e.tarefas); if (st.sessao) st.sessao.tarefas = e.tarefas; break;
+      case 'objetivo': pintarObjetivo(e.objetivo); if (st.sessao) st.sessao.objetivo = e.objetivo; break;
+      case 'modo-plano': if (st.sessao) { st.sessao.planejando = e.planejando; pintarOpcoes(); } break;
+      case 'compactado':
+        add('<div class="nc-nota nc-compacto">Conversa ' + (e.modo === 'resumo' ? 'resumida' : 'enxugada') + ' para caber no contexto: ' +
+          Math.round(e.antes / 100) / 10 + ' mil → ' + Math.round(e.depois / 100) / 10 + ' mil tokens.</div>');
         break;
-      }
-      case 'aprovado': resolvido(e.id, e.ok, e.sempre); break;
+      case 'pede': cartaoPedido(e, historico); break;
+      case 'lembretes': if (!historico) { if (st.sessao) st.sessao.lembretes = e.lembretes; pintarLembretes(e.lembretes); } break;  // ao recarregar vale a lista do servidor
+      case 'entregas': cartaoEntregas(e); break;
+      case 'mcp-pendente': cartaoMcp(e, historico); break;
+      case 'aprovado': resolvido(e.id, e.ok, e.sempre, e.texto); break;
       case 'erro': semTexto(); add('<div class="nc-erro">' + esc(e.texto) + '</div>'); semVivo(); break;
       case 'desfeito': add('<div class="nc-nota">Desfeito: ' + esc((e.arquivos || []).join(', ') || 'nada') + ' voltou ao que era antes.</div>'); break;
       case 'fim': semVivo(); pintarMudancas(e.mudancas); break;
     }
     if (!historico) t.scrollTop = t.scrollHeight;
   }
+
+  function textoLembrete(t) {
+    const um = /reminder_prompt_json: (.+)$/m.exec(t);
+    if (um) { try { return JSON.parse(um[1]); } catch (x) { /* segue */ } }
+    const varios = /reminders_json: (.+)$/m.exec(t);
+    if (varios) { try { return JSON.parse(varios[1]).map((r) => r.reminder_prompt).join(' | '); } catch (x) { /* segue */ } }
+    return t;
+  }
+
+  /* Arquivos que o agente entregou (present): abrir no editor ou no Windows. */
+  function cartaoEntregas(e) {
+    semTexto();
+    const binario = /\.(docx?|xlsx?|pptx?|pdf|png|jpe?g|gif|webp|zip|odt|ods)$/i;
+    const c = add('<div class="nc-entrega"><div class="t">Entregue' + ((e.arquivos || []).length > 1 ? 's' : '') + '</div>' + (e.arquivos || []).map((a) =>
+      '<div class="a"><b>' + esc(base(a.caminho)) + '</b>' + (a.descricao ? '<span>' + esc(a.descricao) + '</span>' : '') +
+      (binario.test(a.caminho) ? '' : '<button class="nc-bt borda" type="button" data-ed="' + esc(a.caminho) + '">Abrir no editor</button>') +
+      '<button class="nc-bt borda" type="button" data-so="' + esc(a.caminho) + '">Abrir no Windows</button></div>').join('') + '</div>');
+    $$('[data-ed]', c).forEach((b) => b.addEventListener('click', () => abrirArquivo(b.dataset.ed)));
+    $$('[data-so]', c).forEach((b) => b.addEventListener('click', () => api('POST', '/fs/abrir-sistema', { raiz: st.raiz, caminho: b.dataset.so }).catch((x) => toast(x.message, true))));
+  }
+
+  /* O projeto tem servidores MCP que ainda nao foram permitidos. */
+  function cartaoMcp(e, historico) {
+    if (historico) {
+      // ao recarregar a conversa: so' mostra se algum ainda espera permissao
+      const lugar = add('<div class="nc-mcp-lugar"></div>');
+      api('GET', '/mcp?' + qs({ pasta: st.raiz })).then((l) => {
+        const falta = (e.servidores || []).filter((x) => l.some((y) => y.nome === x.nome && !y.aprovado));
+        if (!falta.length) { lugar.remove(); return; }
+        lugar.replaceWith(cartaoMcp(Object.assign({}, e, { servidores: falta })));
+      }).catch(() => lugar.remove());
+      return lugar;
+    }
+    const c = add('<div class="nc-pede mcp"><div class="t">Este projeto tem servidores MCP</div>' +
+      '<p class="nc-nota">Eles rodam programas definidos no projeto. Só permita se você confia em quem fez o projeto.</p>' +
+      (e.servidores || []).map((x) => '<pre>' + esc(x.nome) + ': ' + esc(x.comando) + '</pre>').join('') +
+      '<div class="bt"><button class="nc-bt ouro" type="button" data-s>Permitir</button><button class="nc-bt borda" type="button" data-n>Agora não</button></div></div>');
+    $('[data-s]', c).addEventListener('click', () => Promise.all((e.servidores || []).map((x) => api('POST', '/mcp/aprovar', { pasta: st.raiz, nome: x.nome, sim: true })))
+      .then(() => { c.outerHTML = '<div class="nc-nota">Servidores MCP permitidos: as ferramentas entram no próximo pedido.</div>'; }).catch((x) => toast(x.message, true)));
+    $('[data-n]', c).addEventListener('click', () => { c.outerHTML = '<div class="nc-nota">Servidores MCP não ligados. Use /mcp para permitir depois.</div>'; });
+    return c;
+  }
+
+  /* ask_user_question: uma ou mais perguntas, com opcoes (uma ou varias) e resposta livre. */
+  function cartaoPerguntas(e) {
+    const html = '<div class="nc-pede perguntas" data-pede="' + e.id + '">' + (e.perguntas || []).map((q, i) =>
+      '<div class="q" data-q="' + i + '">' + (q.titulo ? '<small>' + esc(q.titulo) + '</small>' : '') + '<div class="t">' + esc(q.pergunta) + '</div>' +
+      (q.opcoes && q.opcoes.length ? '<div class="ops" role="' + (q.multipla ? 'group' : 'radiogroup') + '">' + q.opcoes.map((o) =>
+        '<button class="op" type="button" role="' + (q.multipla ? 'checkbox' : 'radio') + '" aria-checked="false" data-op="' + esc(o.label) + '">' +
+        '<b>' + esc(o.label) + '</b>' + (o.description ? '<span>' + esc(o.description) + '</span>' : '') + '</button>').join('') + '</div>' : '') +
+      '<input class="livre-q" placeholder="' + (q.opcoes && q.opcoes.length ? 'ou escreva outra resposta' : 'sua resposta') + '"></div>').join('') +
+      '<div class="bt"><button class="nc-bt ouro" type="button" data-s>Responder</button><button class="nc-bt borda" type="button" data-n>Pular</button></div></div>';
+    const card = add(html);
+    $$('.q', card).forEach((qd) => {
+      const q = e.perguntas[Number(qd.dataset.q)];
+      $$('.op', qd).forEach((b) => b.addEventListener('click', () => {
+        if (!q.multipla) $$('.op', qd).forEach((x) => x.setAttribute('aria-checked', 'false'));
+        b.setAttribute('aria-checked', String(!(q.multipla && b.getAttribute('aria-checked') === 'true')));
+        if (!q.multipla && e.perguntas.length === 1 && !$('.livre-q', qd).value.trim()) $('[data-s]', card).click();
+      }));
+    });
+    const resp = (pular) => e.perguntas.map((q, i) => {
+      const qd = $('.q[data-q="' + i + '"]', card);
+      const r = { id: q.id, selected: pular ? [] : $$('.op[aria-checked="true"]', qd).map((b) => b.dataset.op) };
+      const livre = $('.livre-q', qd).value.trim();
+      if (livre && !pular) r.custom = livre;
+      return r;
+    });
+    $('[data-s]', card).addEventListener('click', () => responder(e.id, true, false, JSON.stringify(resp(false))));
+    $('[data-n]', card).addEventListener('click', () => responder(e.id, true, false, JSON.stringify(resp(true))));
+    $$('.livre-q', card).forEach((inp) => inp.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') $('[data-s]', card).click(); }));
+    return card;
+  }
+
+  function cartaoPedido(e, historico) {
+    semTexto(); fecharPensamento();
+    if (e.tipo === 'perguntas') {
+      const card = cartaoPerguntas(e);
+      semVivo();
+      if (!historico) { const f = $('.op, .livre-q', card); if (f) f.focus(); if ($('#nc').classList.contains('sem-agente')) alternarAgente(true); }
+      return;
+    }
+    let html;
+    if (e.tipo === 'plano') {
+      html = '<div class="nc-pede plano" data-pede="' + e.id + '"><div class="t">Plano proposto</div><div class="nc-resp">' + md(e.plano) + '</div>' +
+        '<textarea class="fb" rows="2" placeholder="O que mudar no plano (opcional)"></textarea>' +
+        '<div class="bt"><button class="nc-bt ouro" type="button" data-s>Aprovar e executar</button><button class="nc-bt borda" type="button" data-n>Continuar planejando</button></div></div>';
+    } else if (e.tipo === 'pergunta') {
+      html = '<div class="nc-pede pergunta" data-pede="' + e.id + '"><div class="t">' + esc(e.pergunta) + '</div><div class="bt">' +
+        (e.opcoes || []).map((o) => '<button class="nc-bt borda" type="button" data-op="' + esc(o) + '">' + esc(o) + '</button>').join('') + '</div>' +
+        '<div class="livre"><input placeholder="ou escreva a sua resposta"><button class="nc-bt ouro" type="button" data-livre>Responder</button></div></div>';
+    } else if (e.tipo === 'mcp') {
+      html = '<div class="nc-pede" data-pede="' + e.id + '"><div class="t">Usar ' + esc(e.servidor) + ' › ' + esc(String(e.ferramenta).split('__').pop()) + '?</div>' +
+        (e.descricao ? '<p class="nc-nota">' + esc(e.descricao) + '</p>' : '') + '<pre>' + esc(JSON.stringify(e.args, null, 1)) + '</pre>' +
+        '<div class="bt"><button class="nc-bt ouro" type="button" data-s>Permitir</button><button class="nc-bt borda" type="button" data-sempre>Permitir sempre nesta conversa</button>' +
+        '<button class="nc-bt borda" type="button" data-n>Recusar</button></div></div>';
+    } else if (e.tipo === 'internet') {
+      html = '<div class="nc-pede" data-pede="' + e.id + '"><div class="t">Usar a internet nesta conversa?</div>' +
+        '<p class="nc-nota">O agente quer buscar ou ler <b>' + esc(e.alvo) + '</b>. Só o endereço ou a busca saem do seu computador; o código não.</p>' +
+        '<div class="bt"><button class="nc-bt ouro" type="button" data-s>Permitir nesta conversa</button><button class="nc-bt borda" type="button" data-n>Não permitir</button></div></div>';
+    } else {
+      const titulo = e.tipo === 'comando' ? (e.descricao ? esc(e.descricao) : 'Rodar este comando?') : (e.novo ? 'Criar ' : 'Mudar ') + esc(e.arquivo) + '?';
+      const det = e.tipo === 'comando' ? '<pre>' + esc(e.comando) + '</pre>' + (e.fundo ? '<p class="nc-nota">Vai rodar em segundo plano.</p>' : '')
+        : '<pre class="nc-diff">' + diffHtml(e.diff) + '</pre>';
+      html = '<div class="nc-pede" data-pede="' + e.id + '"><div class="t">' + titulo + (e.tipo === 'arquivo' ? '<span>+' + e.mais + ' −' + e.menos + '</span>' : '') + '</div>' + det +
+        '<div class="bt"><button class="nc-bt ouro" type="button" data-s>' + (e.tipo === 'comando' ? 'Rodar' : 'Aplicar') + '</button>' +
+        (e.tipo === 'comando' ? '<button class="nc-bt borda" type="button" data-sempre>Rodar sempre nesta conversa</button>' : '') +
+        '<button class="nc-bt borda" type="button" data-n>Recusar</button></div></div>';
+    }
+    const card = add(html);
+    const s = $('[data-s]', card); if (s) s.addEventListener('click', () => responder(e.id, true, false, e.tipo === 'plano' ? $('.fb', card).value : undefined));
+    const n = $('[data-n]', card); if (n) n.addEventListener('click', () => responder(e.id, false, false, e.tipo === 'plano' ? $('.fb', card).value : undefined));
+    const sm = $('[data-sempre]', card); if (sm) sm.addEventListener('click', () => responder(e.id, true, true));
+    $$('[data-op]', card).forEach((b) => b.addEventListener('click', () => responder(e.id, true, false, b.dataset.op)));
+    const lv = $('[data-livre]', card);
+    if (lv) {
+      const inp = $('.livre input', card);
+      const vai = () => { if (inp.value.trim()) responder(e.id, true, false, inp.value.trim()); };
+      lv.addEventListener('click', vai);
+      inp.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') vai(); });
+    }
+    semVivo();
+    if (!historico) {
+      const foco = $('[data-s], [data-op], .livre input', card); if (foco) foco.focus();
+      if ($('#nc').classList.contains('sem-agente')) alternarAgente(true);
+    }
+  }
+
   function saida(p, abrir) {
     let pre = $('pre', p);
     if (pre && !abrir) { pre.remove(); return; }
@@ -957,11 +1425,28 @@
     if (p._diff) { pre.className = 'nc-diff'; pre.innerHTML = diffHtml(p._diff); } else pre.textContent = p._saida;
     p.appendChild(pre);
   }
-  function resolvido(id, ok, sempre) {
+  function resolvido(id, ok, sempre, texto) {
     const c = $('[data-pede="' + id + '"]', trilha());
     if (!c) return;
+    if (c.classList.contains('plano')) {
+      c.classList.add('feito');
+      $('.bt', c).outerHTML = '<p class="nc-nota">' + (ok ? 'Você aprovou o plano.' : 'Você pediu para continuar planejando' + (texto ? ': ' + esc(texto) : '.')) + '</p>';
+      $('.fb', c)?.remove();
+      return;
+    }
+    if (c.classList.contains('pergunta')) { c.outerHTML = '<div class="nc-nota">' + esc($('.t', c).textContent) + ' <b>' + esc(texto || '') + '</b></div>'; return; }
+    if (c.classList.contains('perguntas')) {
+      let l = [];
+      try { l = JSON.parse(texto || '[]'); } catch (x) { /* resposta antiga */ }
+      c.outerHTML = '<div class="nc-nota">' + $$('.q', c).map((qd, i) => {
+        const r = l[i] || {};
+        const v = (r.selected || []).concat(r.custom ? [r.custom] : []).join(', ');
+        return esc($('.t', qd).textContent) + ' <b>' + esc(v || 'pulou') + '</b>';
+      }).join('<br>') + '</div>';
+      return;
+    }
     if (ok) { if (sempre) add('<div class="nc-nota">Liberado: esse comando roda sem perguntar nesta conversa.</div>'); c.remove(); return; }
-    c.outerHTML = '<div class="nc-nota">Você recusou: ' + esc($('.t', c).textContent.replace(/\?.*$/, '')) + '.</div>';
+    c.outerHTML = '<div class="nc-nota">Você recusou: ' + esc($('.t', c).textContent.replace(/\?.*$/, '').replace(/\+\d+ −\d+$/, '')) + '.</div>';
   }
   function pintarMudancas(l) {
     const box = $('#nc-ag-mud');
@@ -987,13 +1472,18 @@
     b.textContent = trabalhando ? 'Parar' : 'Enviar';
     b.classList.toggle('parar', !!trabalhando);
   }
+
   function enviar() {
     const txt = $('#nc-ag-txt');
     const t = txt.value.trim();
     if (!t || !st.sessao || st.rodandoCtrl) return;
+    txt.value = ''; txt.style.height = 'auto'; fecharAc();
+    if (t.startsWith('/') && comando(t)) return;
+    enviarTexto(t);
+  }
+  function enviarTexto(t) {
     // salva antes: o agente le do disco
     st.abas.filter((a) => a.sujo).forEach((a) => { ativar(st.abas.indexOf(a)); salvarAtiva(); });
-    txt.value = ''; txt.style.height = 'auto';
     st.rodandoCtrl = new AbortController();
     estadoEnvio(true); vivo('Pensando');
     fetch('/mensagem', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: st.sessao.id, texto: t }), signal: st.rodandoCtrl.signal })
@@ -1013,15 +1503,15 @@
       .catch((e) => { if (e.name !== 'AbortError') evento({ t: 'erro', texto: e.message === 'Failed to fetch' ? 'O Nous Code parou de responder.' : e.message }); })
       .then(() => {
         st.rodandoCtrl = null; estadoEnvio(false); semVivo();
-        api('GET', '/sessoes?' + qs({ pasta: st.raiz })).then((l) => {
-          $('#nc-ag-conv').innerHTML = l.map((x) => '<option value="' + x.id + '"' + (x.id === st.sessao.id ? ' selected' : '') + '>' + esc(x.titulo) + '</option>').join('');
-        });
+        // recarrega a conversa: titulo do modelo, "Duplicar daqui", jobs e tarefas atualizados
+        const t2 = $('#nc-trilha'), embaixo = t2.scrollHeight - t2.scrollTop - t2.clientHeight < 40;
+        api('GET', '/sessao?id=' + st.sessao.id).then((s) => { carregarSessao(s); if (!embaixo) t2.scrollTop = 0; });
       });
   }
-  function responder(id, ok, sempre) {
-    resolvido(id, ok, sempre);
-    if (ok) vivo('Trabalhando');
-    api('POST', '/aprovar', { id: st.sessao.id, pedido: id, ok, sempre }).catch(() => toast('Esse pedido expirou: o serviço foi reiniciado. Envie o pedido de novo.', true));
+  function responder(id, ok, sempre, texto) {
+    resolvido(id, ok, sempre, texto);
+    if (ok || texto) vivo('Trabalhando');
+    api('POST', '/aprovar', { id: st.sessao.id, pedido: id, ok, sempre, texto }).catch(() => toast('Esse pedido expirou: o serviço foi reiniciado. Envie o pedido de novo.', true));
   }
   function parar() { api('POST', '/parar', { id: st.sessao.id }).catch(() => {}); }
 
