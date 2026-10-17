@@ -406,44 +406,71 @@ def _friendly_pull_error(msg):
     return "O download falhou: " + (msg or "erro desconhecido")
 
 
+class _Parado(Exception):
+    """Download sem avancar: os bytes nao mudam ha' _PARADO_S segundos."""
+
+
+_PARADO_S = 90       # sem nenhum byte novo por este tempo = travado
+_TENTATIVAS = 3      # o Ollama continua de onde parou, entao recomecar e' barato
+
+
+async def _pull_uma_vez(tag, st, digests):
+    """Uma passada pelo stream NDJSON do /api/pull. True = terminou."""
+    loop = asyncio.get_event_loop()
+    ultimo, quando = -1, loop.time()
+    # sock_read curto: o Ollama manda progresso varias vezes por segundo; o
+    # silencio total tambem conta como travado
+    timeout = aiohttp.ClientTimeout(total=None, connect=10, sock_read=_PARADO_S)
+    async with aiohttp.ClientSession(timeout=timeout) as s:
+        async with s.post(f"{OLLAMA}/api/pull", json={"name": tag, "stream": True}) as r:
+            async for raw in r.content:
+                raw = raw.strip()
+                if not raw:
+                    continue
+                try:
+                    d = json.loads(raw)
+                except Exception:
+                    continue
+                if d.get("error"):
+                    raise RuntimeError(d["error"])
+                if d.get("digest") and d.get("total"):
+                    digests[d["digest"]] = (int(d.get("completed") or 0), int(d["total"]))
+                    comp = sum(c for c, _ in digests.values())
+                    tot = sum(t for _, t in digests.values())
+                    if tot:
+                        st.update(pct=round(comp / tot, 4), completed_gb=round(comp / GB, 2),
+                                  total_gb=round(tot / GB, 2))
+                    if comp != ultimo:
+                        ultimo, quando = comp, loop.time()
+                        st["nota"] = None
+                    elif loop.time() - quando > _PARADO_S:
+                        raise _Parado()
+                if (d.get("status") or "") == "success":
+                    st.update(status="pronto", pct=1.0, nota=None)
+                    return True
+    return False
+
+
 async def _do_pull(tag):
-    """Consome o stream NDJSON do Ollama /api/pull agregando progresso por digest."""
+    """Baixa pelo Ollama; se travar ou a conexao cair, tenta de novo sozinho
+    (ate' _TENTATIVAS vezes) mostrando o aviso no card da Loja."""
     st = _pulls[tag]
     digests = {}
     try:
-        timeout = aiohttp.ClientTimeout(total=None, connect=10, sock_read=600)
-        async with aiohttp.ClientSession(timeout=timeout) as s:
-            async with s.post(f"{OLLAMA}/api/pull",
-                              json={"name": tag, "stream": True}) as r:
-                async for raw in r.content:
-                    raw = raw.strip()
-                    if not raw:
-                        continue
-                    try:
-                        d = json.loads(raw)
-                    except Exception:
-                        continue
-                    if d.get("error"):
-                        st.update(status="erro",
-                                  error=_friendly_pull_error(d["error"]))
-                        return
-                    if d.get("digest") and d.get("total"):
-                        digests[d["digest"]] = (int(d.get("completed") or 0),
-                                                int(d["total"]))
-                        comp = sum(c for c, _ in digests.values())
-                        tot = sum(t for _, t in digests.values())
-                        if tot:
-                            st.update(pct=round(comp / tot, 4),
-                                      completed_gb=round(comp / GB, 2),
-                                      total_gb=round(tot / GB, 2))
-                    if (d.get("status") or "") == "success":
-                        st.update(status="pronto", pct=1.0)
-                        return
-        if st["status"] == "baixando":
-            st.update(status="erro",
-                      error="O download foi interrompido. Tente de novo.")
+        for tentativa in range(1, _TENTATIVAS + 1):
+            try:
+                if await _pull_uma_vez(tag, st, digests):
+                    return
+                motivo = "O download foi interrompido."
+            except (_Parado, asyncio.TimeoutError, aiohttp.ClientError) as e:
+                motivo = ("O download parou de andar." if isinstance(e, (_Parado, asyncio.TimeoutError))
+                          else _friendly_pull_error(str(e)))
+            if tentativa < _TENTATIVAS:
+                st["nota"] = f"Conexao lenta: tentando de novo ({tentativa + 1}/{_TENTATIVAS})..."
+                await asyncio.sleep(3 * tentativa)
+        st.update(status="erro", nota=None, error=motivo + " Verifique a internet e tente de novo.")
     except Exception as e:
-        st.update(status="erro", error=_friendly_pull_error(str(e)))
+        st.update(status="erro", nota=None, error=_friendly_pull_error(str(e)))
     finally:
         _pull_tasks.pop(tag, None)
 
@@ -667,7 +694,7 @@ async def h_pull(request):
         # Já baixado nesta sessão: não refaz o download nem apaga o estado.
         return web.json_response({"started": False, "reason": "ja baixado"})
     _pulls[tag] = {"status": "baixando", "pct": 0.0,
-                   "completed_gb": 0.0, "total_gb": 0.0, "error": None}
+                   "completed_gb": 0.0, "total_gb": 0.0, "error": None, "nota": None}
     _pull_tasks[tag] = asyncio.get_event_loop().create_task(_do_pull(tag))
     return web.json_response({"started": True})
 
@@ -1485,29 +1512,145 @@ async def h_docs_ai(request):
         model = await _pick_model(str(b.get("model") or ""))
     except (ValueError, RuntimeError) as e:
         return web.json_response({"error": str(e)}, status=400)
-    payload = {"model": model, "stream": False, "think": False, "keep_alive": "5m", "messages": msgs,
+    pensa = await _pensa_sempre(model)
+    if not pensa:
+        msgs = es.sem_pensar(msgs, model)
+    payload = {"model": model, "stream": True, "think": pensa, "keep_alive": "5m", "messages": msgs,
                "options": {"temperature": 0.3, "num_ctx": int(os.environ.get("NOUS_NUM_CTX", "16384"))}}
     t0 = asyncio.get_event_loop().time()
+    # stream: NDJSON {"d": pedaco} enquanto o modelo escreve (o painel mostra
+    # ao vivo) e no fim {"fim": {...}} ou {"erro": "..."}. Se o usuario cancela,
+    # a conexao cai, o laco para e o Ollama para de gerar.
+    resp = None
+    if b.get("stream"):
+        resp = web.StreamResponse(headers={"Content-Type": "application/x-ndjson", "Cache-Control": "no-store",
+                                           **_cors_headers(request.headers.get("Origin"))})
+        await resp.prepare(request)
+
+    async def manda(obj):
+        if resp is not None:
+            await resp.write((json.dumps(obj, ensure_ascii=False) + "\n").encode("utf-8"))
+
+    partes, erro, status_erro, pensou = [], None, 502, 0
     async with _DOC_LOCK:
         try:
-            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=420)) as s:
-                status, d = await _cmp_chat(s, payload)
-                if status != 200 and "think" in str(d.get("error", "")).lower():
-                    payload.pop("think")
-                    status, d = await _cmp_chat(s, payload)
+            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=420, sock_read=180)) as s:
+                for tentativa in (1, 2):
+                    async with s.post(f"{OLLAMA}/api/chat", json=payload) as r:
+                        if r.status != 200:
+                            d = await r.json(content_type=None)
+                            if tentativa == 1 and "think" in str(d.get("error", "")).lower():
+                                payload.pop("think", None)  # modelo sem modo de pensar
+                                continue
+                            erro = str(d.get("error") or "falhou")[:300]
+                            break
+                        async for raw in r.content:
+                            raw = raw.strip()
+                            if not raw:
+                                continue
+                            try:
+                                d = json.loads(raw)
+                            except Exception:
+                                continue
+                            if d.get("error"):
+                                erro = str(d["error"])[:300]
+                                break
+                            msg = d.get("message") or {}
+                            if msg.get("thinking"):
+                                # o painel mostra "pensando..." com a contagem, nao o raciocinio
+                                antes, pensou = pensou, pensou + len(msg["thinking"])
+                                if pensou // 300 != antes // 300:
+                                    await manda({"p": pensou})
+                            pedaco = msg.get("content") or ""
+                            if pedaco:
+                                partes.append(pedaco)
+                                await manda({"d": pedaco})
+                            if d.get("done"):
+                                break
+                    break
+        except ConnectionResetError:  # o usuario cancelou (o aiohttp herda dela)
+            return resp
         except asyncio.TimeoutError:
-            return web.json_response({"error": "o modelo demorou demais (7 min). Tente com um trecho menor."}, status=504)
-        except Exception:
-            return web.json_response({"error": "o motor de IA nao respondeu"}, status=502)
-    if status != 200:
-        return web.json_response({"error": str(d.get("error") or "falhou")[:300]}, status=502)
-    novo = es.limpar((d.get("message") or {}).get("content") or "", alvo)
-    if not novo.strip():
-        return web.json_response({"error": "o modelo devolveu um texto vazio. Tente de novo."}, status=502)
+            erro, status_erro = "o modelo demorou demais (7 min). Tente com um trecho menor.", 504
+        except Exception as e:
+            print(f"[Nous][docs] ia: {e}", file=sys.stderr)
+            erro = "o motor de IA nao respondeu"
+    if not erro:
+        novo = es.limpar("".join(partes), alvo)
+        if not novo.strip():
+            erro = "o modelo devolveu um texto vazio. Tente de novo."
+    if erro:
+        if resp is None:
+            return web.json_response({"error": erro}, status=status_erro)
+        await manda({"erro": erro})
+        await resp.write_eof()
+        return resp
     segs = es.diff(alvo, novo, pre, suf)
-    return web.json_response({"segs": segs, "model": model,
-                              "mudancas": sum(1 for x in segs if x["t"] == "~"),
-                              "secs": round(asyncio.get_event_loop().time() - t0, 1)})
+    fim = {"segs": segs, "model": model, "mudancas": sum(1 for x in segs if x["t"] == "~"),
+           "secs": round(asyncio.get_event_loop().time() - t0, 1)}
+    if resp is None:
+        return web.json_response(fim)
+    await manda({"fim": fim})
+    await resp.write_eof()
+    return resp
+
+
+_PENSA = {}   # modelo -> sempre pensa? (cache do /api/show)
+
+
+async def _pensa_sempre(model):
+    """Modelos como o qwen3 2507 "thinking" abrem o <think> no proprio molde:
+    com think=False o raciocinio vaza para a resposta. Para esses o pedido vai
+    com think=True, e o Ollama separa o raciocinio (message.thinking)."""
+    if model not in _PENSA:
+        try:
+            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=8)) as s:
+                async with s.post(f"{OLLAMA}/api/show", json={"model": model}) as r:
+                    d = await r.json(content_type=None)
+            tpl = d.get("template") or ""
+            _PENSA[model] = "thinking" in (d.get("capabilities") or []) and "assistant\n<think>" in tpl
+        except Exception:
+            return False
+    return _PENSA[model]
+
+
+async def h_docs_porque(request):
+    """{antes, depois, contexto?, model?} -> {motivo}: uma frase explicando a sugestao."""
+    b = await _body_json(request)
+    antes, depois = str(b.get("antes") or "")[:2000], str(b.get("depois") or "")[:2000]
+    if not antes.strip() and not depois.strip():
+        return web.json_response({"error": "nada para explicar"}, status=400)
+    es = _doc_mod("escrita")
+    regra = es.porque_regra(antes, depois)
+    if regra:
+        return web.json_response({"motivo": regra, "fonte": "regra"})
+    try:
+        model = await _pick_model(str(b.get("model") or ""))
+    except RuntimeError as e:
+        return web.json_response({"error": str(e)}, status=400)
+    prompt = es.prompt_porque(antes, depois, str(b.get("contexto") or "")[:1500])
+    payload = {"model": model, "stream": False, "think": await _pensa_sempre(model), "keep_alive": "5m",
+               "format": {"type": "object", "required": ["motivo"], "properties": {"motivo": {"type": "string"}}},
+               "messages": es.sem_pensar([{"role": "user", "content": prompt}], model),
+               "options": {"temperature": 0.2, "num_ctx": int(os.environ.get("NOUS_NUM_CTX", "16384"))}}
+    try:
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=120)) as s:
+            status, d = await _cmp_chat(s, payload)
+            if status != 200 and "think" in str(d.get("error", "")).lower():
+                payload.pop("think")
+                status, d = await _cmp_chat(s, payload)
+        motivo = json.loads((d.get("message") or {}).get("content") or "{}").get("motivo") or ""
+    except Exception:
+        return web.json_response({"error": "o modelo nao respondeu"}, status=502)
+    motivo = re.sub(r"\s+", " ", motivo).strip()[:300]
+    return web.json_response({"motivo": motivo or "O modelo nao soube explicar esta mudanca.", "fonte": "ia"})
+
+
+async def h_docs_diff(request):
+    """{a, b} -> {segs}: o que mudou entre duas versoes (a = antes)."""
+    b = await _body_json(request)
+    segs = await _run(_doc_mod("escrita").diff, str(b.get("a") or "")[:500000], str(b.get("b") or "")[:500000])
+    return web.json_response({"segs": segs, "mudancas": sum(1 for x in segs if x["t"] == "~")})
 
 
 async def h_docs_import(request):
@@ -1580,6 +1723,8 @@ def build_app():
                     web.post("/docs/save", h_docs_save),
                     web.post("/docs/delete", h_docs_delete),
                     web.post("/docs/ai", h_docs_ai),
+                    web.post("/docs/porque", h_docs_porque),
+                    web.post("/docs/diff", h_docs_diff),
                     web.post("/docs/import", h_docs_import),
                     web.post("/docs/export", h_docs_export),
                     web.get("/research/export", h_research_export)])

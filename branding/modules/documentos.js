@@ -202,7 +202,7 @@
 				el.querySelector('#nous-pdf-sigimg').src = URL.createObjectURL(blob);
 				el.querySelector('#nous-pdf-redo').addEventListener('click', function () { drawPad(el); });
 				el.querySelector('#nous-pdf-del').addEventListener('click', function () {
-					if (confirm('Apagar sua assinatura salva?')) fetch(MON + '/pdf/signature/delete', { method: 'POST' }).then(function () { renderSig(el); });
+					window.NousUI.pede('Apagar sua assinatura salva?').then(function (sim) { if (sim) fetch(MON + '/pdf/signature/delete', { method: 'POST' }).then(function () { renderSig(el); }); });
 				});
 			} else drawPad(el);
 		}).catch(function () { el.innerHTML = '<div class="nous-pdf-msg nous-pdf-bad">O monitor do Nous nao esta no ar.</div>'; });
@@ -225,7 +225,7 @@
 		c.addEventListener('pointerup', function () { drawing = false; });
 		el.querySelector('#nous-pdf-clr').addEventListener('click', function () { ctx.clearRect(0, 0, c.width, c.height); any = false; });
 		el.querySelector('#nous-pdf-sv').addEventListener('click', function () {
-			if (!any) { alert('Desenhe a assinatura primeiro.'); return; }
+			if (!any) { window.NousUI.aviso('Desenhe a assinatura primeiro.'); return; }
 			c.toBlob(function (blob) {
 				fetch(MON + '/pdf/signature', { method: 'POST', body: blob }).then(function () { renderSig(el); });
 			}, 'image/png');

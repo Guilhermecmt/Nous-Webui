@@ -229,7 +229,7 @@
 		api('/compare/vote', { models: ok, winner: winner, tps: tps }).then(function () {
 			r.votado = winner;
 			renderRodada();
-		}).catch(function (e) { alert('Nao deu para registrar o voto: ' + e.message); });
+		}).catch(function (e) { window.NousUI.aviso('Nao deu para registrar o voto: ' + e.message); });
 	}
 
 	/* ---------------------------------------------------------- placar */
@@ -255,8 +255,10 @@
 				'<div class="nous-cp-row"><span class="nous-cp-dim" style="flex:1">Velocidade medida nesta maquina. Um token e\' mais ou menos 3/4 de uma palavra.</span>' +
 				'<button class="nous-cp-btn" id="nous-cp-zera" type="button">Zerar placar</button></div>';
 			box.querySelector('#nous-cp-zera').addEventListener('click', function () {
-				if (!confirm('Apagar todos os votos do placar?')) return;
-				api('/compare/reset', {}).then(renderPlacar);
+				window.NousUI.pede('Apagar todos os votos do placar?').then(function (sim) {
+					if (!sim) return;
+					api('/compare/reset', {}).then(renderPlacar);
+				});
 			});
 		}).catch(function () {
 			box.innerHTML = '<div class="nous-cp-dim">O monitor do Nous nao responde.</div>';

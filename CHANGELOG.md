@@ -45,8 +45,21 @@ isolada. O Nous continua MIT.
   - Memória: busca a partir de 8 memórias, apagar com **Desfazer**, importar
     com "marcar todas/nenhuma" e avisos de quantas foram guardadas/exportadas.
   - Avisos (toasts) e confirmações no visual do Nous (`modules/_base.js`) no
-    lugar do `alert`/`confirm` do navegador; títulos dos painéis em Cinzel.
+    lugar do `alert`/`confirm` do navegador — também nos painéis antigos
+    (Agenda, E-mail, Habilidades, Comparar, Formulários, Galeria) — e os
+    títulos de todos os painéis em Cinzel.
+  - Documentos: a resposta da IA aparece **ao vivo** ("pensando" e depois o
+    texto chegando; Cancelar agora para o modelo de verdade); **❓ Por quê?**
+    explica cada sugestão (acento, maiúscula, pontuação e ortografia por
+    regra, sem errar; o resto pelo modelo, marcado "pode errar"); **comparar
+    versões** antes de voltar (riscado sai, sublinhado volta).
+  - Relatórios: **💬 Conversar** leva o relatório para o chat.
+  - Loja: download **travado** (sem bytes novos por 90 s) ou com a conexão
+    caída tenta de novo sozinho, até 3 vezes, com o aviso no card.
 ### Corrigido
+- Modelos que sempre pensam (qwen3 2507 "thinking": o molde abre o `<think>`)
+  despejavam o raciocínio na resposta dos Documentos; agora o Nous detecta
+  pelo molde e pede `think` ao Ollama, que separa o raciocínio.
 - No celular, os botões das respostas alargavam a página inteira (todo painel
   aparecia cortado à direita); agora viram só ícones em telas estreitas.
 ### Mudado

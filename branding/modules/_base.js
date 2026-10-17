@@ -112,8 +112,44 @@
 		});
 	}
 
+	/* pede(texto): o confirmar() pronto para os paineis antigos. A 1a frase
+	 * (ate' o "?") vira o titulo, o resto o texto; o botao repete o verbo e
+	 * apagar/remover/descadastrar ficam vermelhos. */
+	function pede(texto, op) {
+		texto = String(texto || '');
+		var i = texto.indexOf('?'), titulo = i > 0 ? texto.slice(0, i + 1) : texto, resto = i > 0 ? texto.slice(i + 1).trim() : '';
+		var verbo = (titulo.match(/^(Apagar|Remover|Enviar|Descadastrar|Zerar|Excluir)/i) || [])[1];
+		var perigo = /^(Apagar|Remover|Descadastrar|Zerar|Excluir)/i.test(titulo);
+		if (/nao pode ser desfeit|não pode ser desfeit/i.test(texto)) perigo = true;
+		return confirmar(resto || (perigo ? 'Nao da para desfazer.' : ''), Object.assign({
+			titulo: titulo, ok: verbo ? verbo.charAt(0).toUpperCase() + verbo.slice(1).toLowerCase() : 'Continuar', perigo: perigo
+		}, op || {}));
+	}
+
+	/* aviso(texto, tipo): o alert() dos paineis antigos virou toast */
+	function aviso(texto, tipo) {
+		texto = String(texto || '');
+		if (!tipo) tipo = /\b(nao|não|erro|falhou|primeiro|indisponivel)\b/i.test(texto) ? 'erro' : 'ok';
+		return toast(texto, { tipo: tipo, ms: tipo === 'erro' ? 6000 : 3500 });
+	}
+
+	/* titulos de todos os paineis na fonte da marca (Cinzel, a do NOUS) */
+	function injectTitulos() {
+		if (document.getElementById('nous-titulos-style')) return;
+		var st = document.createElement('style');
+		st.id = 'nous-titulos-style';
+		st.textContent = ['voice', 'email', 'gal', 'mem', 'store', 'ag', 'cp', 'dg', 'pdf', 'em', 'sk', 'rp', 'ed'].map(function (k) {
+			return '#nous-' + k + '-head span:first-of-type';
+		}).join(',') + '{font-family:Cinzel,Georgia,serif!important;font-weight:600!important;letter-spacing:.05em}';
+		document.head.appendChild(st);
+	}
+
 	/* ja' na carga: os outros modulos guardam a referencia do NousUI */
 	var ui = window.NousUI = window.NousUI || {};
 	ui.toast = toast;
 	ui.confirmar = confirmar;
+	ui.pede = pede;
+	ui.aviso = aviso;
+	if (document.head) injectTitulos();
+	else document.addEventListener('DOMContentLoaded', injectTitulos);
 })();

@@ -85,6 +85,7 @@
 					dt.toLocaleDateString('pt-BR') + ' ' + dt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) +
 					' · ' + r.n_sources + ' fontes' + (r.domains && r.domains.length ? ' · ' + esc(r.domains.slice(0, 3).join(', ')) : '') +
 					'</div></a><span class="nous-rp-acts">' +
+					'<button class="nous-rp-exp" type="button" title="Conversar com a IA sobre este relatorio" data-exp="chat" data-rid="' + esc(r.id) + '">💬 Conversar</button>' +
 					'<button class="nous-rp-exp" type="button" title="Baixar em PDF" data-exp="pdf" data-rid="' + esc(r.id) + '">PDF</button>' +
 					'<button class="nous-rp-exp" type="button" title="Baixar em Word" data-exp="docx" data-rid="' + esc(r.id) + '">Word</button>' +
 					'<button class="nous-rp-exp" type="button" title="Abrir nos Documentos para editar" data-exp="doc" data-rid="' + esc(r.id) + '">✎ Editar</button>' +
@@ -96,7 +97,7 @@
 				b.addEventListener('click', function () {
 					var fmt = b.getAttribute('data-exp'), rid = b.getAttribute('data-rid'), old = b.textContent;
 					var q = (list.filter(function (x) { return x.id === rid; })[0] || {}).question || 'Pesquisa';
-					var md = fmt === 'doc' || fmt === 'copiar';
+					var md = fmt === 'doc' || fmt === 'copiar' || fmt === 'chat';
 					b.disabled = true;
 					b.textContent = '...';
 					fetch(MON + '/research/export?id=' + encodeURIComponent(rid) + '&formato=' + (md ? 'md' : fmt))
@@ -108,6 +109,22 @@
 								if (!window.NousDocs) throw new Error('os Documentos nao carregaram');
 								ov.classList.add('nous-hidden');
 								window.NousDocs.novo(q.slice(0, 100), res);
+								return;
+							}
+							if (fmt === 'chat') {
+								var box = document.getElementById('chat-input');
+								if (!box) throw new Error('abra uma conversa primeiro');
+								ov.classList.add('nous-hidden');
+								var m = 'Quero conversar sobre esta pesquisa que o Nous fez:\n\n' + res + '\n\nMinha pergunta: ';
+								box.focus();
+								if (box.tagName === 'TEXTAREA') {
+									box.value = m;
+									box.dispatchEvent(new Event('input', { bubbles: true }));
+								} else {
+									document.execCommand('selectAll', false, null);
+									document.execCommand('insertText', false, m);
+								}
+								toast('O relatorio foi para o chat: escreva a sua pergunta no fim e envie.', { tipo: 'info' });
 								return;
 							}
 							if (fmt === 'copiar') {

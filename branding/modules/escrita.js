@@ -17,6 +17,7 @@
 	var UI = window.NousUI || {};
 	var esc = UI.esc || function (s) { return String(s || ''); };
 	var ov = null, cur = null, saveTimer = null, review = null, busy = null, criando = false, docsCache = [];
+	var compara = null;   /* {texto}: comparando uma versao antiga com o texto de agora */
 
 	var CHIPS = [['corrigir', '✓ Corrigir portugues'], ['formal', '👔 Mais formal'], ['simples', '🙂 Mais simples'],
 		['curto', '✂ Mais curto'], ['topicos', '¶ Topicos em texto'], ['organizar', '☰ Organizar com titulos'],
@@ -103,12 +104,20 @@
 			'background:' + g + '.1);border:1px solid ' + g + '.3);font-size:12px}#nous-dc-revbar.on{display:flex}' +
 			'#nous-dc-revbar .nous-dc-rt{flex:1;min-width:150px}#nous-dc-revbar kbd{font:10px Inter,sans-serif;opacity:.6;margin-left:3px}' +
 			'.nous-dc-nav{min-width:30px}' +
+			'.nous-dc-cmp del,#nous-dc-revbar del{color:#f39b9b;background:rgba(220,60,60,.15)}' +
+			'.nous-dc-cmp ins,#nous-dc-revbar ins{color:#7fe0a6;background:rgba(58,208,122,.15);text-decoration:underline}' +
+			'#nous-dc-why{flex-basis:100%;margin-top:4px;padding:6px 9px;border-radius:8px;background:rgba(0,0,0,.25);color:#eee;font-size:12px;line-height:1.5}' +
+			'#nous-dc-why small{opacity:.55}#nous-dc-why i{opacity:.7}' +
 			/* IA escrevendo */
 			'#nous-dc-busy{position:absolute;inset:0;display:none;align-items:center;justify-content:center;border-radius:10px;' +
 			'background:rgba(14,14,18,.72);backdrop-filter:blur(1.5px)}#nous-dc-busy.on{display:flex}' +
 			'#nous-dc-busy div{display:flex;flex-direction:column;align-items:center;gap:10px;padding:18px 24px;border-radius:14px;' +
 			'background:rgba(18,18,22,.96);border:1px solid ' + g + '.45);text-align:center}' +
 			'#nous-dc-busy b{font:600 14px Cinzel,Georgia,serif;letter-spacing:.05em;color:#e7c069}#nous-dc-busy small{opacity:.65}' +
+			/* o texto chegando ao vivo, com o fim sempre a vista */
+			'#nous-dc-live{width:min(560px,70vw);max-height:38vh;overflow-y:auto;margin:0;padding:10px 12px;border-radius:10px;text-align:left;' +
+			'white-space:pre-wrap;word-wrap:break-word;font:13px/1.6 Inter,system-ui,sans-serif;color:#ddd;background:rgba(255,255,255,.04);' +
+			'border:1px solid rgba(255,255,255,.08);-webkit-mask-image:linear-gradient(to bottom,transparent,#000 22px)}' +
 			'.nous-dc-pulse{width:12px;height:12px;border-radius:50%;background:#e7c069;animation:nous-dc-p 1.2s ease-in-out infinite}' +
 			'@keyframes nous-dc-p{0%,100%{opacity:.35;transform:scale(.8)}50%{opacity:1;transform:scale(1.15);box-shadow:0 0 14px #e7c069}}' +
 			/* documento vazio */
@@ -204,8 +213,9 @@
 			'<textarea id="nous-dc-text" spellcheck="true" lang="pt-BR" aria-label="Texto do documento"></textarea>' +
 			'<div id="nous-dc-view" style="display:none"></div><div id="nous-dc-rev" style="display:none" tabindex="-1"></div>' +
 			'<div id="nous-dc-start"></div>' +
-			'<div id="nous-dc-busy" aria-live="polite"><div><span class="nous-dc-pulse"></span><b>A IA esta escrevendo</b>' +
-			'<small id="nous-dc-busyt"></small><button class="nous-dc-btn ghost" id="nous-dc-cancel" type="button">Cancelar</button></div></div>' +
+			'<div id="nous-dc-busy" aria-live="polite"><div><span class="nous-dc-pulse"></span><b id="nous-dc-busyb">A IA esta escrevendo</b>' +
+			'<small id="nous-dc-busyt"></small><pre id="nous-dc-live" aria-hidden="true"></pre>' +
+			'<button class="nous-dc-btn ghost" id="nous-dc-cancel" type="button">Cancelar</button></div></div>' +
 			'</div>' +
 			'<div id="nous-dc-foot"><span id="nous-dc-stats"></span><span id="nous-dc-msg"></span>' +
 			'<span id="nous-dc-save" aria-live="polite"></span></div>' +
@@ -292,6 +302,7 @@
 			if (document.querySelector('.nous-dc-pop')) { fecharPops(); e.stopPropagation(); return; }
 			if ($('#nous-dc').classList.contains('lista')) { $('#nous-dc').classList.remove('lista'); e.stopPropagation(); return; }
 			if (busy) { cancelar(); e.stopPropagation(); return; }
+			if (compara) { fecharComparacao(); e.stopPropagation(); return; }
 			e.stopPropagation();
 			close();
 			return;
@@ -308,6 +319,7 @@
 		else if (e.key === 'Delete' || e.key === 'Backspace' || e.key === 'r' || e.key === 'R') { e.preventDefault(); decidir(review.atual, false); }
 		else if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); ir(1); }
 		else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); ir(-1); }
+		else if (e.key === '?') { e.preventDefault(); porque(); }
 	}
 
 	function atalhosTexto(e) {
@@ -344,6 +356,7 @@
 
 	function fechar() {
 		if (busy) cancelar();
+		compara = null;
 		salvarAgora();
 		fecharPops();
 		$('#nous-dc').classList.remove('lista');
@@ -456,6 +469,7 @@
 	function mostrar(doc) {
 		cur = doc;
 		review = null;
+		compara = null;
 		$('#nous-dc-title').value = doc.titulo === 'Sem titulo' ? '' : (doc.titulo || '');
 		$('#nous-dc-text').value = doc.texto || '';
 		modo('w');
@@ -617,6 +631,7 @@
 
 	function pedir(instrucao, rotulo) {
 		if (busy || review) return;
+		fecharComparacao();
 		var ta = $('#nous-dc-text');
 		if ($('#nous-dc-view').style.display !== 'none') modo('w');
 		var texto = ta.value, ini = ta.selectionStart, fim = ta.selectionEnd;
@@ -628,24 +643,31 @@
 			return;
 		}
 		var ctrl = window.AbortController ? new AbortController() : null, t0 = Date.now();
-		busy = { ctrl: ctrl, timer: null };
+		busy = { ctrl: ctrl, timer: null, fase: 'espera', vivo: '' };
 		var rot = !texto.trim() ? 'Rascunho da IA' : rotulo;
 		$('#nous-dc-busy').classList.add('on');
+		$('#nous-dc-live').textContent = '';
+		$('#nous-dc-live').style.display = 'none';
 		function tick() {
 			var s = Math.round((Date.now() - t0) / 1000);
+			$('#nous-dc-busyb').textContent = busy.fase === 'pensa' ? 'A IA esta pensando' : busy.fase === 'escreve' ? 'A IA esta escrevendo' : 'Preparando o modelo';
 			$('#nous-dc-busyt').textContent = (sel ? 'So\' no trecho selecionado · ' : '') + s + ' s' +
-				(s > 20 ? ' — modelos locais levam ate\' um minuto' : '');
+				(s > 20 && busy.fase !== 'escreve' ? ' — modelos locais levam ate\' um minuto' : '');
 		}
 		tick();
+		busy.tick = tick;
 		busy.timer = setInterval(tick, 500);
 		travar(true);
 		msg('');
-		var body = { texto: texto, instrucao: instrucao, model: $('#nous-dc-model').value };
+		var body = { texto: texto, instrucao: instrucao, model: $('#nous-dc-model').value, stream: true };
 		if (sel) { body.ini = ini; body.fim = fim; }
 		var meu = busy;
 		fetch(MON + '/docs/ai', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
 			signal: ctrl ? ctrl.signal : undefined })
-			.then(function (r) { return r.json(); }).then(function (d) {
+			.then(function (r) {
+				if (!r.ok || !r.body || !r.body.getReader) return r.json();
+				return lerAoVivo(r, meu);
+			}).then(function (d) {
 				if (busy !== meu) return;  /* cancelado */
 				if (d.error) throw new Error(d.error);
 				if (ta.value !== texto) throw new Error('Voce mudou o texto enquanto a IA escrevia. Peca de novo.');
@@ -657,6 +679,47 @@
 				if (busy !== meu || (e && e.name === 'AbortError')) return;
 				msg(e.message || 'A IA nao respondeu.', true);
 			}).then(function () { if (busy === meu) fimBusy(); });
+	}
+
+	/* NDJSON do monitor: {"p": n} pensando, {"d": pedaco} texto ao vivo,
+	 * {"fim": {...}} pronto ou {"erro": "..."}. Resolve com o mesmo formato
+	 * da resposta sem stream ({segs, mudancas} ou {error}). */
+	function lerAoVivo(r, meu) {
+		var leitor = r.body.getReader(), dec = new TextDecoder(), resto = '', fim = null;
+		var live = $('#nous-dc-live');
+		function linha(l) {
+			if (!l.trim()) return;
+			var o;
+			try { o = JSON.parse(l); } catch (e) { return; }
+			if (busy !== meu) return;
+			var antes = busy.fase;
+			if (o.p && busy.fase !== 'escreve') busy.fase = 'pensa';
+			if (o.d) busy.fase = 'escreve';
+			if (busy.fase !== antes && busy.tick) busy.tick();
+			if (o.d) {
+				busy.vivo += o.d;
+				live.style.display = '';
+				/* qwen3 e parecidos: o que vem antes do </think> e' raciocinio */
+				var t = busy.vivo.indexOf('</think>') >= 0 ? busy.vivo.split('</think>').pop() : busy.vivo.replace(/^<think>[\s\S]*/, '');
+				live.textContent = t.trimStart();
+				live.scrollTop = live.scrollHeight;
+			}
+			if (o.fim) fim = o.fim;
+			if (o.erro) fim = { error: o.erro };
+		}
+		function le() {
+			return leitor.read().then(function (p) {
+				if (p.done) {
+					linha(resto);
+					return fim || { error: 'A conexao com o monitor caiu. Tente de novo.' };
+				}
+				var partes = (resto + dec.decode(p.value, { stream: true })).split('\n');
+				resto = partes.pop();
+				partes.forEach(linha);
+				return le();
+			});
+		}
+		return le();
 	}
 
 	function fimBusy() {
@@ -681,7 +744,7 @@
 	}
 
 	function mostrarSugestoes(d, rotulo) {
-		review = { segs: d.segs, rotulo: rotulo, dec: {}, atual: null, antes: $('#nous-dc-text').value };
+		review = { segs: d.segs, rotulo: rotulo, dec: {}, atual: null, antes: $('#nous-dc-text').value, porque: {} };
 		var box = $('#nous-dc-rev'), html = '';
 		d.segs.forEach(function (s, i) {
 			if (s.t === '=') { html += esc(s.s); return; }
@@ -722,6 +785,24 @@
 		focar(l[Math.max(0, Math.min(l.length - 1, (p < 0 ? 0 : p) + passo))]);
 	}
 
+	/* "Por que?": regra para acento/pontuacao/maiuscula; o modelo explica o resto */
+	function porque() {
+		if (!review || review.atual === null) return;
+		var i = review.atual, r = review, s = r.segs[i];
+		if (r.porque[i] && !r.porque[i].erro) return;
+		var ctx = '';
+		for (var k = i - 1; k >= 0 && ctx.length < 160; k--) ctx = (r.segs[k].t === '=' ? r.segs[k].s : r.segs[k].a) + ctx;
+		ctx = ctx.slice(-160) + (s.a || '') + (r.segs[i + 1] && r.segs[i + 1].t === '=' ? r.segs[i + 1].s.slice(0, 160) : '');
+		r.porque[i] = { carregando: true };
+		barra();
+		fetch(MON + '/docs/porque', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ antes: s.a, depois: s.b, contexto: ctx, model: $('#nous-dc-model').value }) })
+			.then(function (x) { return x.json(); }).then(function (d) {
+				r.porque[i] = d.error ? { motivo: 'Nao consegui explicar agora.', erro: true } : d;
+			}).catch(function () { r.porque[i] = { motivo: 'Nao consegui explicar agora.', erro: true }; })
+			.then(function () { if (review === r) barra(); });
+	}
+
 	/* decide uma; vai para a proxima pendente; tudo decidido = conclui */
 	function decidir(i, ok, ficar) {
 		if (!review || i === undefined || i === null) return;
@@ -745,11 +826,16 @@
 			'<button class="nous-dc-btn ghost nous-dc-nav" type="button" data-go="1" title="Proxima (→)" aria-label="Proxima sugestao">›</button>' +
 			'<button class="nous-dc-btn" type="button" data-um="1">✓ Aceitar<kbd class="nous-dc-k">Enter</kbd></button>' +
 			'<button class="nous-dc-btn ghost" type="button" data-um="0">✕ Recusar<kbd class="nous-dc-k">Del</kbd></button>' +
+			'<button class="nous-dc-btn ghost" type="button" id="nous-dc-pq" title="Por que mudar? (tecla ?)">❓ Por que?</button>' +
 			'<span class="nous-dc-sp"></span>' +
 			'<button class="nous-dc-btn ghost" type="button" data-all="1">Aceitar todas</button>' +
 			'<button class="nous-dc-btn ghost" type="button" data-all="0">Recusar todas</button>' +
 			'<button class="nous-dc-btn" type="button" id="nous-dc-done">Concluir</button>';
 		bar.querySelectorAll('[data-go]').forEach(function (b) { b.addEventListener('click', function () { ir(+b.getAttribute('data-go')); }); });
+		bar.querySelector('#nous-dc-pq').addEventListener('click', porque);
+		var why = review.porque[review.atual];
+		bar.insertAdjacentHTML('beforeend', '<div id="nous-dc-why"' + (why ? '' : ' style="display:none"') + '>' +
+			(why ? (why.carregando ? '<i>Pensando no motivo...</i>' : esc(why.motivo) + (why.fonte === 'ia' ? ' <small>(explicacao da IA, pode errar)</small>' : '')) : '') + '</div>');
 		bar.querySelectorAll('[data-um]').forEach(function (b) {
 			b.addEventListener('click', function () { decidir(review.atual, b.getAttribute('data-um') === '1'); });
 		});
@@ -867,21 +953,57 @@
 				var b = e.target.closest('[data-v]');
 				if (!b) return;
 				p.remove();
-				var antes = $('#nous-dc-text').value, rot = b.firstChild.textContent.trim();
-				fetch(MON + '/docs/version?id=' + encodeURIComponent(cur.id) + '&i=' + b.getAttribute('data-v'), { cache: 'no-store' })
-					.then(function (r) { return r.json(); }).then(function (d) {
-						if (d.error) throw new Error(d.error);
-						$('#nous-dc-text').value = d.texto;
-						contar(); vazio();
-						salvarAgora('antes de voltar uma versao');
-						toast('Voltou para a versao de ' + rot + '.', { acao: function () {
-							$('#nous-dc-text').value = antes;
-							contar(); vazio();
-							salvarAgora('antes de desfazer a volta');
-						} });
-					}).catch(function (e) { msg(e.message, true); });
+				var v = vs.filter(function (x) { return String(x.i) === b.getAttribute('data-v'); })[0] || {};
+				comparar(v);
 			});
 		});
+	}
+
+	/* Antes de voltar: mostra o que muda (riscado sai, sublinhado volta). */
+	function comparar(v) {
+		var atual = $('#nous-dc-text').value, rot = quando(v.t) + (v.motivo ? ' (' + v.motivo + ')' : '');
+		fetch(MON + '/docs/version?id=' + encodeURIComponent(cur.id) + '&i=' + v.i, { cache: 'no-store' })
+			.then(function (r) { return r.json(); }).then(function (d) {
+				if (d.error) throw new Error(d.error);
+				return fetch(MON + '/docs/diff', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ a: atual, b: d.texto }) }).then(function (r) { return r.json(); })
+					.then(function (df) { return [d.texto, df]; });
+			}).then(function (par) {
+				var texto = par[0], df = par[1];
+				if (!df.mudancas) { toast('Esta versao e\' igual ao texto de agora.', { tipo: 'info' }); return; }
+				compara = { texto: texto };
+				$('#nous-dc-rev').innerHTML = df.segs.map(function (s) {
+					return s.t === '=' ? esc(s.s) : '<span class="nous-dc-cmp">' + (s.a ? '<del>' + esc(s.a) + '</del>' : '') +
+						(s.b ? '<ins>' + esc(s.b) + '</ins>' : '') + '</span>';
+				}).join('');
+				$('#nous-dc-rev').onclick = null;
+				modo('r');
+				var bar = $('#nous-dc-revbar');
+				bar.innerHTML = '<span class="nous-dc-rt">🕘 <b>Versao de ' + esc(rot) + '</b> · ' + df.mudancas + ' diferenca' +
+					(df.mudancas === 1 ? '' : 's') + ': <del>riscado</del> sai, <ins>sublinhado</ins> volta</span>' +
+					'<button class="nous-dc-btn" type="button" id="nous-dc-volta">↩ Voltar para esta versao</button>' +
+					'<button class="nous-dc-btn ghost" type="button" id="nous-dc-cmpx">Fechar</button>';
+				bar.querySelector('#nous-dc-cmpx').addEventListener('click', fecharComparacao);
+				bar.querySelector('#nous-dc-volta').addEventListener('click', function () {
+					fecharComparacao();
+					$('#nous-dc-text').value = texto;
+					contar(); vazio();
+					salvarAgora('antes de voltar uma versao');
+					toast('Voltou para a versao de ' + quando(v.t) + '.', { acao: function () {
+						$('#nous-dc-text').value = atual;
+						contar(); vazio();
+						salvarAgora('antes de desfazer a volta');
+					} });
+				});
+				var first = $('#nous-dc-rev .nous-dc-cmp');
+				if (first) first.scrollIntoView({ block: 'center' });
+			}).catch(function (e) { msg(e.message, true); });
+	}
+
+	function fecharComparacao() {
+		if (!compara) return;
+		compara = null;
+		modo('w');
 	}
 
 	/* ---------------------------------------------------- arquivo e chat */

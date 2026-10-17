@@ -231,7 +231,7 @@ Depois de acertar algo numa conversa (o formato do relatório, o tom do e-mail d
 
 Documento vazio? Escolha um **modelo pronto** (carta formal, currículo, e-mail profissional, reclamação, ata) ou **✨ Escrever com a IA**: descreva o que precisa e revise o rascunho.
 
-A IA nunca escreve direto no documento: cada mudança aparece **riscada (antes) e sublinhada (depois)** com ✓ e ✕. A revisão mostra *"sugestão 2 de 7"*; **Enter** aceita, **Delete** recusa e o Nous passa para a próxima sozinho — ou use **Aceitar todas** / **Recusar todas**. Depois de aplicar, o aviso traz **Desfazer**. Se você **selecionar um trecho** antes de pedir, só ele muda. Antes de cada mudança aceita, o Nous guarda uma **versão** (também a cada 10 min de escrita), e dá para voltar a qualquer uma.
+A IA nunca escreve direto no documento: cada mudança aparece **riscada (antes) e sublinhada (depois)** com ✓ e ✕. A revisão mostra *"sugestão 2 de 7"*; **Enter** aceita, **Delete** recusa e o Nous passa para a próxima sozinho — ou use **Aceitar todas** / **Recusar todas**. Depois de aplicar, o aviso traz **Desfazer**. Enquanto a IA trabalha, você vê o texto chegando **ao vivo**; na revisão, **❓ Por quê?** (ou a tecla **?**) explica a sugestão. Em **🕘 Versões**, clicar numa versão mostra o que muda antes de voltar. Se você **selecionar um trecho** antes de pedir, só ele muda. Antes de cada mudança aceita, o Nous guarda uma **versão** (também a cada 10 min de escrita), e dá para voltar a qualquer uma.
 
 O documento salva sozinho em `NousData\documentos`. **⬇ Baixar** gera **Word (.docx)**, **PDF** ou **Markdown**; **💬 Usar no chat** leva o texto para a conversa. Nas respostas do chat, o botão **📝 Documento** faz o caminho inverso. Tudo roda no modelo local.
 

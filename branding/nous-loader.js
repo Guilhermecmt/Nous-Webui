@@ -1086,6 +1086,7 @@
 			'color:#e7c069;font-size:11px;cursor:pointer}.nous-store-chip small{opacity:.6}' +
 			'.nous-store-chip:hover{background:rgba(200,150,46,.14)}.nous-store-chip.on{background:rgba(200,150,46,.3);border-color:rgba(200,150,46,.7)}' +
 			'.nous-store-mem{margin:-4px 0 7px;font-size:11px;opacity:.6}.nous-store-mem b{color:#e08080}' +
+			'.nous-store-warn{color:#e7c069;opacity:1}' +
 			'#nous-store-head span{font-family:Cinzel,Georgia,serif;letter-spacing:.06em}' +
 			'#nous-store-sim{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:4px 0 8px;font-size:11px}' +
 			'#nous-store-sim.nous-hidden{display:none}#nous-store-sim label{display:flex;gap:5px;align-items:center;opacity:.9}' +
@@ -1346,7 +1347,8 @@
 				anyPulling = true;
 				var pc = Math.round((p.pct || 0) * 100);
 				row = '<div class="nous-store-prog"><div class="nous-mon-track"><div class="nous-mon-fill" style="width:' + pc + '%"></div></div>' +
-					'<span class="nous-store-ptxt">Baixando... ' + pc + '%' + (p.total_gb ? ' · ' + p.completed_gb + ' / ' + p.total_gb + ' GB' : '') + '</span></div>';
+					'<span class="nous-store-ptxt">Baixando... ' + pc + '%' + (p.total_gb ? ' · ' + p.completed_gb + ' / ' + p.total_gb + ' GB' : '') + '</span>' +
+					(p.nota ? '<span class="nous-store-ptxt nous-store-warn">' + _esc(p.nota) + '</span>' : '') + '</div>';
 			} else if (p.status === 'erro') {
 				row = '<span class="nous-store-err">' + _esc(p.error || 'O download falhou.') + '</span>';
 			} else {
@@ -1378,7 +1380,7 @@
 					'<div class="nous-mon-track"><div class="nous-mon-fill" style="width:' + pct + '%"></div></div>' +
 					'<span class="nous-store-ptxt">Baixando... ' + pct + '%' +
 					(pull.total_gb ? ' · ' + pull.completed_gb + ' / ' + pull.total_gb + ' GB' : '') +
-					'</span></div>';
+					'</span>' + (pull.nota ? '<span class="nous-store-ptxt nous-store-warn">' + _esc(pull.nota) + '</span>' : '') + '</div>';
 			} else if (pull && pull.status === 'erro') {
 				rowHtml =
 					'<span class="nous-store-err">' + _esc(pull.error || 'O download falhou.') + '</span>' +
@@ -2135,8 +2137,10 @@
 			});
 			card.querySelector('.nous-gal-btn-del').addEventListener('click', function (e) {
 				e.stopPropagation();
-				if (!confirm('Apagar permanentemente esta imagem?\nEsta ação não pode ser desfeita.')) return;
-				deleteImage(img.id, true, card);
+				window.NousUI.pede('Apagar permanentemente esta imagem?\nEsta ação não pode ser desfeita.').then(function (sim) {
+					if (!sim) return;
+					deleteImage(img.id, true, card);
+				});
 			});
 			grid.appendChild(card);
 		});
@@ -2167,12 +2171,12 @@
 				}
 			} else {
 				if (card) { card.style.opacity = '1'; card.style.pointerEvents = ''; }
-				alert('Não foi possível apagar a imagem: ' + (res.error || 'erro desconhecido'));
+				window.NousUI.aviso('Não foi possível apagar a imagem: ' + (res.error || 'erro desconhecido'));
 			}
 		})
 		.catch(function () {
 			if (card) { card.style.opacity = '1'; card.style.pointerEvents = ''; }
-			alert('Erro de comunicação com o monitor. Tente de novo.');
+			window.NousUI.aviso('Erro de comunicação com o monitor. Tente de novo.');
 		});
 	}
 

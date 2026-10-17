@@ -167,6 +167,56 @@ def prompt(texto, instrucao, ini=None, fim=None):
     return [{"role": "system", "content": SISTEMA}, {"role": "user", "content": user}], pre, alvo, suf
 
 
+def sem_pensar(msgs, model):
+    """O qwen3 pensa em voz alta mesmo com think=False (centenas de tokens em
+    ingles antes da resposta); "/no_think" no fim do pedido desliga isso nele."""
+    if "qwen3" in (model or "").lower() and msgs and msgs[-1].get("role") == "user":
+        msgs[-1]["content"] = msgs[-1]["content"].rstrip() + "\n/no_think"
+    return msgs
+
+
+def _sem_acento(s):
+    import unicodedata
+    return "".join(c for c in unicodedata.normalize("NFD", s) if unicodedata.category(c) != "Mn")
+
+
+def porque_regra(antes, depois):
+    """Explicacao certa, sem modelo, para as mudancas pequenas e comuns.
+    None = precisa do modelo (o modelo pequeno erra essas faceis)."""
+    a, b = antes.strip(), depois.strip()
+    if a == b:
+        return "So' espaco ou quebra de linha."
+    if a and b and a.lower() == b.lower():
+        return "Maiuscula/minuscula: " + ("comeco de frase ou nome proprio pede maiuscula." if b[:1].isupper() else "aqui vai minuscula.")
+    if a and b and _sem_acento(a) == _sem_acento(b):
+        return f'Acentuacao: o certo e\' "{b}".'
+    so_pont = re.compile(r"^[\s.,;:!?…\"'()—–-]*$")
+    if so_pont.match(a) and so_pont.match(b):
+        if "," in b and "," not in a:
+            return "Pontuacao: a virgula separa as partes da frase (ex.: antes de \"mas\")."
+        return "Pontuacao: ajuste de sinais (virgula, ponto ou travessao)."
+    if a and b and _sem_acento(a).lower() == _sem_acento(b).lower():
+        return f'Acentuacao e maiuscula: o certo e\' "{b}".'
+    if a and b and len(a.split()) == 1 and len(b.split()) == 1 and difflib.SequenceMatcher(None, a.lower(), b.lower()).ratio() > 0.75:
+        return f'Ortografia ou concordancia: o certo aqui e\' "{b}".'
+    return None
+
+
+def prompt_porque(antes, depois, contexto=""):
+    """Pede UMA frase explicando a sugestao (botao "Por que?" da revisao)."""
+    if not antes.strip():
+        mudanca = f'Foi ACRESCENTADO: "{depois}"'
+    elif not depois.strip():
+        mudanca = f'Foi APAGADO: "{antes}"'
+    else:
+        mudanca = f'Trocou "{antes}" por "{depois}"'
+    return ("Um revisor de textos sugeriu esta mudanca num texto em portugues.\n"
+            f"{mudanca}\n" + (f"Trecho em volta: {contexto}\n" if contexto.strip() else "") +
+            "\nExplique em UMA frase curta (ate' 20 palavras), em portugues simples, por que a mudanca "
+            "melhora o texto (ex.: \"'Esta' leva acento: e' o verbo estar.\"). "
+            'Responda so\' com JSON: {"motivo": "..."}')
+
+
 _ABERTURA = re.compile(r"^\s*(?:aqui est[aá]|segue|claro[,!]|texto (?:revisado|reescrito|corrigido))[^\n]{0,80}:\s*\n", re.I)
 
 

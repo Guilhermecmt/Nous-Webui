@@ -231,7 +231,7 @@ After getting something right in a conversation, say **"aprenda isso"** ("learn 
 
 Empty document? Pick a **ready template** (formal letter, résumé, work email, complaint, meeting minutes) or **✨ Escrever com a IA**: describe what you need and review the draft.
 
-The AI never writes straight into the document: each change appears **struck through (before) and underlined (after)** with ✓ and ✕. Review shows *"suggestion 2 of 7"*; **Enter** accepts, **Delete** rejects and Nous moves to the next one — or use **Accept all** / **Reject all**. After applying, the notice offers **Undo**. If you **select a passage** first, only that part changes. Before each accepted change Nous keeps a **version** (also every 10 minutes of writing), and you can go back to any of them.
+The AI never writes straight into the document: each change appears **struck through (before) and underlined (after)** with ✓ and ✕. Review shows *"suggestion 2 of 7"*; **Enter** accepts, **Delete** rejects and Nous moves to the next one — or use **Accept all** / **Reject all**. After applying, the notice offers **Undo**. While the AI works you watch the text arrive **live**; during review, **❓ Por quê?** (or the **?** key) explains the suggestion. In **🕘 Versões**, clicking a version shows what would change before you go back. If you **select a passage** first, only that part changes. Before each accepted change Nous keeps a **version** (also every 10 minutes of writing), and you can go back to any of them.
 
 Documents autosave to `NousData\documentos`. **⬇ Baixar** produces **Word (.docx)**, **PDF** or **Markdown**; **💬 Usar no chat** takes the text into the conversation. In chat replies, the **📝 Documento** button goes the other way. Everything runs on the local model.
 
