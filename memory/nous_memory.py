@@ -267,8 +267,10 @@ class Filter:
             return body
         # Modelos de nuvem tem id com '/' (ex.: "deepseek-ai/deepseek-r1").
         # Por padrao nao injetamos dados pessoais em requisicoes externas.
+        # "hf.co/..." e' um GGUF do Hugging Face baixado pelo Ollama: roda aqui.
         model_id = body.get("model", "")
-        if "/" in model_id and not self.valves.CLOUD_MODELS_GET_MEMORY:
+        local = model_id.lower().startswith("hf.co/")
+        if "/" in model_id and not local and not self.valves.CLOUD_MODELS_GET_MEMORY:
             return body
         user_id = (__user__ or {}).get("id") or "default"
         persona = _get_active_persona(user_id)

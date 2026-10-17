@@ -1,7 +1,8 @@
 /* =====================================================================
    Nous - Relatorios (v2.7). Botao "Relatorios" no card Recursos -> a
    biblioteca da Pesquisa Profunda (relatorios visuais salvos pelo monitor,
-   127.0.0.1:8990/research). Cada um abre numa aba propria.
+   127.0.0.1:8990/research). Cada um abre numa aba propria; desde a v2.9
+   tambem baixa em PDF ou Word (/research/export).
    ===================================================================== */
 (function () {
 	'use strict';
@@ -32,6 +33,8 @@
 			'.nous-rp-item a{flex:1;color:#eee;text-decoration:none}.nous-rp-item a:hover b{color:#e7c069}' +
 			'.nous-rp-sub{font-size:11px;opacity:.6;margin-top:3px}' +
 			'.nous-rp-del{background:none;border:none;color:#888;cursor:pointer}.nous-rp-del:hover{color:#f08080}' +
+			'.nous-rp-exp{align-self:center;padding:3px 8px;border:1px solid ' + g + '.35);border-radius:7px;background:transparent;' +
+			'color:#e7c069;font-size:11px;font-weight:600;cursor:pointer}.nous-rp-exp:hover{background:' + g + '.16)}' +
 			'.nous-rp-empty{opacity:.6;text-align:center;padding:18px 8px;font-size:12px;line-height:1.6}';
 		var st = document.createElement('style');
 		st.id = 'nous-rp-style';
@@ -80,8 +83,31 @@
 					encodeURIComponent(r.id) + '"><b>' + esc(r.question) + '</b><div class="nous-rp-sub">' +
 					dt.toLocaleDateString('pt-BR') + ' ' + dt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) +
 					' · ' + r.n_sources + ' fontes' + (r.domains && r.domains.length ? ' · ' + esc(r.domains.slice(0, 3).join(', ')) : '') +
-					'</div></a><button class="nous-rp-del" type="button" title="Apagar" data-id="' + esc(r.id) + '">🗑</button></div>';
+					'</div></a><button class="nous-rp-exp" type="button" title="Baixar em PDF" data-exp="pdf" data-rid="' + esc(r.id) + '">PDF</button>' +
+					'<button class="nous-rp-exp" type="button" title="Baixar em Word" data-exp="docx" data-rid="' + esc(r.id) + '">Word</button>' +
+					'<button class="nous-rp-del" type="button" title="Apagar" data-id="' + esc(r.id) + '">🗑</button></div>';
 			}).join('');
+			box.querySelectorAll('[data-exp]').forEach(function (b) {
+				b.addEventListener('click', function () {
+					var fmt = b.getAttribute('data-exp'), rid = b.getAttribute('data-rid'), old = b.textContent;
+					b.disabled = true;
+					b.textContent = '...';
+					fetch(MON + '/research/export?id=' + encodeURIComponent(rid) + '&formato=' + fmt)
+						.then(function (r) {
+							if (r.ok) return r.blob();
+							return r.json().then(function (d) { throw new Error(d.error || 'falhou'); });
+						}).then(function (blob) {
+							var q = (list.filter(function (x) { return x.id === rid; })[0] || {}).question || 'Pesquisa';
+							var a = document.createElement('a');
+							a.href = URL.createObjectURL(blob);
+							a.download = q.slice(0, 80).replace(/[\\/:*?"<>|]+/g, ' ').trim() + '.' + fmt;
+							document.body.appendChild(a);
+							a.click();
+							setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
+						}).catch(function (e) { alert('Nao consegui gerar o arquivo: ' + e.message); })
+						.then(function () { b.disabled = false; b.textContent = old; });
+				});
+			});
 			box.querySelectorAll('[data-id]').forEach(function (b) {
 				b.addEventListener('click', function () {
 					if (!confirm('Apagar este relatorio?')) return;

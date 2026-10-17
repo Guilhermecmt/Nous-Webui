@@ -29,6 +29,9 @@
 				['#nous-ed-side', 'Ou faca na mao: corte, gire, ajuste luz e cor e remova o fundo com IA local. Ctrl+Z desfaz. Tambem da para colar uma imagem com Ctrl+V.']] },
 		comparar: { when: function () { return visible('nous-cp-ov'); },
 			steps: [['#nous-cp-body', 'Faca a mesma pergunta para ate\' 4 modelos e vote na melhor resposta. O placar mostra qual combina mais com voce e qual e\' mais rapido nesta maquina.']] },
+		documentos: { when: function () { return visible('nous-dc-ov'); },
+			steps: [['#nous-dc-text', 'Escreva aqui, ou cole suas anotacoes. Salva sozinho e da para baixar em Word ou PDF.'],
+				['#nous-dc-chips', 'Peca para a IA corrigir, deixar formal, encurtar ou transformar topicos em texto. Ela so\' sugere: cada mudanca aparece riscada e voce aceita ou recusa.']] },
 		galeria: { when: function () { return visible('nous-gal-ov'); },
 			steps: [['#nous-gal-filter', 'Marque as favoritas com ★ e organize em albuns com 📁. O ✎ abre a imagem no Editor.']] }
 	};
@@ -38,7 +41,7 @@
 	/* algum painel do Nous (ou o assistente de primeiro uso) aberto? */
 	function anyPanel() {
 		return ['nous-wiz-ov', 'nous-ag-ov', 'nous-em-ov', 'nous-sk-ov', 'nous-rp-ov', 'nous-pdf-ov', 'nous-ed-ov',
-			'nous-store-ov', 'nous-dg-ov', 'nous-voice-ov', 'nous-cp-ov', 'nous-gal-ov'].some(visible) || visible('nous-mem-panel');
+			'nous-store-ov', 'nous-dg-ov', 'nous-voice-ov', 'nous-cp-ov', 'nous-gal-ov', 'nous-dc-ov'].some(visible) || visible('nous-mem-panel');
 	}
 	function hide() {
 		['nous-tour-halo', 'nous-tour-card'].forEach(function (id) { var e = document.getElementById(id); if (e) e.remove(); });
