@@ -37,7 +37,9 @@ except Exception:
 
 DB_NAME = "nous_files.sqlite3"
 CONFIG_NAME = "nous_files.json"
-EMBED_MODEL = os.environ.get("NOUS_EMBED_MODEL", "nomic-embed-text")
+# Multilingue: em portugues separa trechos relevantes de irrelevantes bem melhor
+# que o nomic-embed-text (calibracao no CHANGELOG da 2.8).
+EMBED_MODEL = os.environ.get("NOUS_EMBED_MODEL", "granite-embedding:278m")
 OLLAMA_URL = os.environ.get("OLLAMA_BASE_URL", "http://127.0.0.1:11434").rstrip("/")
 EXTS = (".md", ".txt")
 SKIP_DIRS = {".obsidian", ".git", ".trash", "node_modules", ".vscode", "__pycache__"}
@@ -91,6 +93,15 @@ def connect(db):
     )
     cx.execute("CREATE INDEX IF NOT EXISTS idx_chunks_path ON chunks(path)")
     cx.execute("CREATE VIRTUAL TABLE IF NOT EXISTS chunks_fts USING fts5(text)")
+    cx.execute("CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY, value TEXT)")
+    # Vetores de outro modelo nao se comparam com os novos: reindexa tudo.
+    em = cx.execute("SELECT value FROM meta WHERE key='embed_model'").fetchone()
+    if em is None or em[0] != EMBED_MODEL:
+        if cx.execute("SELECT 1 FROM chunks LIMIT 1").fetchone():
+            cx.execute("DELETE FROM chunks")
+            cx.execute("DELETE FROM chunks_fts")
+            cx.execute("DELETE FROM files")
+        cx.execute("INSERT OR REPLACE INTO meta(key,value) VALUES('embed_model',?)", (EMBED_MODEL,))
     cx.commit()
     return cx
 
@@ -155,6 +166,24 @@ def embed(text):
         return None
 
 
+def embed_ready():
+    """O modelo de embeddings esta' instalado? Sem ele, o ciclo espera: indexar
+    agora gravaria trechos sem vetor (so' palavra-chave) para sempre."""
+    if requests is None:
+        return False
+    try:
+        tags = requests.get(f"{OLLAMA_URL}/api/tags", timeout=5).json().get("models", [])
+    except Exception:
+        return False
+    want = EMBED_MODEL if ":" in EMBED_MODEL else EMBED_MODEL + ":latest"
+    return any(m.get("name") == want for m in tags)
+
+
+def doc_prefix(text):
+    """So' o nomic-embed-text pede prefixo de tarefa; os outros modelos nao."""
+    return ("search_document: " + text) if EMBED_MODEL.startswith("nomic") else text
+
+
 # ----------------------------- varredura -----------------------------
 def walk_files(folder):
     for root, dirs, names in os.walk(folder):
@@ -197,8 +226,7 @@ def index_once(cx, folder, log=print):
         drop_file(cx, path)
         for ord_, (heading, chunk) in enumerate(chunk_text(text)):
             emb_input = (heading + "\n" + chunk) if heading else chunk
-            # prefixo exigido pelo nomic-embed-text (documentos vs consultas)
-            vec = embed("search_document: " + emb_input)
+            vec = embed(doc_prefix(emb_input))
             blob = None
             if vec is not None and np is not None:
                 blob = np.asarray(vec, dtype="float32").tobytes()
@@ -276,7 +304,7 @@ def main():
     try:
         while True:
             folder = read_folder(data_dir, a.folder)
-            if folder and os.path.isdir(folder):
+            if folder and os.path.isdir(folder) and embed_ready():
                 try:
                     index_once(cx, folder, log=lambda *_: None)
                 except Exception as e:

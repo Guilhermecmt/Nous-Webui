@@ -1,0 +1,22 @@
+name: lint
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  lint:
+    # Windows de proposito: o lint usa o powershell.exe 5.1, o mesmo que roda
+    # os scripts do Nous na maquina dos usuarios.
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Checagens do Nous
+        shell: powershell
+        run: .\tools\lint.ps1

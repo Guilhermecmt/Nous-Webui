@@ -32,6 +32,9 @@ import sqlite3
 
 OLLAMA_URL = os.environ.get("OLLAMA_BASE_URL", "http://127.0.0.1:11434").rstrip("/")
 NUM_CTX = int(os.environ.get("NOUS_NUM_CTX", "16384"))
+SYSTEM_PT = ("Você é o Nous, um assistente pessoal que roda no computador do usuário. "
+             "Responda sempre em português do Brasil, a menos que o usuário peça outro idioma. "
+             "Seja claro e direto.")
 
 # Modelos de embedding nao recebem num_ctx de chat.
 _EMBED_PATTERNS = ("embed", "nomic", "minilm", "bge-", "e5-", "gte-", "rerank")
@@ -100,17 +103,25 @@ def _set_ctx(cx, model_id, owner, now):
             params = {}
         if not isinstance(params, dict):
             params = {}
+        changed = False
         # So' atualiza se faltar ou estiver menor — nao reduz um valor que o
         # usuario tenha aumentado de proposito.
-        if int(params.get("num_ctx") or 0) >= NUM_CTX:
+        if int(params.get("num_ctx") or 0) < NUM_CTX:
+            params["num_ctx"] = NUM_CTX
+            changed = True
+        # Sem prompt de sistema, modelos pequenos (qwen3:4b) respondem em ingles
+        # a perguntas em portugues. So' preenche se o usuario nao definiu um.
+        if "system" not in params:
+            params["system"] = SYSTEM_PT
+            changed = True
+        if not changed:
             return False
-        params["num_ctx"] = NUM_CTX
         cx.execute(
             "UPDATE model SET params=?, updated_at=? WHERE id=?",
             (json.dumps(params), now, model_id),
         )
     else:
-        params = {"num_ctx": NUM_CTX}
+        params = {"num_ctx": NUM_CTX, "system": SYSTEM_PT}
         meta = json.dumps({})
         cx.execute(
             """INSERT INTO model

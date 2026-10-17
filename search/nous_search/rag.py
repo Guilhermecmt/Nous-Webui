@@ -9,6 +9,9 @@ from .search import search_web
 
 OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434").rstrip("/")
 NOUS_MODEL = os.environ.get("NOUS_MODEL", "gemma4:12b")
+# Mesmo num_ctx do chat (monitor/register_model_ctx.py): com outro valor o
+# Ollama recarrega o modelo (no 0.30 o padrao chega a 256k e estoura a VRAM).
+NUM_CTX = int(os.environ.get("NOUS_NUM_CTX", "16384"))
 
 SYSTEM_PROMPT = (
     "Voce e o Nous, um assistente de pesquisa. Responda em portugues, de forma "
@@ -94,6 +97,7 @@ def answer(query, k=5, *, model=None, deep=False, timeout=300):
         "system": SYSTEM_PROMPT,
         "prompt": prompt,
         "stream": False,
+        "options": {"num_ctx": NUM_CTX},
     }
     resp = requests.post(f"{OLLAMA_URL}/api/generate", json=payload, timeout=timeout)
     resp.raise_for_status()

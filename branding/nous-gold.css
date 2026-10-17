@@ -162,3 +162,17 @@ body.nous-shell-mark::after { opacity: 0; }
     pointer-events: none;
     white-space: nowrap;
 }
+
+/* Telas estreitas (celular / janela pela metade): o wordmark encavalava no
+   nome do modelo e o card Recursos cobria as sugestoes. */
+@media (max-width: 640px) {
+    #nous-home-wordmark,
+    #nous-monitor {
+        display: none !important;
+    }
+    /* sem barra lateral visivel o loader cai no body::after (o da tela de
+       login); fora do login ele tambem encavala no seletor de modelo */
+    body:not(:has(#auth-page))::after {
+        display: none !important;
+    }
+}

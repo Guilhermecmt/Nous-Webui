@@ -28,6 +28,10 @@ from typing import Optional
 import aiohttp
 from pydantic import BaseModel, Field
 
+# Mesmo num_ctx do chat (monitor/register_model_ctx.py): com outro valor o
+# Ollama recarrega o modelo (no 0.30 o padrao chega a 256k e estoura a VRAM).
+NUM_CTX = int(os.environ.get("NOUS_NUM_CTX", "16384"))
+
 
 # --------------------------------------------------------------------------
 # Workflow embutido (Flux Schnell, formato API do ComfyUI).
@@ -68,12 +72,17 @@ FLUX_SCHNELL_WORKFLOW = {
 
 # Gatilhos de intencao de imagem (PT + EN).
 _VERBS = (r"cri[ae]|gere|gera|gerar|desenh[ae]|fa[cç]a|fazer|ilustr[ae]|pinte|"
-          r"produz[ae]|render(?:ize)?|imagin[ae]|create|generate|draw|make|paint|render")
+          r"produz[ae]|render(?:ize)?|imagin[ae]|mostr[ae]|quero|preciso|"
+          r"create|generate|draw|make|paint|render|show|give\s+me|want")
 _NOUNS = (r"imagem|imagens|logo|logotipo|[ií]cone|foto|retrato|paisagem|wallpaper|"
           r"arte|ilustra[cç][aã]o|desenho|cena|p[oô]ster|poster|capa|avatar|"
-          r"image|picture|portrait|landscape|illustration|drawing|art|icon")
-_INTENT_RE = re.compile(rf"\b(?:{_VERBS})\b[^.?!]*\b(?:{_NOUNS})\b", re.IGNORECASE)
+          r"image|picture|portrait|landscape|illustration|drawing|art|icon|photo")
+# Verbo + substantivo na mesma sentença
+_INTENT_RE = re.compile(rf"\b(?:{_VERBS})\b[^.?!\n]{{0,60}}\b(?:{_NOUNS})\b", re.IGNORECASE)
+# Prefixo /img, /imagine etc.
 _PREFIX_RE = re.compile(r"^\s*(?:/(?:img|image|imagem)\b|imagine\b)", re.IGNORECASE)
+# "uma foto de X", "uma imagem de X" sem verbo explícito
+_NOUN_LEAD_RE = re.compile(rf"\b(?:uma?|the|an?)\s+(?:{_NOUNS})\b", re.IGNORECASE)
 
 
 def _last_user_text(messages):
@@ -173,12 +182,13 @@ class Pipe:
                 __metadata__, __event_emitter__):
                 yield chunk
             return
+        # Passa ao Ollama sem tools (evita que o Gemma retorne JSON de tool-call)
         async for chunk in self._text_flow(body, messages):
             yield chunk
 
     # ----------------------------------------------------------- deteccao
     def _is_image_request(self, text: str) -> bool:
-        return bool(_PREFIX_RE.search(text) or _INTENT_RE.search(text))
+        return bool(_PREFIX_RE.search(text) or _INTENT_RE.search(text) or _NOUN_LEAD_RE.search(text))
 
     # ----------------------------------------------------------- imagem (ComfyUI)
     def _load_workflow(self):
@@ -222,16 +232,52 @@ class Pipe:
                         "type": img.get("type", "output")}
         return None
 
+    async def _ensure_comfyui(self) -> bool:
+        """Pede ao Nous Monitor para subir o ComfyUI se necessário.
+        O monitor (porta 8990) tem permissão para lançar processos — o pipe não."""
+        # Verifica primeiro diretamente (evita round-trip ao monitor se já está no ar)
+        base = self.valves.COMFYUI_URL.rstrip("/")
+        chk = aiohttp.ClientTimeout(total=5)
+        try:
+            async with aiohttp.ClientSession(timeout=chk) as s:
+                async with s.get(f"{base}/system_stats") as r:
+                    if r.status < 500:
+                        return True
+        except Exception:
+            pass
+
+        # Delega a inicialização ao monitor (aguarda até 90 s lá dentro)
+        mon = aiohttp.ClientTimeout(total=100)
+        try:
+            async with aiohttp.ClientSession(timeout=mon) as s:
+                async with s.post("http://127.0.0.1:8990/comfyui/start") as r:
+                    data = await r.json()
+                    return bool(data.get("ok"))
+        except Exception:
+            return False
+
     async def _comfy_generate(self, prompt) -> Optional[bytes]:
         base = self.valves.COMFYUI_URL.rstrip("/")
         graph = self._load_workflow()
         self._apply_params(graph, prompt)
         timeout = aiohttp.ClientTimeout(total=60)
         async with aiohttp.ClientSession(timeout=timeout) as s:
-            async with s.post(f"{base}/prompt",
-                              json={"prompt": graph, "client_id": uuid.uuid4().hex}) as r:
-                r.raise_for_status()
-                pid = (await r.json())["prompt_id"]
+            # Retry no /prompt: o ComfyUI pode aceitar /system_stats mas ainda
+            # não estar pronto para enfileirar prompts logo após subir.
+            pid = None
+            for attempt in range(10):
+                try:
+                    async with s.post(f"{base}/prompt",
+                                      json={"prompt": graph, "client_id": uuid.uuid4().hex}) as r:
+                        r.raise_for_status()
+                        pid = (await r.json())["prompt_id"]
+                    break
+                except Exception:
+                    if attempt == 9:
+                        raise
+                    await asyncio.sleep(3)
+            if pid is None:
+                raise RuntimeError("ComfyUI não aceitou o prompt após várias tentativas")
             deadline = time.time() + self.valves.IMAGE_TIMEOUT
             ref = None
             while time.time() < deadline:
@@ -277,6 +323,12 @@ class Pipe:
                 pass
 
     async def _image_flow(self, prompt, request, user, metadata, emit):
+        await self._emit(emit, "🎨 Verificando ComfyUI…", False)
+        ok = await self._ensure_comfyui()
+        if not ok:
+            await self._emit(emit, "ComfyUI offline", True)
+            yield f"*(O ComfyUI não está acessível em {self.valves.COMFYUI_URL} e não foi possível iniciá-lo automaticamente. Verifique a instalação.)*"
+            return
         await self._emit(emit, "🎨 Gerando imagem com Flux…", False)
         try:
             data = await self._comfy_generate(prompt)
@@ -290,15 +342,18 @@ class Pipe:
             return
         url = await self._save_image(data, request, user, metadata)
         await self._emit(emit, "Imagem pronta", True)
-        yield f"![{prompt}]({url})"
+        aviso = "\n\n*⚠️ [Leia o Termo de Responsabilidade](docs/TERMO-RESPONSABILIDADE-IMAGEM.md) antes de usar.* O Flux não tem restrições — você é responsável pelo conteúdo gerado."
+        yield f"![{prompt}]({url}){aviso}"
 
     # ----------------------------------------------------------- texto (Ollama)
     async def _text_flow(self, body, messages):
         payload = {"model": self.valves.TEXT_MODEL,
                    "messages": _ollama_messages(messages), "stream": True,
-                   "keep_alive": self.valves.KEEP_ALIVE}
+                   "keep_alive": self.valves.KEEP_ALIVE,
+                   "tools": []}  # garante que o Gemma não use tool-calling
+        payload["options"] = {"num_ctx": NUM_CTX}
         if body.get("temperature") is not None:
-            payload["options"] = {"temperature": body["temperature"]}
+            payload["options"]["temperature"] = body["temperature"]
         timeout = aiohttp.ClientTimeout(total=900)
         try:
             async with aiohttp.ClientSession(timeout=timeout) as s:

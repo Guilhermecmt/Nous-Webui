@@ -39,7 +39,7 @@ LOCK_PORT     = 8992          # mutex de processo unico (diferente do indexador 
 WATCH_SECONDS = 60            # conversas mudam com menos frequencia que arquivos
 OVERLAP_SECS  = 3600          # 1 h de sobreposicao: captura respostas que chegam depois
 MIN_TEXT_LEN  = 15            # ignora mensagens muito curtas ("ok", emojis, etc.)
-EMBED_MODEL   = os.environ.get("NOUS_EMBED_MODEL", "nomic-embed-text")
+EMBED_MODEL   = os.environ.get("NOUS_EMBED_MODEL", "granite-embedding:278m")
 OLLAMA_URL    = os.environ.get("OLLAMA_BASE_URL", "http://127.0.0.1:11434").rstrip("/")
 PARSER_VERSION = "2"          # bump => forca reindex (mudou a extracao de texto)
 
@@ -186,6 +186,24 @@ def open_hist(db_path):
     return cx
 
 
+def embed_ready():
+    """O modelo de embeddings esta' instalado? Sem ele, o ciclo espera: indexar
+    agora gravaria trechos sem vetor (so' palavra-chave) para sempre."""
+    if requests is None:
+        return False
+    try:
+        tags = requests.get(f"{OLLAMA_URL}/api/tags", timeout=5).json().get("models", [])
+    except Exception:
+        return False
+    want = EMBED_MODEL if ":" in EMBED_MODEL else EMBED_MODEL + ":latest"
+    return any(m.get("name") == want for m in tags)
+
+
+def doc_prefix(text):
+    """So' o nomic-embed-text pede prefixo de tarefa; os outros modelos nao."""
+    return ("search_document: " + text) if EMBED_MODEL.startswith("nomic") else text
+
+
 # ---- ciclo de indexacao -----------------------------------------------------
 
 def check_reindex_needed(hist_cx, log=print):
@@ -279,7 +297,7 @@ def index_once(hist_cx, webui_db, log=print):
                 embed_text = pair["user_msg"]
                 if pair["asst_msg"]:
                     embed_text += "\n" + pair["asst_msg"]
-                vec = _embed("search_document: " + embed_text)
+                vec = _embed(doc_prefix(embed_text))
                 blob = None
                 if vec is not None and np is not None:
                     blob = np.asarray(vec, dtype="float32").tobytes()
@@ -362,7 +380,8 @@ def main():
     try:
         while True:
             try:
-                index_once(cx, webui_db, log=lambda *_: None)
+                if embed_ready():
+                    index_once(cx, webui_db, log=lambda *_: None)
             except Exception as e:
                 print("Erro na indexacao do historico:", e)
             time.sleep(WATCH_SECONDS)

@@ -16,7 +16,8 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from typing import Optional
 
-ACCOUNT_FILE = ".email_account.json"
+ACCOUNT_FILE = ".email_account.json"     # formato antigo (uma conta so')
+ACCOUNTS_FILE = ".email_accounts.json"   # v2.8: {"padrao": user, "contas": {user: conta}}
 
 # Tabela de detecção automática de IMAP/SMTP por domínio.
 _AUTO = {
@@ -42,23 +43,36 @@ def _account_path() -> str:
     return os.path.join(_data_dir(), ACCOUNT_FILE)
 
 
-def load_account() -> Optional[dict]:
-    path = _account_path()
-    if not os.path.isfile(path):
-        return None
+def _accounts_path() -> str:
+    return os.path.join(_data_dir(), ACCOUNTS_FILE)
+
+
+def _read_store() -> dict:
+    """{"padrao": user, "contas": {user: conta}}. Le o arquivo antigo (uma conta)
+    se o novo ainda nao existe; a migracao acontece no proximo save."""
     try:
-        with open(path, encoding="utf-8") as f:
-            return json.load(f)
+        with open(_accounts_path(), encoding="utf-8") as f:
+            st = json.load(f)
+        if isinstance(st.get("contas"), dict):
+            return st
     except Exception:
-        return None
+        pass
+    try:
+        with open(_account_path(), encoding="utf-8") as f:
+            old = json.load(f)
+        if old.get("user"):
+            return {"padrao": old["user"], "contas": {old["user"]: old}}
+    except Exception:
+        pass
+    return {"padrao": None, "contas": {}}
 
 
-def save_account(data: dict) -> None:
-    path = _account_path()
+def _write_store(st: dict) -> None:
+    path = _accounts_path()
     os.makedirs(os.path.dirname(path), exist_ok=True)
     tmp = path + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False)
+        json.dump(st, f, ensure_ascii=False)
     os.replace(tmp, path)
     # Restringir permissões ao dono (best-effort no Windows)
     try:
@@ -66,14 +80,56 @@ def save_account(data: dict) -> None:
         os.chmod(path, stat.S_IRUSR | stat.S_IWUSR)
     except Exception:
         pass
-
-
-def delete_account() -> None:
-    path = _account_path()
-    try:
-        os.remove(path)
+    try:  # migrado: o arquivo antigo (com senha) nao fica para tras
+        os.remove(_account_path())
     except FileNotFoundError:
         pass
+
+
+def list_accounts() -> list[dict]:
+    st = _read_store()
+    return [{"user": u, "padrao": u == st.get("padrao"), "imap": a.get("imap", "")}
+            for u, a in st["contas"].items()]
+
+
+def load_account(account: Optional[str] = None) -> Optional[dict]:
+    st = _read_store()
+    user = account or st.get("padrao") or next(iter(st["contas"]), None)
+    return st["contas"].get(user) if user else None
+
+
+def save_account(data: dict) -> None:
+    st = _read_store()
+    st["contas"][data["user"]] = data
+    if not st.get("padrao") or st["padrao"] not in st["contas"]:
+        st["padrao"] = data["user"]
+    _write_store(st)
+
+
+def set_default(account: str) -> bool:
+    st = _read_store()
+    if account not in st["contas"]:
+        return False
+    st["padrao"] = account
+    _write_store(st)
+    return True
+
+
+def delete_account(account: Optional[str] = None) -> None:
+    """Remove uma conta (ou todas, sem argumento)."""
+    st = _read_store()
+    if account:
+        st["contas"].pop(account, None)
+        if st.get("padrao") == account:
+            st["padrao"] = next(iter(st["contas"]), None)
+    if account and st["contas"]:
+        _write_store(st)
+        return
+    for p in (_accounts_path(), _account_path()):
+        try:
+            os.remove(p)
+        except FileNotFoundError:
+            pass
 
 
 def detect_servers(email_addr: str) -> dict:
@@ -175,9 +231,12 @@ def test_connection(acc: dict) -> tuple[bool, str]:
         return False, str(e)
 
 
-def list_recent(n: int = 20) -> list[dict]:
+_LIST_HEADERS = "FROM TO SUBJECT DATE MESSAGE-ID LIST-UNSUBSCRIBE LIST-ID PRECEDENCE AUTO-SUBMITTED"
+
+
+def list_recent(n: int = 20, account: Optional[str] = None) -> list[dict]:
     """Retorna os n emails mais recentes da caixa de entrada."""
-    acc = load_account()
+    acc = load_account(account)
     if not acc:
         return []
     conn = None
@@ -191,18 +250,26 @@ def list_recent(n: int = 20) -> list[dict]:
         uids = uids[-n:][::-1]  # os mais recentes primeiro
         msgs = []
         for uid in uids:
-            _, raw = conn.uid("FETCH", uid, "(RFC822.SIZE BODY.PEEK[HEADER.FIELDS (FROM SUBJECT DATE MESSAGE-ID)])")
+            _, raw = conn.uid("FETCH", uid, f"(RFC822.SIZE FLAGS BODY.PEEK[HEADER.FIELDS ({_LIST_HEADERS})])")
             if not raw or not raw[0]:
                 continue
             header_bytes = raw[0][1] if isinstance(raw[0], tuple) else raw[0]
+            flags = raw[0][0].decode(errors="ignore") if isinstance(raw[0], tuple) else ""
             msg = email.message_from_bytes(header_bytes)
             snippet_uid = uid.decode()
             msgs.append({
                 "uid": snippet_uid,
+                "account": acc["user"],
                 "from": _decode_header_str(msg.get("From", "")),
+                "to": _decode_header_str(msg.get("To", "")),
                 "subject": _decode_header_str(msg.get("Subject", "(sem assunto)")),
                 "date": msg.get("Date", ""),
                 "message_id": msg.get("Message-ID", ""),
+                "unread": "\\Seen" not in flags,
+                # Newsletter/lista: RFC 2369 + cabecalhos de envio automatico
+                "list_unsubscribe": " ".join(str(msg.get("List-Unsubscribe", "")).split()),
+                "bulk": bool(msg.get("List-Id") or str(msg.get("Precedence", "")).lower() in ("bulk", "list")
+                             or str(msg.get("Auto-Submitted", "no")).lower() != "no"),
                 "snippet": "",
                 "category": None,
                 "summary": None,
@@ -214,39 +281,75 @@ def list_recent(n: int = 20) -> list[dict]:
         _imap_logout(conn)
 
 
-def get_message(uid: str) -> dict:
-    """Retorna o corpo completo de um email pelo UID."""
-    acc = load_account()
+def _fetch(uid: str, account: Optional[str]):
+    acc = load_account(account)
     if not acc:
-        return {"error": "sem conta configurada"}
-    conn = None
+        raise RuntimeError("sem conta configurada")
+    conn = _imap_connect(acc)
     try:
-        conn = _imap_connect(acc)
         conn.select("INBOX", readonly=True)
         # UID FETCH: o uid recebido de list_recent é um UID estável, não um
         # número de sequência — evita abrir/responder a mensagem errada.
         _, raw = conn.uid("FETCH", uid.encode(), "(RFC822)")
-        if not raw or not raw[0]:
-            return {"error": "mensagem não encontrada"}
-        msg = email.message_from_bytes(raw[0][1])
-        return {
-            "uid": uid,
-            "from": _decode_header_str(msg.get("From", "")),
-            "to": _decode_header_str(msg.get("To", "")),
-            "subject": _decode_header_str(msg.get("Subject", "")),
-            "date": msg.get("Date", ""),
-            "message_id": msg.get("Message-ID", ""),
-            "body": _get_body(msg),
-        }
-    except Exception as e:
-        return {"error": str(e)}
     finally:
         _imap_logout(conn)
+    if not raw or not raw[0] or not isinstance(raw[0], tuple):
+        raise RuntimeError("mensagem não encontrada")
+    return email.message_from_bytes(raw[0][1])
 
 
-def send_message(to: str, subject: str, body: str, in_reply_to: Optional[str] = None) -> tuple[bool, str]:
+def _parts(msg):
+    """[(indice, nome, tipo, bytes)] dos anexos e do convite (text/calendar)."""
+    out = []
+    for i, part in enumerate(msg.walk()):
+        if part.is_multipart():
+            continue
+        name = part.get_filename()
+        ct = part.get_content_type()
+        if name or ct == "text/calendar":
+            try:
+                data = part.get_payload(decode=True) or b""
+            except Exception:
+                data = b""
+            out.append((i, _decode_header_str(name or "convite.ics"), ct, data))
+    return out
+
+
+def get_message(uid: str, account: Optional[str] = None) -> dict:
+    """Retorna o corpo completo de um email pelo UID (+ anexos e convite)."""
+    try:
+        msg = _fetch(uid, account)
+    except Exception as e:
+        return {"error": str(e)}
+    parts = _parts(msg)
+    invite = next((d for _i, _n, ct, d in parts if ct == "text/calendar"), None)
+    return {
+        "uid": uid,
+        "from": _decode_header_str(msg.get("From", "")),
+        "to": _decode_header_str(msg.get("To", "")),
+        "subject": _decode_header_str(msg.get("Subject", "")),
+        "date": msg.get("Date", ""),
+        "message_id": msg.get("Message-ID", ""),
+        "body": _get_body(msg),
+        "list_unsubscribe": " ".join(str(msg.get("List-Unsubscribe", "")).split()),
+        "attachments": [{"idx": i, "name": n, "type": ct, "size": len(d)}
+                        for i, n, ct, d in parts if ct != "text/calendar"],
+        "invite": invite.decode("utf-8", errors="replace") if invite else None,
+    }
+
+
+def get_attachment(uid: str, idx: int, account: Optional[str] = None):
+    """(nome, tipo, bytes) do anexo de indice idx."""
+    for i, n, ct, d in _parts(_fetch(uid, account)):
+        if i == idx:
+            return n, ct, d
+    raise RuntimeError("anexo não encontrado")
+
+
+def send_message(to: str, subject: str, body: str, in_reply_to: Optional[str] = None,
+                 account: Optional[str] = None) -> tuple[bool, str]:
     """Envia email via SMTP. Só chamado após confirmação explícita do usuário."""
-    acc = load_account()
+    acc = load_account(account)
     if not acc:
         return False, "Sem conta configurada."
     server = None

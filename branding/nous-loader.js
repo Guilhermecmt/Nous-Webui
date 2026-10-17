@@ -120,7 +120,11 @@
 			'border-top:5px solid #c8962e;transition:transform .2s}' +
 			'#nous-monitor.nous-collapsed #nous-mon-caret{transform:rotate(180deg)}' +
 			'#nous-monitor.nous-collapsed #nous-mon-body{display:none}' +
-			'#nous-mon-body{padding:0 10px 10px}' +
+			'#nous-mon-body{padding:0 10px 10px;display:flex;flex-wrap:wrap;column-gap:5px}' +
+			'#nous-mon-body>*{flex:1 1 100%;min-width:0}' +
+			/* atalhos dos paineis (Baixar modelos, Agenda, Habilidades...) em 2 colunas */
+			'#nous-mon-body>button:not(#nous-mon-stop){flex:1 1 calc(50% - 5px);font-size:11px!important;' +
+			'padding:6px 3px!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
 			'.nous-mon-row{display:flex;justify-content:space-between;margin:6px 0 3px;opacity:.85}' +
 			'.nous-mon-val{font-variant-numeric:tabular-nums}' +
 			'.nous-mon-track{height:6px;border-radius:4px;background:rgba(255,255,255,.1);overflow:hidden}' +
@@ -206,7 +210,66 @@
 			'.nous-email-back:hover{text-decoration:underline}' +
 			'.nous-email-draft{width:100%;box-sizing:border-box;min-height:120px;padding:8px;' +
 			'background:rgba(255,255,255,.06);border:1px solid rgba(200,150,46,.25);' +
-			'border-radius:8px;color:#eee;font-size:12px;resize:vertical;margin:8px 0}';
+			'border-radius:8px;color:#eee;font-size:12px;resize:vertical;margin:8px 0}' +
+			/* galeria */
+			'#nous-gallery-open{width:100%;margin-top:5px;padding:6px;border:1px solid rgba(200,150,46,.25);' +
+			'border-radius:8px;cursor:pointer;background:transparent;color:#e7c069;' +
+			'font-weight:600;font-size:12px;transition:background .15s}' +
+			'#nous-gallery-open:hover{background:rgba(200,150,46,.12)}' +
+			'#nous-gal-ov{position:fixed;inset:0;z-index:10001;background:rgba(0,0,0,.6);' +
+			'display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)}' +
+			'#nous-gal-ov.nous-hidden{display:none}' +
+			'#nous-gal-box{width:700px;max-width:96vw;max-height:88vh;display:flex;flex-direction:column;' +
+			'font-family:Inter,system-ui,sans-serif;font-size:13px;color:#eee;' +
+			'background:rgba(18,18,22,.98);border:1px solid rgba(200,150,46,.4);' +
+			'border-radius:16px;box-shadow:0 16px 48px rgba(0,0,0,.6);overflow:hidden}' +
+			'#nous-gal-head{display:flex;align-items:center;gap:8px;padding:14px 16px 10px;' +
+			'border-bottom:1px solid rgba(255,255,255,.07);flex-shrink:0}' +
+			'#nous-gal-head span{flex:1;font-weight:700;font-size:15px;color:#e7c069}' +
+			'#nous-gal-count{font-size:11px;opacity:.5;font-weight:400}' +
+			'#nous-gal-close{background:none;border:none;color:#888;cursor:pointer;font-size:19px;line-height:1}' +
+			'#nous-gal-close:hover{color:#eee}' +
+			'#nous-gal-grid{flex:1;overflow-y:auto;padding:14px;' +
+			'display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px}' +
+			'#nous-gal-grid::-webkit-scrollbar{width:6px}' +
+			'#nous-gal-grid::-webkit-scrollbar-thumb{background:rgba(200,150,46,.3);border-radius:4px}' +
+			'.nous-gal-card{position:relative;border-radius:10px;overflow:hidden;' +
+			'background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);' +
+			'aspect-ratio:1/1;cursor:pointer;transition:border-color .15s}' +
+			'.nous-gal-card:hover{border-color:rgba(200,150,46,.5)}' +
+			'.nous-gal-card img{width:100%;height:100%;object-fit:cover;display:block}' +
+			'.nous-gal-card .nous-gal-overlay{position:absolute;inset:0;background:rgba(0,0,0,.0);' +
+			'display:flex;flex-direction:column;justify-content:flex-end;transition:background .2s}' +
+			'.nous-gal-card:hover .nous-gal-overlay{background:rgba(0,0,0,.55)}' +
+			'.nous-gal-actions{display:flex;gap:5px;padding:8px;opacity:0;transition:opacity .2s}' +
+			'.nous-gal-card:hover .nous-gal-actions{opacity:1}' +
+			'.nous-gal-btn{flex:1;padding:5px;border:none;border-radius:6px;font-size:11px;' +
+			'font-weight:600;cursor:pointer;transition:background .15s}' +
+			'.nous-gal-btn-trash{background:rgba(240,120,60,.25);color:#f08060}' +
+			'.nous-gal-btn-trash:hover{background:rgba(240,120,60,.5)}' +
+			'.nous-gal-btn-del{background:rgba(220,50,50,.25);color:#e06060}' +
+			'.nous-gal-btn-del:hover{background:rgba(220,50,50,.5)}' +
+			'.nous-gal-date{font-size:10px;opacity:.5;padding:0 8px 6px;' +
+			'overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
+			'.nous-gal-empty{grid-column:1/-1;text-align:center;padding:40px 20px;' +
+			'opacity:.5;font-size:13px;line-height:1.6}' +
+			'#nous-gal-lightbox{position:fixed;inset:0;z-index:10010;background:rgba(0,0,0,.92);' +
+			'display:flex;align-items:center;justify-content:center;overflow:hidden}' +
+			'#nous-gal-lightbox.nous-hidden{display:none}' +
+			'#nous-gal-lightbox img{max-width:90vw;max-height:90vh;border-radius:8px;' +
+			'box-shadow:0 8px 40px rgba(0,0,0,.6);cursor:zoom-in;transform-origin:center center;' +
+			'transition:transform .2s ease,border-radius .2s;user-select:none;-webkit-user-drag:none}' +
+			'#nous-gal-lightbox img.zoomed{cursor:zoom-out;border-radius:2px}' +
+			'#nous-gal-lb-close{position:absolute;top:16px;right:20px;background:none;border:none;' +
+			'color:#fff;font-size:28px;cursor:pointer;line-height:1;opacity:.7;z-index:1}' +
+			'#nous-gal-lb-close:hover{opacity:1}' +
+			'#nous-gal-lb-edit{position:absolute;top:16px;left:20px;padding:7px 13px;border-radius:9px;cursor:pointer;' +
+			'border:1px solid rgba(200,150,46,.6);background:rgba(18,18,22,.85);color:#e7c069;font-weight:600;font-size:13px}' +
+			'#nous-gal-filter{display:flex;gap:6px;flex-wrap:wrap;padding:0 16px 8px}' +
+			'.nous-gal-chip{padding:4px 10px;border-radius:99px;border:1px solid rgba(200,150,46,.35);background:transparent;' +
+			'color:#e7c069;font-size:11px;cursor:pointer}.nous-gal-chip.on{background:rgba(200,150,46,.25)}' +
+			'#nous-gal-lb-hint{position:absolute;bottom:18px;left:50%;transform:translateX(-50%);' +
+			'color:rgba(255,255,255,.35);font-size:11px;pointer-events:none;font-family:Inter,system-ui,sans-serif}';
 		var st = document.createElement('style');
 		st.id = 'nous-monitor-style';
 		st.textContent = css;
@@ -230,7 +293,8 @@
 			'<button id="nous-mon-stop" type="button" disabled>Parar modelos</button>' +
 			'<button id="nous-store-open" type="button">Baixar modelos</button>' +
 			'<button id="nous-voice-open" type="button">🎙 Ativar voz em PT-BR</button>' +
-			'<button id="nous-email-open" type="button">✉ Assistente de Email</button></div>';
+			'<button id="nous-email-open" type="button">✉ Assistente de Email</button>' +
+			'<button id="nous-gallery-open" type="button">🖼 Galeria de Imagens</button></div>';
 		document.body.appendChild(monEl);
 		monModels = monEl.querySelector('#nous-mon-models');
 		monBtn = monEl.querySelector('#nous-mon-stop');
@@ -254,6 +318,7 @@
 		monEl.querySelector('#nous-store-open').addEventListener('click', openStore);
 		monEl.querySelector('#nous-voice-open').addEventListener('click', openVoice);
 		monEl.querySelector('#nous-email-open').addEventListener('click', openEmail);
+		monEl.querySelector('#nous-gallery-open').addEventListener('click', openGallery);
 		monEl.classList.toggle('nous-collapsed', monCollapsed);
 	}
 
@@ -439,7 +504,16 @@
 			'#nous-mem-add{background:rgba(200,150,46,.18);border:1px solid rgba(200,150,46,.4);' +
 			'color:#e7c069;border-radius:8px;padding:6px 10px;font-size:12px;cursor:pointer;' +
 			'font-weight:600;white-space:nowrap}' +
-			'#nous-mem-add:hover{background:rgba(200,150,46,.32)}';
+			'#nous-mem-add:hover{background:rgba(200,150,46,.32)}' +
+			'.nous-mem-pin{opacity:.3;filter:grayscale(1)}.nous-mem-pin.on{opacity:1;filter:none}' +
+			'#nous-mem-tidy{width:100%;margin-top:8px;padding:6px;border:1px dashed rgba(200,150,46,.4);border-radius:8px;' +
+			'background:transparent;color:#e7c069;cursor:pointer;font-size:12px}' +
+			'#nous-mem-tidy:hover{background:rgba(200,150,46,.12)}' +
+			'.nous-tidy-g{display:flex;gap:7px;align-items:flex-start;padding:7px 4px;font-size:12px;line-height:1.45;' +
+			'border-bottom:1px solid rgba(255,255,255,.06);cursor:pointer}' +
+			'.nous-tidy-g i{opacity:.5;font-style:normal}' +
+			'.nous-tidy-row{display:flex;gap:6px;margin-top:8px}.nous-tidy-row button{flex:1;padding:6px;border-radius:8px;' +
+			'cursor:pointer;border:1px solid rgba(200,150,46,.4);background:rgba(200,150,46,.18);color:#e7c069;font-size:12px}';
 		var st = document.createElement('style');
 		st.id = 'nous-mem-style';
 		st.textContent = css;
@@ -636,12 +710,76 @@
 			item.innerHTML =
 				'<span class="nous-mem-text">' + _esc(m.text) + '</span>' +
 				'<div class="nous-mem-acts">' +
+				'<button class="nous-mem-pin' + (m.pinned ? ' on' : '') + '" type="button" title="' +
+				(m.pinned ? 'Fixada: entra em toda conversa. Clique para soltar' : 'Fixar: entra em toda conversa') +
+				'">&#x1F4CC;</button>' +
 				'<button class="nous-mem-edit" title="Editar" type="button">&#x270F;</button>' +
 				'<button class="nous-mem-del" title="Deletar" type="button">&#x1F5D1;</button>' +
 				'</div>';
+			item.querySelector('.nous-mem-pin').addEventListener('click', function() { pinMem(m.id, !m.pinned); });
 			item.querySelector('.nous-mem-edit').addEventListener('click', function() { startEdit(item, m); });
 			item.querySelector('.nous-mem-del').addEventListener('click', function() { deleteMem(m.id); });
 			list.appendChild(item);
+		});
+		if (mems.length >= 2) {
+			var tidy = document.createElement('button');
+			tidy.type = 'button';
+			tidy.id = 'nous-mem-tidy';
+			tidy.textContent = '🧹 Organizar memorias';
+			tidy.title = 'O Nous procura memorias repetidas ou que se contradizem e propoe juntar. Voce aprova antes.';
+			tidy.addEventListener('click', tidyMemories);
+			list.appendChild(tidy);
+		}
+	}
+
+	function pinMem(id, pinned) {
+		if (!_nousUid) return;
+		fetch(MEM_URL + '/memories/' + id + '/pin', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ user_id: _nousUid, pinned: pinned })
+		}).then(function() { loadMemories(); }).catch(loadMemories);
+	}
+
+	/* Faxina: o modelo PROPOE, o usuario marca o que aceita e aplica. */
+	function tidyMemories() {
+		var list = memPanelEl.querySelector('#nous-mem-list');
+		list.innerHTML = '<div class="nous-mem-loading">Lendo as memorias... (pode levar um minuto)</div>';
+		fetch(MEM_URL + '/memories/tidy', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ user_id: _nousUid, persona: _activePer })
+		}).then(function(r) { return r.json(); }).then(function(d) {
+			if (d.error) throw new Error(d.error);
+			var gs = d.grupos || [];
+			if (!gs.length) {
+				list.innerHTML = '<div class="nous-mem-empty">Tudo em ordem: nada repetido nem contraditorio.</div>';
+				setTimeout(loadMemories, 2500);
+				return;
+			}
+			list.innerHTML = '<div class="nous-mem-empty" style="text-align:left">Marque o que pode juntar:</div>' +
+				gs.map(function(g, i) {
+					return '<label class="nous-tidy-g"><input type="checkbox" checked data-g="' + i + '">' +
+						'<span><b>' + (g.motivo === 'contradicao' ? 'Contradicao' : 'Repetida') + ':</b> ' +
+						g.antes.map(_esc).join(' <i>+</i> ') + '<br>&rarr; <b>' + _esc(g.texto) + '</b></span></label>';
+				}).join('') +
+				'<div class="nous-tidy-row"><button type="button" id="nous-tidy-ok">Aplicar</button>' +
+				'<button type="button" id="nous-tidy-no">Cancelar</button></div>';
+			list.querySelector('#nous-tidy-no').addEventListener('click', loadMemories);
+			list.querySelector('#nous-tidy-ok').addEventListener('click', function() {
+				var sel = [];
+				list.querySelectorAll('[data-g]').forEach(function(cb) {
+					if (cb.checked) sel.push(gs[+cb.getAttribute('data-g')]);
+				});
+				fetch(MEM_URL + '/memories/tidy/apply', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ user_id: _nousUid, grupos: sel })
+				}).then(loadMemories, loadMemories);
+			});
+		}).catch(function(e) {
+			list.innerHTML = '<div class="nous-mem-empty">' + _esc(e.message || 'Nao consegui organizar agora.') + '</div>';
+			setTimeout(loadMemories, 4000);
 		});
 	}
 
@@ -755,6 +893,8 @@
 			'.nous-b-inst{background:rgba(58,208,122,.14);color:#5fd693;border:1px solid rgba(58,208,122,.4)}' +
 			'.nous-b-vis{background:rgba(110,150,230,.14);color:#9db8ee;border:1px solid rgba(110,150,230,.35)}' +
 			'.nous-store-desc{margin:5px 0 7px;font-size:12px;line-height:1.45;opacity:.8}' +
+			'.nous-store-speed{margin:-3px 0 7px;font-size:11px;opacity:.65}' +
+			'.nous-store-speed b{color:#e7c069;font-weight:600}' +
 			'.nous-store-row{display:flex;align-items:center;gap:10px}' +
 			'.nous-store-size{font-size:11px;opacity:.55;flex:1}' +
 			'.nous-store-btn{background:rgba(200,150,46,.18);border:1px solid rgba(200,150,46,.45);' +
@@ -828,6 +968,18 @@
 		return 'Sua maquina: ' + _esc(hw.gpu_name || 'GPU') + ' · ' + hw.vram_gb + ' GB de VRAM';
 	}
 
+	/* Estimativa do monitor (tokens/s) em palavras por segundo: ~0,7 palavra
+	 * por token em portugues. Abaixo de ~3 palavras/s a leitura fica arrastada. */
+	function _speedTxt(m) {
+		var s = m.speed;
+		if (!s || !s.tps) return '';
+		var wps = Math.max(1, Math.round(s.tps * 0.7));
+		var nivel = wps >= 15 ? 'rapido' : wps >= 6 ? 'bom' : wps >= 3 ? 'devagar' : 'muito lento';
+		var onde = s.onde === 'misto' ? ' · parte fica na RAM' : s.onde === 'cpu' ? ' · roda no processador' : '';
+		return '<div class="nous-store-speed">Velocidade estimada: <b>' + nivel + '</b> (~' + wps +
+			' palavras/s)' + onde + '</div>';
+	}
+
 	function renderStore(data) {
 		if (!storeOpen || !storeEl) return;
 		var hwEl = storeEl.querySelector('#nous-store-hw');
@@ -837,6 +989,9 @@
 			list.innerHTML =
 				'<div class="nous-store-empty">O motor de IA (Ollama) nao esta no ar.<br>' +
 				'Abra o Nous pelo atalho da area de trabalho — ele inicia tudo sozinho.</div>';
+			/* tenta de novo sozinho: o Ollama costuma subir alguns segundos depois */
+			if (storeTimer) clearTimeout(storeTimer);
+			storeTimer = setTimeout(storeRefresh, 3000);
 			return;
 		}
 		var models = data.models || [];
@@ -882,6 +1037,7 @@
 				'<div class="nous-store-top"><span class="nous-store-name">' + _esc(m.name) + '</span>' +
 				badges + '</div>' +
 				'<div class="nous-store-desc">' + _esc(m.desc) + '</div>' +
+				_speedTxt(m) +
 				'<div class="nous-store-row">' + rowHtml + '</div>';
 			list.appendChild(card);
 		});
@@ -892,13 +1048,18 @@
 		if (anyPulling) storeTimer = setTimeout(storeRefresh, 2000);
 	}
 
+	/* Resolve true se o download comecou (ou ja estava em andamento). */
 	function startPull(tag) {
-		if (!tag) return;
-		fetch(MON_URL + '/pull', {
+		if (!tag) return Promise.resolve(false);
+		return fetch(MON_URL + '/pull', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ model: tag })
-		}).catch(function () {}).then(function () { setTimeout(storeRefresh, 400); });
+		})
+			.then(function (r) { return r.json().catch(function () { return {}; }); })
+			.then(function (d) { return !!(d.started || d.reason === 'em andamento'); })
+			.catch(function () { return false; })
+			.then(function (ok) { setTimeout(storeRefresh, 400); return ok; });
 	}
 
 	/* ====================== Painel de Voz local (v2.3) ======================
@@ -1018,235 +1179,12 @@
 			.then(function () { setTimeout(voiceRefresh, 800); });
 	}
 
-	/* ========================== Painel Email ================================ */
-
-	var EMAIL_URL = 'http://127.0.0.1:8995';
-	var emailEl = null, emailOpen = false;
-	var _emailMsg = null;
-
-	function _esc2(s) {
-		return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-	}
-
-	function buildEmail() {
-		if (emailEl && document.body && document.body.contains(emailEl)) return;
-		if (!document.body) return;
-		emailEl = document.createElement('div');
-		emailEl.id = 'nous-email-ov';
-		emailEl.classList.add('nous-hidden');
-		emailEl.innerHTML =
-			'<div id="nous-email-box">' +
-			'<div id="nous-email-head"><span>✉ Assistente de Email</span>' +
-			'<button id="nous-email-close" type="button" title="Fechar">✕</button></div>' +
-			'<div id="nous-email-body"><div class="nous-email-msg" style="opacity:.6">Carregando…</div></div>' +
-			'</div>';
-		document.body.appendChild(emailEl);
-		emailEl.addEventListener('click', function (e) { if (e.target === emailEl) closeEmail(); });
-		emailEl.querySelector('#nous-email-close').addEventListener('click', closeEmail);
-	}
-
+	/* ========================== Painel Email ================================
+	 * O painel (contas, caixa, rascunhos, newsletters, contatos) mora em
+	 * branding/modules/email.js desde a v2.8; o botao do card Recursos o abre.
+	 * ======================================================================= */
 	function openEmail() {
-		buildEmail();
-		if (!emailEl) return;
-		emailOpen = true;
-		emailEl.classList.remove('nous-hidden');
-		_emailRefreshStatus();
-	}
-
-	function closeEmail() {
-		emailOpen = false;
-		if (emailEl) emailEl.classList.add('nous-hidden');
-	}
-
-	function _emailBody() {
-		return emailEl ? emailEl.querySelector('#nous-email-body') : null;
-	}
-
-	function _emailRefreshStatus() {
-		var body = _emailBody();
-		if (!body) return;
-		body.innerHTML = '<div class="nous-email-msg" style="opacity:.6">Verificando conta…</div>';
-		fetch(EMAIL_URL + '/status', { cache: 'no-store' })
-			.then(function (r) { return r.json(); })
-			.then(function (d) {
-				if (d.connected) { _emailLoadInbox(); }
-				else { _emailShowConnect(); }
-			})
-			.catch(function () { _emailShowConnect(); });
-	}
-
-	function _emailShowConnect() {
-		var body = _emailBody();
-		if (!body) return;
-		body.innerHTML =
-			'<p class="nous-email-hint">Conecte sua conta de email para triagem, resumos e rascunhos.<br>' +
-			'Tudo é processado pelo modelo local — seus emails nunca saem da máquina.</p>' +
-			'<div class="nous-email-form">' +
-			'<div class="nous-email-label">Endereço de email</div>' +
-			'<input id="nous-email-addr" type="email" placeholder="voce@gmail.com">' +
-			'<div class="nous-email-label">Senha de aplicativo <span style="opacity:.6">(não a senha principal)</span></div>' +
-			'<input id="nous-email-pwd" type="password" placeholder="xxxx xxxx xxxx xxxx">' +
-			'<div class="nous-email-hint">Gere em: Gmail → Segurança → Senhas de app.<br>Outlook → Conta → Segurança → Senha de app.</div>' +
-			'<button class="nous-email-btn" id="nous-email-conn-btn" type="button">Conectar</button>' +
-			'<div id="nous-email-conn-err" style="color:#f08080;font-size:11px;margin-top:6px"></div>' +
-			'</div>';
-		body.querySelector('#nous-email-conn-btn').addEventListener('click', _emailDoConnect);
-	}
-
-	function _emailDoConnect() {
-		var addr = (emailEl.querySelector('#nous-email-addr') || {}).value || '';
-		var pwd  = (emailEl.querySelector('#nous-email-pwd')  || {}).value || '';
-		var errEl = emailEl.querySelector('#nous-email-conn-err');
-		var btn  = emailEl.querySelector('#nous-email-conn-btn');
-		if (!addr || !pwd) { if (errEl) errEl.textContent = 'Preencha email e senha.'; return; }
-		if (btn) { btn.disabled = true; btn.textContent = 'Conectando…'; }
-		fetch(EMAIL_URL + '/connect', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ user: addr, app_password: pwd }),
-		})
-		.then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
-		.then(function (res) {
-			if (res.ok) { _emailLoadInbox(); }
-			else {
-				if (errEl) errEl.textContent = res.d.error || 'Falha na conexão.';
-				if (btn) { btn.disabled = false; btn.textContent = 'Conectar'; }
-			}
-		})
-		.catch(function () {
-			if (errEl) errEl.textContent = 'Serviço indisponível. Reinicie o Nous.';
-			if (btn) { btn.disabled = false; btn.textContent = 'Conectar'; }
-		});
-	}
-
-	function _emailLoadInbox() {
-		var body = _emailBody();
-		if (!body) return;
-		body.innerHTML = '<div class="nous-email-msg" style="opacity:.6">Carregando caixa de entrada e triagem…<br><span style="font-size:11px;opacity:.7">A IA local classifica cada email. Aguarde.</span></div>';
-		fetch(EMAIL_URL + '/inbox', { cache: 'no-store' })
-			.then(function (r) { return r.json(); })
-			.then(_emailRenderInbox)
-			.catch(function (e) {
-				var body = _emailBody();
-				if (body) body.innerHTML = '<div class="nous-email-msg" style="color:#f08080">Erro ao carregar inbox.</div>';
-			});
-	}
-
-	function _emailRenderInbox(msgs) {
-		var body = _emailBody();
-		if (!body) return;
-		if (!Array.isArray(msgs) || msgs.length === 0) {
-			body.innerHTML = '<div class="nous-email-msg" style="opacity:.7">Caixa de entrada vazia.</div>' +
-				'<button class="nous-email-btn nous-email-btn-danger" id="nous-email-disc">Desconectar conta</button>';
-			body.querySelector('#nous-email-disc').addEventListener('click', _emailDisconnect);
-			return;
-		}
-		var html = '<div style="font-size:11px;opacity:.6;margin-bottom:8px">Últimas ' + msgs.length + ' mensagens — clique para abrir</div>';
-		msgs.forEach(function (m) {
-			if (m.error) return;
-			html +=
-				'<div class="nous-email-row" data-uid="' + _esc2(m.uid) + '">' +
-				'<div class="nous-email-from">' + _esc2(m.from || '') + '</div>' +
-				'<div class="nous-email-subj">' + _esc2(m.subject || '') + '</div>' +
-				(m.category ? '<span class="nous-email-cat">' + _esc2(m.category) + '</span>' : '') +
-				(m.summary ? '<div class="nous-email-summ">' + _esc2(m.summary) + '</div>' : '') +
-				'</div>';
-		});
-		html += '<button class="nous-email-btn nous-email-btn-danger" id="nous-email-disc" type="button" style="margin-top:12px">Desconectar conta</button>';
-		body.innerHTML = html;
-		body.querySelectorAll('.nous-email-row').forEach(function (row) {
-			row.addEventListener('click', function () { _emailOpenMsg(row.dataset.uid); });
-		});
-		body.querySelector('#nous-email-disc').addEventListener('click', _emailDisconnect);
-	}
-
-	function _emailOpenMsg(uid) {
-		var body = _emailBody();
-		if (!body) return;
-		body.innerHTML = '<div class="nous-email-msg" style="opacity:.6">Carregando email e resumo…</div>';
-		fetch(EMAIL_URL + '/message?uid=' + encodeURIComponent(uid), { cache: 'no-store' })
-			.then(function (r) { return r.json(); })
-			.then(function (msg) {
-				_emailMsg = msg;
-				body.innerHTML =
-					'<button class="nous-email-back" id="nous-email-back" type="button">← Voltar à caixa</button>' +
-					'<div style="font-weight:600;margin-bottom:3px">' + _esc2(msg.subject || '') + '</div>' +
-					'<div style="font-size:11px;opacity:.7;margin-bottom:8px">De: ' + _esc2(msg.from || '') + ' · ' + _esc2(msg.date || '') + '</div>' +
-					(msg.summary ? '<div class="nous-email-msg" style="margin-bottom:10px"><b>Resumo:</b> ' + _esc2(msg.summary) + '</div>' : '') +
-					'<div style="font-size:11px;opacity:.7;max-height:180px;overflow-y:auto;margin-bottom:10px;line-height:1.5">' + _esc2((msg.body || '').slice(0, 1500)) + (msg.body && msg.body.length > 1500 ? '…' : '') + '</div>' +
-					'<button class="nous-email-btn" id="nous-email-draft-btn" type="button">✍ Rascunhar resposta</button>' +
-					'<div id="nous-email-draft-area" style="display:none">' +
-					'<div style="font-size:11px;opacity:.7;margin:8px 0 3px">Rascunho (edite antes de enviar):</div>' +
-					'<textarea class="nous-email-draft" id="nous-email-draft-txt"></textarea>' +
-					'<button class="nous-email-btn" id="nous-email-send-btn" type="button">Enviar resposta</button>' +
-					'<div id="nous-email-send-status" style="font-size:11px;margin-top:6px"></div>' +
-					'</div>';
-				body.querySelector('#nous-email-back').addEventListener('click', _emailLoadInbox);
-				body.querySelector('#nous-email-draft-btn').addEventListener('click', function () { _emailLoadDraft(uid); });
-			})
-			.catch(function () {
-				if (body) body.innerHTML = '<div class="nous-email-msg" style="color:#f08080">Erro ao carregar mensagem.</div>';
-			});
-	}
-
-	function _emailLoadDraft(uid) {
-		var btn = emailEl.querySelector('#nous-email-draft-btn');
-		if (btn) { btn.disabled = true; btn.textContent = 'Gerando rascunho…'; }
-		fetch(EMAIL_URL + '/draft?uid=' + encodeURIComponent(uid), { method: 'POST' })
-			.then(function (r) { return r.json(); })
-			.then(function (d) {
-				var area = emailEl.querySelector('#nous-email-draft-area');
-				var txt  = emailEl.querySelector('#nous-email-draft-txt');
-				if (area) area.style.display = 'block';
-				if (txt)  txt.value = d.draft || '';
-				if (btn) { btn.style.display = 'none'; }
-				var sendBtn = emailEl.querySelector('#nous-email-send-btn');
-				if (sendBtn) sendBtn.addEventListener('click', function () { _emailDoSend(uid); });
-			})
-			.catch(function () {
-				if (btn) { btn.disabled = false; btn.textContent = '✍ Rascunhar resposta'; }
-			});
-	}
-
-	function _emailDoSend(uid) {
-		var txt    = emailEl.querySelector('#nous-email-draft-txt');
-		var status = emailEl.querySelector('#nous-email-send-status');
-		var btn    = emailEl.querySelector('#nous-email-send-btn');
-		var draft  = txt ? txt.value.trim() : '';
-		if (!draft) { if (status) status.textContent = 'Escreva algo antes de enviar.'; return; }
-		if (!confirm('Enviar esta resposta por email?')) return;
-		if (btn) { btn.disabled = true; btn.textContent = 'Enviando…'; }
-		var msg = _emailMsg || {};
-		fetch(EMAIL_URL + '/send', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({
-				to: (function(f){ var m = (f||'').match(/<([^>]+)>/); return m ? m[1] : (f||'').trim(); })(msg.from),
-				subject: 'Re: ' + (msg.subject || ''),
-				body: draft,
-				in_reply_to: msg.message_id || null,
-			}),
-		})
-		.then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
-		.then(function (res) {
-			if (res.ok) {
-				if (status) { status.textContent = '✓ Email enviado!'; status.style.color = '#5fd693'; }
-				if (btn) { btn.disabled = true; btn.textContent = 'Enviado'; }
-			} else {
-				if (status) { status.textContent = res.d.error || 'Falha ao enviar.'; }
-				if (btn) { btn.disabled = false; btn.textContent = 'Enviar resposta'; }
-			}
-		})
-		.catch(function () {
-			if (status) status.textContent = 'Erro de rede.';
-			if (btn) { btn.disabled = false; btn.textContent = 'Enviar resposta'; }
-		});
-	}
-
-	function _emailDisconnect() {
-		if (!confirm('Desconectar a conta de email?')) return;
-		fetch(EMAIL_URL + '/disconnect', { method: 'POST' }).catch(function () {});
-		setTimeout(_emailShowConnect, 400);
+		if (window.NousEmail) window.NousEmail.open();
 	}
 
 	/* ====================== Assistente de primeiro uso ======================
@@ -1262,15 +1200,10 @@
 		var token = '';
 		try { token = localStorage.getItem('token') || ''; } catch (e) {}
 		if (!token) return;
-		fetch('http://127.0.0.1:11434/api/tags', { cache: 'no-store' })
+		fetch(MON_URL + '/installed', { cache: 'no-store' })
 			.then(function (r) { return r.json(); })
 			.then(function (data) {
-				var chat = (data.models || []).filter(function (m) {
-					var n = (m.name || '').toLowerCase();
-					return n.indexOf('embed') === -1 && n.indexOf('minilm') === -1 &&
-						n.indexOf('bge-') === -1 && n.indexOf('rerank') === -1;
-				});
-				if (!chat.length && !wizShown && !storeOpen) showWizard();
+				if (data.online && !(data.chat || []).length && !wizShown && !storeOpen) showWizard();
 			})
 			.catch(function () {});
 	}
@@ -1344,9 +1277,13 @@
 		zone.innerHTML =
 			'<button class="nous-store-btn" type="button" style="width:100%;padding:9px;font-size:13px">' +
 			'Baixar e comecar</button>';
-		zone.querySelector('button').addEventListener('click', function () {
-			startPull(rec.tag);
-			_wizProgress(rec);
+		zone.querySelector('button').addEventListener('click', function () { _wizStart(rec); });
+	}
+
+	function _wizStart(rec) {
+		_wizProgress(rec);
+		startPull(rec.tag).then(function (ok) {
+			if (!ok) _wizError(rec, 'Não consegui iniciar o download. Confira a internet e tente de novo.');
 		});
 	}
 
@@ -1358,13 +1295,20 @@
 			'<div class="nous-mon-track"><div class="nous-mon-fill" id="nous-wiz-fill" style="width:0%"></div></div>' +
 			'<span class="nous-store-ptxt" id="nous-wiz-ptxt">Iniciando o download... ' +
 			'Pode deixar esta janela aberta — avisamos quando terminar.</span></div>';
+		var none = 0;
 		function poll() {
 			fetch(MON_URL + '/pull/status?model=' + encodeURIComponent(rec.tag), { cache: 'no-store' })
 				.then(function (r) { return r.json(); })
 				.then(function (st) {
 					if (!wizEl) return;
-					if (st.status === 'pronto') { _wizDone(); return; }
+					if (st.status === 'pronto') { _wizDone(rec); return; }
 					if (st.status === 'erro') { _wizError(rec, st.error); return; }
+					/* "nenhum" = o monitor nao conhece este download (o pedido falhou
+					   ou o monitor reiniciou). Antes: "Baixando... 0%" para sempre. */
+					if (st.status === 'nenhum' && ++none >= 5) {
+						_wizError(rec, 'O download parou. Tente de novo.');
+						return;
+					}
 					var pct = Math.round((st.pct || 0) * 100);
 					var fill = wizEl.querySelector('#nous-wiz-fill');
 					var txt = wizEl.querySelector('#nous-wiz-ptxt');
@@ -1385,13 +1329,10 @@
 		zone.innerHTML =
 			'<span class="nous-store-err">' + _esc(msg || 'O download falhou.') + '</span>' +
 			'<button class="nous-store-btn" type="button">Tentar de novo</button>';
-		zone.querySelector('button').addEventListener('click', function () {
-			startPull(rec.tag);
-			_wizProgress(rec);
-		});
+		zone.querySelector('button').addEventListener('click', function () { _wizStart(rec); });
 	}
 
-	function _wizDone() {
+	function _wizDone(rec) {
 		var zone = wizEl && wizEl.querySelector('#nous-wiz-zone');
 		if (!zone) return;
 		zone.innerHTML =
@@ -1401,77 +1342,67 @@
 			'<button class="nous-store-btn" type="button" style="width:100%;padding:9px;font-size:13px">' +
 			'Comecar a conversar</button></div>';
 		zone.querySelector('button').addEventListener('click', function () {
-			location.reload();
+			/* Abre o chat JA com o modelo novo: com reload puro o Open WebUI podia
+			   escolher o primeiro da lista - as vezes o de embeddings, que nao conversa. */
+			location.href = '/?model=' + encodeURIComponent(rec.tag);
 		});
 	}
 
-	/* ====================== Link "Criar conta" na tela de auth ====================== *
-	 * O Open WebUI esconde o botao "Criar conta" quando ENABLE_SIGNUP=False ou quando  *
-	 * o admin ja' existe. Injetamos um link discreto para /auth?mode=signup para que   *
-	 * novos usuarios possam se cadastrar sem terminal.                                  *
-	 * ================================================================================= */
+	/* ====================== Dica de cadastro na tela de login ====================== *
+	 * O Open WebUI fecha o cadastro depois que a primeira conta (admin) e' criada, e  *
+	 * novas contas nascem "pendentes". O antigo link "Criar conta" levava a          *
+	 * /auth?mode=signup, parametro que o Open WebUI ignora: voltava ao login.        *
+	 * Agora: so' na tela de LOGIN (sem campo de nome), explica o caminho real.       *
+	 * ============================================================================== */
 	function onAuth() {
 		return location.pathname === '/auth';
 	}
 
 	function ensureSignupLink() {
-		if (!onAuth()) {
-			var old = document.getElementById('nous-signup-link');
-			if (old) old.remove();
-			return;
-		}
-		/* Nao injeta em modo signup (o formulario ja' esta' aberto) */
-		if (location.search.indexOf('mode=signup') !== -1) {
-			var old2 = document.getElementById('nous-signup-link');
-			if (old2) old2.remove();
-			return;
-		}
-		if (document.getElementById('nous-signup-link')) return;
-		/* Aguarda o formulario de login estar no DOM */
-		var form = document.querySelector('form');
-		if (!form) return;
-		var link = document.createElement('p');
-		link.id = 'nous-signup-link';
-		link.style.cssText =
-			'text-align:center;margin-top:14px;font-size:13px;' +
+		var old = document.getElementById('nous-signup-link');
+		var form = onAuth() ? document.querySelector('form') : null;
+		/* Cadastro aberto (1a conta = administrador) tem campo de nome: sem dica */
+		var isLogin = form && !form.querySelector('input[autocomplete="name"]') &&
+			form.querySelector('input[type="password"]');
+		if (!isLogin) { if (old) old.remove(); return; }
+		if (old) return;
+		var hint = document.createElement('p');
+		hint.id = 'nous-signup-link';
+		hint.style.cssText =
+			'text-align:center;margin-top:14px;font-size:13px;line-height:1.5;' +
 			'font-family:Inter,system-ui,sans-serif;color:#888;';
-		link.innerHTML =
-			'Primeiro acesso? <a href="/auth?mode=signup" ' +
-			'style="color:#c8962e;text-decoration:none;font-weight:600;" ' +
-			'onmouseover="this.style.textDecoration=\'underline\'" ' +
-			'onmouseout="this.style.textDecoration=\'none\'">' +
-			'Criar conta</a>';
-		/* Insere depois do form */
-		form.parentNode.insertBefore(link, form.nextSibling);
+		hint.innerHTML =
+			'Novo por aqui? Peça a quem administra o Nous para criar sua conta em ' +
+			'<b style="color:#c8962e;font-weight:600">Painel Admin › Usuários</b>.';
+		form.parentNode.insertBefore(hint, form.nextSibling);
 	}
 
 	/* ====================== Capability gate (badge VRAM nos modelos) ==================
 	 * Mostra um badge colorido ao lado de cada modelo no dropdown do chat:
-	 *   🟢 verde  — cabe confortavelmente na VRAM disponivel (< 85%)
+	 *   🟢 verde  — cabe confortavelmente na VRAM da placa (< 85%)
 	 *   🟡 amarelo — cabe mas apertado (85-100% da VRAM)
-	 *   🔴 vermelho — nao cabe (maior que a VRAM disponivel)
+	 *   🔴 vermelho — nao cabe (maior que a VRAM da placa)
 	 *   ⚪ cinza   — sem informacao de tamanho
-	 * Dados: /api/tags do Ollama (tamanho) + /stats do monitor (VRAM livre).
+	 * Dados: /installed (tamanho) + /stats (VRAM total), ambos do monitor.
 	 * ================================================================================= */
 	var _capModels  = {};   /* { modelName: sizeBytes } */
-	var _capVramFree = -1;  /* bytes livres; -1 = nao inicializado */
+	/* VRAM TOTAL da placa. Comparar com a livre deixava vermelho justamente o
+	   modelo que ja estava carregado (ele mesmo ocupa a VRAM). -1 = sem dado. */
+	var _capVramTotal = -1;
 	var _capLastFetch = 0;
 
 	function _capRefresh() {
 		var now = Date.now();
 		if (now - _capLastFetch < 10000) return; /* atualiza a cada 10s */
 		_capLastFetch = now;
-		/* VRAM livre via monitor */
 		fetch(MON_URL + '/stats', { cache: 'no-store' })
 			.then(function(r) { return r.json(); })
 			.then(function(s) {
 				var g = s.gpu || {};
-				if (g.ded_total && g.ded_used != null) {
-					_capVramFree = g.ded_total - g.ded_used;
-				}
+				if (g.ded_total) _capVramTotal = g.ded_total;
 			}).catch(function() {});
-		/* Tamanhos dos modelos via Ollama */
-		fetch('http://127.0.0.1:11434/api/tags', { cache: 'no-store' })
+		/* Tamanhos dos modelos via monitor (que consulta o Ollama) */
+		fetch(MON_URL + '/installed', { cache: 'no-store' })
 			.then(function(r) { return r.json(); })
 			.then(function(data) {
 				var models = data.models || [];
@@ -1486,7 +1417,7 @@
 	}
 
 	function _capBadge(modelName) {
-		if (_capVramFree < 0) return '';
+		if (_capVramTotal < 0) return '';
 		/* Tenta match exato, depois base (sem tag), depois prefixo */
 		var sz = _capModels[modelName];
 		if (!sz) {
@@ -1494,7 +1425,7 @@
 			sz = _capModels[base];
 		}
 		if (!sz) return '';
-		var ratio = sz / (_capVramFree || 1);
+		var ratio = sz / (_capVramTotal || 1);
 		var dot, tip;
 		if (ratio <= 0.85)      { dot = '#3ad07a'; tip = 'Cabe bem na VRAM'; }
 		else if (ratio <= 1.0)  { dot = '#f5a623'; tip = 'Cabe (VRAM apertada)'; }
@@ -1543,6 +1474,340 @@
 		setInterval(_capApply, 1000);
 	}
 
+	/* ====================== "O que ha de novo" do Open WebUI ======================
+	 * Logo apos criar a conta, o Open WebUI abria as notas de versao EM INGLES, com
+	 * links do GitHub - a primeira coisa que o leigo via. O modal aparece quando a
+	 * conta e' admin e settings.version != versao do servidor. Aqui: fechamos o
+	 * modal (o fechar grava a versao) e desligamos showChangelog na conta, para
+	 * nao voltar nem depois de um upgrade.
+	 * =============================================================================== */
+	var CHANGELOG_H3 = /^v\d+\.\d+\.\d+ - \d{4}-\d{2}-\d{2}$/;
+	var _clPrefDone = false;
+
+	function suppressChangelog() {
+		var hs = document.querySelectorAll('h3');
+		for (var i = 0; i < hs.length; i++) {
+			if (!CHANGELOG_H3.test((hs[i].textContent || '').trim())) continue;
+			/* sobe ate o cartao do modal: o X e' o primeiro botao do cabecalho */
+			var box = hs[i].parentElement;
+			while (box && box !== document.body && !box.querySelector('h2 + button, h2 ~ button')) box = box.parentElement;
+			var close = box && box !== document.body && box.querySelector('h2 ~ button');
+			if (close) { close.click(); break; }
+		}
+		if (_clPrefDone) return;
+		var token = '';
+		try { token = localStorage.getItem('token') || ''; } catch (e) {}
+		if (!token) return;
+		_clPrefDone = true;
+		var H = { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' };
+		/* depois do fechar do modal salvar a versao, para nao disputar a escrita */
+		setTimeout(function () {
+			fetch('/api/v1/users/user/settings', { headers: H })
+				.then(function (r) { return r.ok ? r.json() : null; })
+				.then(function (cur) {
+					var ui = (cur && cur.ui) || {};
+					if (ui.showChangelog === false) return;
+					ui.showChangelog = false;
+					var body = cur || {};
+					body.ui = ui;
+					return fetch('/api/v1/users/user/settings/update',
+						{ method: 'POST', headers: H, body: JSON.stringify(body) });
+				})
+				.catch(function () {});
+		}, 3000);
+	}
+
+	/* ========================== Galeria de Imagens ========================== */
+
+	/* Injeta item "Galeria" na sidebar lateral, entre /workspace e /notes */
+	var _galNavInjected = false;
+	function ensureGalleryNavItem() {
+		if (_galNavInjected) return;
+		/* âncora: o link /notes já renderizado pelo Svelte */
+		var notesLink = document.querySelector('a[href="/notes"]');
+		if (!notesLink) return;
+		/* parentElement direto = div.flex.items-center.w-full (wrapper do item) */
+		var wrapper = notesLink.parentElement;
+		if (!wrapper || !wrapper.parentElement) return;
+		/* evita duplicar */
+		if (wrapper.parentElement.querySelector('#nous-gal-nav')) return;
+		_galNavInjected = true;
+
+		var item = document.createElement('div');
+		item.id = 'nous-gal-nav';
+		item.className = 'flex items-center w-full';
+		item.innerHTML =
+			'<a href="javascript:void(0)" id="nous-gal-nav-link" draggable="false" ' +
+			'class="flex flex-1 rounded-xl py-1.5 px-3 hover:bg-gray-50 dark:hover:bg-gray-800 transition cursor-pointer select-none">' +
+			'<div class="self-center mr-3">' +
+			'<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-5">' +
+			'<path stroke-linecap="round" stroke-linejoin="round" ' +
+			'd="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z"/>' +
+			'</svg></div>' +
+			'<div class="self-center truncate">Galeria</div>' +
+			'</a>';
+
+		/* insere ANTES do wrapper do /notes */
+		wrapper.parentElement.insertBefore(item, wrapper);
+		item.querySelector('#nous-gal-nav-link').addEventListener('click', openGallery);
+	}
+
+	var galEl = null, galLbEl = null, galOpen = false;
+
+	function buildGallery() {
+		if (galEl && document.body && document.body.contains(galEl)) return;
+		if (!document.body) return;
+		galEl = document.createElement('div');
+		galEl.id = 'nous-gal-ov';
+		galEl.classList.add('nous-hidden');
+		galEl.innerHTML =
+			'<div id="nous-gal-box">' +
+			'<div id="nous-gal-head">' +
+			'<span>🖼 Galeria de Imagens <small id="nous-gal-count"></small></span>' +
+			'<button id="nous-gal-close" type="button" aria-label="Fechar">&#x2715;</button>' +
+			'</div>' +
+			'<div id="nous-gal-filter"></div>' +
+			'<div id="nous-gal-grid"><div class="nous-gal-empty">Carregando...</div></div>' +
+			'</div>';
+		document.body.appendChild(galEl);
+		galEl.addEventListener('click', function (e) { if (e.target === galEl) closeGallery(); });
+		galEl.querySelector('#nous-gal-close').addEventListener('click', closeGallery);
+
+		/* lightbox */
+		galLbEl = document.createElement('div');
+		galLbEl.id = 'nous-gal-lightbox';
+		galLbEl.classList.add('nous-hidden');
+		galLbEl.innerHTML =
+			'<button id="nous-gal-lb-close" type="button">&#x2715;</button>' +
+			'<img id="nous-gal-lb-img" src="" alt="">' +
+			'<button id="nous-gal-lb-edit" type="button">✎ Editar esta imagem</button>' +
+			'<div id="nous-gal-lb-hint">Scroll para ampliar · Esc para fechar</div>';
+		document.body.appendChild(galLbEl);
+		galLbEl.addEventListener('click', function (e) { if (e.target === galLbEl) closeLightbox(); });
+		galLbEl.querySelector('#nous-gal-lb-close').addEventListener('click', closeLightbox);
+		galLbEl.querySelector('#nous-gal-lb-edit').addEventListener('click', function (e) {
+			e.stopPropagation();
+			editImage(galLbEl.dataset.id);
+		});
+
+		/* zoom com scroll */
+		var lbImg = galLbEl.querySelector('#nous-gal-lb-img');
+		var lbScale = 1, lbMinScale = 1, lbMaxScale = 4;
+		function _lbApplyZoom(newScale) {
+			lbScale = Math.min(lbMaxScale, Math.max(lbMinScale, newScale));
+			lbImg.style.transform = lbScale > 1 ? 'scale(' + lbScale + ')' : '';
+			lbImg.classList.toggle('zoomed', lbScale > 1);
+		}
+		galLbEl.addEventListener('wheel', function (e) {
+			e.preventDefault();
+			_lbApplyZoom(lbScale * (e.deltaY < 0 ? 1.15 : 0.87));
+		}, { passive: false });
+		/* clique na imagem: toggle zoom 1x / 2x */
+		lbImg.addEventListener('click', function (e) {
+			e.stopPropagation();
+			_lbApplyZoom(lbScale > 1 ? lbMinScale : 2);
+		});
+		/* Esc fecha */
+		document.addEventListener('keydown', function (e) {
+			if (e.key === 'Escape' && galLbEl && !galLbEl.classList.contains('nous-hidden')) closeLightbox();
+		});
+		galLbEl._resetZoom = function () { lbScale = 1; lbImg.style.transform = ''; lbImg.classList.remove('zoomed'); };
+	}
+
+	function openGallery() {
+		buildGallery();
+		if (!galEl) return;
+		galOpen = true;
+		galEl.classList.remove('nous-hidden');
+		loadGallery();
+	}
+
+	function closeGallery() {
+		galOpen = false;
+		if (galEl) galEl.classList.add('nous-hidden');
+		closeLightbox();
+	}
+
+	function closeLightbox() {
+		if (galLbEl) {
+			galLbEl.classList.add('nous-hidden');
+			if (galLbEl._resetZoom) galLbEl._resetZoom();
+		}
+	}
+
+	function openLightbox(id) {
+		buildGallery();
+		if (!galLbEl) return;
+		if (galLbEl._resetZoom) galLbEl._resetZoom();
+		var img = galLbEl.querySelector('#nous-gal-lb-img');
+		if (img) img.src = MON_URL + '/gallery/image/' + encodeURIComponent(id);
+		galLbEl.dataset.id = id;
+		galLbEl.classList.remove('nous-hidden');
+	}
+
+	function _galFmt(ts) {
+		if (!ts) return '';
+		try {
+			var d = new Date(ts * 1000);
+			return d.toLocaleDateString('pt-BR') + ' ' +
+				d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+		} catch (e) { return ''; }
+	}
+
+	function _galSize(bytes) {
+		if (!bytes) return '';
+		if (bytes >= 1048576) return (bytes / 1048576).toFixed(1) + ' MB';
+		return Math.round(bytes / 1024) + ' KB';
+	}
+
+	function loadGallery() {
+		if (!galEl) return;
+		var grid = galEl.querySelector('#nous-gal-grid');
+		if (grid) grid.innerHTML = '<div class="nous-gal-empty">Carregando...</div>';
+		fetch(MON_URL + '/gallery', { cache: 'no-store' })
+			.then(function (r) { return r.json(); })
+			.then(renderGallery)
+			.catch(function () {
+				if (grid) grid.innerHTML =
+					'<div class="nous-gal-empty">Monitor offline.<br>Abra o Nous pelo atalho e tente de novo.</div>';
+			});
+	}
+
+	/* Abre a imagem no Editor de fotos (branding/modules/editor.js). */
+	function editImage(id) {
+		if (!window.NousEditor || !id) return;
+		closeGallery();
+		window.NousEditor.openUrl(MON_URL + '/gallery/image/' + encodeURIComponent(id), 'imagem');
+	}
+
+	function galMeta(id, patch) {
+		return fetch(MON_URL + '/gallery/meta', {
+			method: 'POST', headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify(Object.assign({ id: id }, patch))
+		}).then(loadGallery, loadGallery);
+	}
+
+	var galFilter = '';  /* '' = todas, '*' = favoritas, outro = nome do album */
+
+	function renderFilter(data) {
+		var bar = galEl.querySelector('#nous-gal-filter');
+		if (!bar) return;
+		var opts = [['', 'Todas'], ['*', '★ Favoritas']].concat(((data && data.albums) || []).map(function (a) { return [a, '📁 ' + a]; }));
+		bar.innerHTML = opts.map(function (o) {
+			return '<button type="button" class="nous-gal-chip' + (o[0] === galFilter ? ' on' : '') + '" data-f="' + _esc(o[0]) + '">' + _esc(o[1]) + '</button>';
+		}).join('');
+		bar.querySelectorAll('[data-f]').forEach(function (b) {
+			b.addEventListener('click', function () { galFilter = b.getAttribute('data-f'); renderGallery(data); });
+		});
+	}
+
+	function renderGallery(data) {
+		if (!galEl) return;
+		var grid = galEl.querySelector('#nous-gal-grid');
+		var count = galEl.querySelector('#nous-gal-count');
+		renderFilter(data);
+		var images = ((data && data.images) || []).filter(function (img) {
+			return !galFilter || (galFilter === '*' ? img.fav : img.album === galFilter);
+		});
+		if (count) count.textContent = images.length ? '(' + images.length + ')' : '';
+		if (!images.length) {
+			grid.innerHTML = '<div class="nous-gal-empty">Nenhuma imagem gerada ainda.<br>' +
+				'Diga ao Nous: <em>"crie uma imagem de..."</em></div>';
+			return;
+		}
+		grid.innerHTML = '';
+		images.forEach(function (img) {
+			var card = document.createElement('div');
+			card.className = 'nous-gal-card';
+			card.dataset.id = img.id;
+			var thumbSrc = img.exists
+				? MON_URL + '/gallery/image/' + encodeURIComponent(img.id)
+				: '';
+			var thumbHtml = thumbSrc
+				? '<img src="' + thumbSrc + '" alt="" loading="lazy" onerror="this.parentElement.style.background=\'rgba(255,255,255,.08)\'">'
+				: '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;opacity:.3;font-size:28px">🖼</div>';
+			card.innerHTML =
+				thumbHtml +
+				'<div class="nous-gal-overlay">' +
+				'<div class="nous-gal-actions">' +
+				'<button class="nous-gal-btn nous-gal-btn-fav" type="button" title="Favorita">' + (img.fav ? '★' : '☆') + '</button>' +
+				'<button class="nous-gal-btn nous-gal-btn-alb" type="button" title="Por num album">📁</button>' +
+				'<button class="nous-gal-btn nous-gal-btn-edit" type="button" title="Editar">✎</button>' +
+				'<button class="nous-gal-btn nous-gal-btn-trash" type="button" title="Mover para Lixeira">🗑 Lixeira</button>' +
+				'<button class="nous-gal-btn nous-gal-btn-del" type="button" title="Apagar definitivamente">✕ Apagar</button>' +
+				'</div>' +
+				'<div class="nous-gal-date">' + _galFmt(img.created_at) +
+				(img.size ? ' · ' + _galSize(img.size) : '') + '</div>' +
+				'</div>';
+
+			/* clique no card (exceto botões) abre lightbox */
+			if (img.exists) card.addEventListener('click', function (e) {
+				if (e.target.closest('.nous-gal-btn')) return;
+				openLightbox(img.id);
+			});
+
+			card.querySelector('.nous-gal-btn-fav').addEventListener('click', function (e) {
+				e.stopPropagation();
+				galMeta(img.id, { fav: !img.fav });
+			});
+			card.querySelector('.nous-gal-btn-alb').addEventListener('click', function (e) {
+				e.stopPropagation();
+				var nome = prompt('Nome do album (vazio tira do album):', img.album || '');
+				if (nome !== null) galMeta(img.id, { album: nome });
+			});
+			card.querySelector('.nous-gal-btn-edit').addEventListener('click', function (e) {
+				e.stopPropagation();
+				editImage(img.id);
+			});
+			card.querySelector('.nous-gal-btn-trash').addEventListener('click', function (e) {
+				e.stopPropagation();
+				deleteImage(img.id, false, card);
+			});
+			card.querySelector('.nous-gal-btn-del').addEventListener('click', function (e) {
+				e.stopPropagation();
+				if (!confirm('Apagar permanentemente esta imagem?\nEsta ação não pode ser desfeita.')) return;
+				deleteImage(img.id, true, card);
+			});
+			grid.appendChild(card);
+		});
+	}
+
+	function deleteImage(id, permanent, card) {
+		/* feedback imediato: esmaece o card */
+		if (card) { card.style.opacity = '0.35'; card.style.pointerEvents = 'none'; }
+		fetch(MON_URL + '/gallery/delete', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ id: id, permanent: permanent })
+		})
+		.then(function (r) { return r.json(); })
+		.then(function (res) {
+			if (res.ok) {
+				if (card) card.remove();
+				/* atualiza contador */
+				var grid = galEl && galEl.querySelector('#nous-gal-grid');
+				var count = galEl && galEl.querySelector('#nous-gal-count');
+				if (grid && count) {
+					var remaining = grid.querySelectorAll('.nous-gal-card').length;
+					count.textContent = remaining ? '(' + remaining + ')' : '';
+					if (!remaining) {
+						grid.innerHTML = '<div class="nous-gal-empty">Nenhuma imagem gerada ainda.<br>' +
+							'Diga ao Nous: <em>"crie uma imagem de..."</em></div>';
+					}
+				}
+			} else {
+				if (card) { card.style.opacity = '1'; card.style.pointerEvents = ''; }
+				alert('Não foi possível apagar a imagem: ' + (res.error || 'erro desconhecido'));
+			}
+		})
+		.catch(function () {
+			if (card) { card.style.opacity = '1'; card.style.pointerEvents = ''; }
+			alert('Erro de comunicação com o monitor. Tente de novo.');
+		});
+	}
+
+	/* ======================================================================== */
+
 	function tick() {
 		ensureToggle();
 		if (btn) btn.style.display = onHome() ? 'flex' : 'none';
@@ -1551,6 +1816,14 @@
 		ensureTopWordmark();
 		ensureMemBtn();
 		ensureSignupLink();
+		suppressChangelog();
+		/* Tela de login/cadastro: nada de VRAM, modelos ou memoria antes de entrar */
+		var auth = onAuth();
+		if (monEl) monEl.style.display = auth ? 'none' : '';
+		if (memBtnEl) memBtnEl.style.display = auth ? 'none' : '';
+		/* re-injeta se o Svelte re-renderizou a sidebar (troca de rota) */
+		if (!document.getElementById('nous-gal-nav')) _galNavInjected = false;
+		ensureGalleryNavItem();
 	}
 
 	function start() {
@@ -1565,6 +1838,11 @@
 		setTimeout(wizCheck, 3000);
 		setInterval(wizCheck, 12000);
 	}
+
+	/* Utilitarios para os modulos em branding/modules/*.js (agenda, skills...),
+	 * que o apply_branding.py concatena depois deste arquivo no loader.js. */
+	window.NousUI = { loadUserId: loadUserId, esc: _esc, onAuth: onAuth, openStore: openStore,
+		openMemory: function () { if (!memOpen) toggleMemPanel(); }, setTheme: setTheme, openGallery: openGallery };
 
 	if (document.readyState === 'loading') {
 		document.addEventListener('DOMContentLoaded', start);

@@ -9,6 +9,9 @@ Memorias:
   POST /memories                          { user_id, text, persona? } -> adiciona
   PUT  /memories/{id}                     { user_id, text }           -> edita texto
   DELETE /memories/{id}?user_id=...       deleta memoria
+  POST /memories/{id}/pin                 { user_id, pinned } -> fixa (entra em toda conversa)
+  POST /memories/tidy                     { user_id, persona? } -> PROPOE juntar repetidas/contradicoes
+  POST /memories/tidy/apply               { user_id, grupos:[{ids, texto}] } -> aplica o que o usuario aprovou
 
 Personas:
   GET  /personas                          dicionario de todas as personas
@@ -138,28 +141,161 @@ def list_memories(user_id, persona=None):
         return []
     try:
         cols = {r[1] for r in cx.execute("PRAGMA table_info(memories)").fetchall()}
+        pin = "COALESCE(pinned, 0)" if "pinned" in cols else "0"
+        order = f"ORDER BY {pin} DESC, created_at DESC"
         if "persona" in cols:
             if persona and persona != "all":
                 rows = cx.execute(
-                    "SELECT id, text, persona, created_at FROM memories "
-                    "WHERE user_id=? AND (persona=? OR persona IS NULL) "
-                    "ORDER BY created_at DESC",
+                    f"SELECT id, text, persona, created_at, {pin} FROM memories "
+                    "WHERE user_id=? AND (persona=? OR persona IS NULL) " + order,
                     (user_id, persona),
                 ).fetchall()
             else:
                 rows = cx.execute(
-                    "SELECT id, text, persona, created_at FROM memories "
-                    "WHERE user_id=? ORDER BY created_at DESC",
+                    f"SELECT id, text, persona, created_at, {pin} FROM memories "
+                    "WHERE user_id=? " + order,
                     (user_id,),
                 ).fetchall()
         else:
             rows = cx.execute(
-                "SELECT id, text, 'default', created_at FROM memories "
+                "SELECT id, text, 'default', created_at, 0 FROM memories "
                 "WHERE user_id=? ORDER BY created_at DESC",
                 (user_id,),
             ).fetchall()
-        return [{"id": r[0], "text": r[1], "persona": r[2] or "default", "created_at": r[3]}
-                for r in rows]
+        return [{"id": r[0], "text": r[1], "persona": r[2] or "default", "created_at": r[3],
+                 "pinned": bool(r[4])} for r in rows]
+    finally:
+        cx.close()
+
+
+def set_pinned(mem_id, user_id, pinned):
+    cx = _conn()
+    if cx is None:
+        return False
+    try:
+        try:
+            cx.execute("ALTER TABLE memories ADD COLUMN pinned INTEGER DEFAULT 0")
+        except Exception:
+            pass
+        cx.execute("UPDATE memories SET pinned=? WHERE id=? AND user_id=?",
+                   (1 if pinned else 0, mem_id, user_id))
+        cx.commit()
+        return cx.execute("SELECT changes()").fetchone()[0] > 0
+    finally:
+        cx.close()
+
+
+# ---- faxina: o modelo PROPOE juntar repetidas/contraditorias; o usuario aprova ----
+
+OLLAMA_URL = os.environ.get("OLLAMA_BASE_URL", "http://127.0.0.1:11434").rstrip("/")
+NUM_CTX = int(os.environ.get("NOUS_NUM_CTX", "16384"))
+_EMBED = ("embed", "nomic", "minilm", "bge-", "e5-", "gte-")
+EMBED_MODEL = os.environ.get("NOUS_EMBED_MODEL", "granite-embedding:278m")
+PAIR_MIN_SIM = 0.72   # granite: repetidas >= 0.80; contradicoes caem em ~0.74
+MAX_PAIRS = 30
+_PAIR_SCHEMA = {
+    "type": "object", "required": ["relacao", "texto_final"],
+    "properties": {"relacao": {"type": "string", "enum": ["mesma_coisa", "contradicao", "diferentes"]},
+                   "texto_final": {"type": "string"}},
+}
+_PAIR_PROMPT = """Duas memorias sobre o mesmo usuario. A e' a mais antiga, B a mais recente.
+A: {a}
+B: {b}
+
+Classifique:
+- "mesma_coisa": dizem o mesmo fato com outras palavras (texto_final = uma frase juntando as duas)
+- "contradicao": nao podem ser verdade ao mesmo tempo (texto_final = o fato de B, o mais recente)
+- "diferentes": sao fatos diferentes, mesmo que parecidos (texto_final = "")
+
+texto_final e' uma frase completa, no mesmo estilo das memorias.
+
+Exemplos:
+"O usuario gosta de cafe sem acucar" / "O usuario adora cafe puro, sem acucar" -> mesma_coisa,
+  texto_final "O usuario gosta de cafe puro, sem acucar"
+"O usuario mora em Curitiba" / "O usuario se mudou para Florianopolis" -> contradicao,
+  texto_final "O usuario mora em Florianopolis"
+"O usuario leu o livro 1 da serie" / "O usuario leu o livro 2 da serie" -> diferentes
+"O usuario mora em Curitiba" / "O usuario torce para o Coritiba" -> diferentes
+Responda so' com JSON."""
+
+
+def _local_model():
+    import requests
+    try:
+        for m in requests.get(f"{OLLAMA_URL}/api/tags", timeout=5).json().get("models", []):
+            n = m.get("name", "")
+            if "/" not in n and not any(p in n.lower() for p in _EMBED):
+                return n
+    except Exception:
+        pass
+    return None
+
+
+def tidy_propose(user_id, persona=None):
+    """Duas etapas: embeddings escolhem os PARES parecidos; o modelo julga um par
+    por vez. Mandar a lista inteira fazia um modelo de 4B juntar tudo numa frase."""
+    import requests
+    import numpy as np
+    mems = sorted(list_memories(user_id, persona)[:200], key=lambda m: m["id"])
+    if len(mems) < 2:
+        return []
+    model = _local_model()
+    if not model:
+        raise RuntimeError("nenhum modelo de conversa instalado")
+    r = requests.post(f"{OLLAMA_URL}/api/embed",
+                      json={"model": EMBED_MODEL, "input": [m["text"] for m in mems]}, timeout=120)
+    r.raise_for_status()
+    a = np.asarray(r.json()["embeddings"], dtype="float32")
+    a /= np.linalg.norm(a, axis=1, keepdims=True)
+    sims = a @ a.T
+    # "leu o livro 1" x "leu o livro 2": so' os numeros mudam = fatos diferentes.
+    # Sem este corte, uma serie de 26 livros gerava 325 pares e esgotava o limite.
+    shape = [re.sub(r"\d+", "#", _normalize(m["text"])) for m in mems]
+    pairs = [(float(sims[i, j]), i, j) for i in range(len(mems)) for j in range(i + 1, len(mems))
+             if sims[i, j] >= PAIR_MIN_SIM and shape[i] != shape[j]]
+    pairs.sort(reverse=True)
+    out, used = [], set()
+    for _s, i, j in pairs[:MAX_PAIRS]:
+        if i in used or j in used:
+            continue
+        resp = requests.post(f"{OLLAMA_URL}/api/generate",
+                             json={"model": model, "stream": False, "think": False, "format": _PAIR_SCHEMA,
+                                   "prompt": _PAIR_PROMPT.format(a=mems[i]["text"], b=mems[j]["text"]),
+                                   "options": {"temperature": 0, "num_ctx": NUM_CTX}}, timeout=120)
+        d = json.loads(resp.json().get("response") or "{}")
+        rel, texto = d.get("relacao"), (d.get("texto_final") or "").strip()
+        if rel in ("mesma_coisa", "contradicao") and texto:
+            used.update((i, j))
+            out.append({"ids": [mems[i]["id"], mems[j]["id"]], "texto": texto,
+                        "motivo": "contradicao" if rel == "contradicao" else "repetida",
+                        "antes": [mems[i]["text"], mems[j]["text"]]})
+    return out
+
+
+def tidy_apply(user_id, grupos):
+    cx = _conn()
+    if cx is None:
+        return 0
+    n = 0
+    try:
+        for g in grupos:
+            ids = [int(i) for i in g.get("ids") or []]
+            texto = (g.get("texto") or "").strip()
+            if len(ids) < 2 or not texto:
+                continue
+            q = ",".join("?" * len(ids))
+            rows = cx.execute(f"SELECT persona, COALESCE(pinned, 0) FROM memories "
+                              f"WHERE user_id=? AND id IN ({q})", (user_id, *ids)).fetchall()
+            if len(rows) != len(ids):
+                continue  # alguma ja' foi apagada/editada: nao mexe
+            cx.execute(f"DELETE FROM memories WHERE user_id=? AND id IN ({q})", (user_id, *ids))
+            cx.execute("INSERT INTO memories(user_id, text, norm, created_at, persona, pinned) "
+                       "VALUES(?,?,?,?,?,?)",
+                       (user_id, texto, _normalize(texto), int(time.time()),
+                        rows[0][0] or "default", max(r[1] for r in rows)))
+            n += 1
+        cx.commit()
+        return n
     finally:
         cx.close()
 
@@ -289,6 +425,41 @@ async def h_delete(request):
     return web.json_response({"ok": delete_memory(mid, uid)})
 
 
+async def h_pin(request):
+    try:
+        mid = int(request.match_info["id"])
+    except Exception:
+        return web.json_response({"error": "invalid id"}, status=400)
+    body = await _json_body(request) or {}
+    uid = body.get("user_id")
+    if not uid:
+        return web.json_response({"error": "user_id required"}, status=400)
+    return web.json_response({"ok": set_pinned(mid, uid, bool(body.get("pinned")))})
+
+
+async def h_tidy(request):
+    body = await _json_body(request) or {}
+    uid = body.get("user_id")
+    if not uid:
+        return web.json_response({"error": "user_id required"}, status=400)
+    import asyncio
+    try:
+        grupos = await asyncio.get_event_loop().run_in_executor(
+            None, tidy_propose, uid, body.get("persona"))
+    except Exception as e:
+        msg = str(e) if "modelo" in str(e) else "O modelo nao respondeu. Tente de novo."
+        return web.json_response({"error": msg}, status=502)
+    return web.json_response({"grupos": grupos})
+
+
+async def h_tidy_apply(request):
+    body = await _json_body(request) or {}
+    uid = body.get("user_id")
+    if not uid:
+        return web.json_response({"error": "user_id required"}, status=400)
+    return web.json_response({"ok": True, "aplicados": tidy_apply(uid, body.get("grupos") or [])})
+
+
 async def h_personas(request):
     return web.json_response(get_personas())
 
@@ -353,10 +524,17 @@ def _cors_headers(origin):
     }
 
 
+def _host_ok(request):
+    # Barra DNS rebinding (mesmo padrao do monitor): dominio externo apontado
+    # para 127.0.0.1 chega com Host: dominio-externo.
+    host = (request.host or "").rsplit(":", 1)[0].strip("[]")
+    return host in ("localhost", "127.0.0.1", "::1")
+
+
 @web.middleware
 async def cors_mw(request, handler):
     origin = request.headers.get("Origin")
-    if not _origin_ok(origin):
+    if not _origin_ok(origin) or not _host_ok(request):
         return web.json_response({"error": "forbidden origin"}, status=403,
                                  headers=_cors_headers(origin))
     if request.method == "OPTIONS":
@@ -374,6 +552,9 @@ def build_app():
         web.post("/memories",       h_add),
         web.put("/memories/{id}",   h_edit),
         web.delete("/memories/{id}", h_delete),
+        web.post("/memories/{id}/pin", h_pin),
+        web.post("/memories/tidy", h_tidy),
+        web.post("/memories/tidy/apply", h_tidy_apply),
         web.get("/personas",        h_personas),
         web.get("/persona",         h_get_active),
         web.post("/persona",        h_set_active),

@@ -34,8 +34,10 @@ try {
     Invoke-RestMethod "$apiBase/disconnect" -Method Post -TimeoutSec 5 | Out-Null
 } catch {
     # Se a API não responder, apaga o arquivo diretamente
-    $f = Join-Path $env:USERPROFILE "NousData\.email_account.json"
-    if (Test-Path $f) { Remove-Item $f -Force }
+    foreach ($n in ".email_account.json", ".email_accounts.json") {
+        $f = Join-Path $env:USERPROFILE "NousData\$n"
+        if (Test-Path $f) { Remove-Item $f -Force }
+    }
 }
 
 [System.Windows.Forms.MessageBox]::Show(

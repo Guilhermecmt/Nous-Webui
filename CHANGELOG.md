@@ -1,5 +1,136 @@
 # Changelog
 
+## [2.8.0] - 2026-10-17
+O melhor do Odysseus que faltava, em seis ondas, e cada função testada de
+verdade com um modelo pequeno (qwen3:4b) numa instância isolada. Código
+próprio, o Nous continua MIT.
+### Novo
+- **Memória:** memórias fixadas (identidade e saúde fixam sozinhas), escolha
+  pelas que têm a ver com a pergunta quando passam de 30 e **🧹 Organizar
+  memórias**, que junta repetidas par a par com a sua aprovação.
+- **Agenda:** listas de verificação nas notas, "💬 usar no chat", avisos no
+  celular (ntfy) e no e-mail, **↩ Desfazer** no chat, tarefas encadeadas e
+  tarefas que esperam o computador ficar livre.
+- **Conversas longas** (filtro Nous Compactar): o começo vira um resumo
+  incremental e a conversa continua lembrando dos detalhes.
+- **Pesquisa Profunda:** modo para modelos pequenos, resposta curta para
+  perguntas simples, continuação sobre o último relatório, sugestões em
+  botões para perguntas vagas e relatório parcial quando algo falha.
+- **E-mail:** várias contas, anexos lidos, convites para a Agenda,
+  newsletters com descadastro, rascunhos agendados, contatos aprendidos
+  (vCard) e **e-mail pelo chat** (vira rascunho; nunca envia sozinho).
+- **Ler imagens e boletos** (filtro Nous Leitura): OCR local (RapidOCR) para
+  fotos e prints, também com modelos sem visão; boletos conferidos pelo
+  dígito verificador (banco, valor, vencimento).
+- **Formulários PDF** (`documentos/`): campos, sugestões pelas memórias e
+  assinatura salva.
+- **Modo agente leve:** botões nas respostas (`⟦opcao⟧`, `⟦abrir⟧`,
+  `⟦tema⟧`, `⟦acao⟧`), comandos pelo chat ("abre minha agenda", "tema
+  escuro", "libera a placa de vídeo") e a **guarda**, que confere se o que o
+  modelo diz ter feito foi mesmo feito.
+- **Primeiros passos:** 🩺 Diagnóstico, dicas na primeira vez de cada painel,
+  CPF/cartão/senhas borrados na tela e "✍ Ensinar meu jeito de escrever".
+- **Galeria** (vinda do wip-galeria): grade, lightbox com zoom, lixeira,
+  ComfyUI ligado sob demanda; agora com favoritas, álbuns e ✎ para o Editor.
+- **Editor:** "Diga o que fazer" — frases em português viram as ações.
+- **Comparar modelos** no painel: 2 a 4 modelos, tempo e tokens/s, voto às
+  cegas e placar acumulado.
+### Mudado
+- **Embeddings:** granite-embedding:278m (multilíngue) no lugar do
+  nomic-embed-text, também no RAG do Open WebUI (só onde ainda não há
+  arquivos); índices refeitos sozinhos ao trocar o modelo.
+- **Contexto de 16k** em todas as chamadas diretas ao Ollama e no
+  `OLLAMA_CONTEXT_LENGTH`: o Ollama 0.30 abria 262k (44 GB) e cada resposta
+  levava 140–210 s; agora 5–25 s.
+- **Português por padrão:** idioma da interface, legendas do YouTube e um
+  prompt de sistema em PT-BR para modelos sem prompt próprio.
+- Calendário e Automações nativos do Open WebUI escondidos (filtro de
+  ajustes em `ajustes/`); a Agenda e as Tarefas do Nous fazem isso.
+- Agenda pelo chat lê datas e horas por regra (não pelo modelo) e recusa
+  horário no passado.
+- Citações de Arquivos e Histórico não vão mais no fim da resposta
+  (decisão do wip-galeria).
+- SearXNG escuta só em 127.0.0.1.
+### Corrigido
+- qwen3 "pensando em voz alta" quebrava respostas estruturadas (agora com
+  JSON schema e `think` desligado).
+- Habilidades aprendidas ficavam específicas demais ("do João").
+
+## [2.7.0] - 2026-10-16
+Funções inspiradas no Odysseus (PewDiePie), reescritas no estilo do Nous
+(o Odysseus é AGPL; nenhum código dele foi copiado e o Nous continua MIT).
+### Novo
+- **Agenda** (`agenda/`, porta 8996): notas, lembretes com repetição,
+  calendário com compromissos e aviso antes, importar/exportar `.ics` e
+  assinatura do Google Agenda/Outlook/iCloud pelo endereço iCal (só leitura).
+  Lembretes chegam como notificação do Windows mesmo com o navegador fechado.
+- **Agenda pelo chat** (filtro Nous Agenda): "me lembre de...", "marca
+  dentista dia 20", "o que tenho amanhã?". Regenerar a resposta não duplica.
+- **Tarefas agendadas**: pergunta ao modelo, pesquisa na web, resumo dos
+  e-mails e "bom dia" (agenda + e-mails), no horário, com o resultado em nota,
+  aviso e e-mail opcional.
+- **Habilidades** (`skills/`, porta 8997): "aprenda isso" no chat guarda o
+  passo a passo em Markdown; pedidos parecidos depois usam a habilidade.
+  Painel para revisar, editar e importar SKILL.md do GitHub.
+- **Relatório visual da Pesquisa Profunda** com biblioteca em Recursos ›
+  Relatórios (HTML escapado + CSP sem scripts).
+- **Editor de fotos**: cortar, girar, luz/cor, filtros, redimensionar,
+  desfazer, baixar/copiar e **remover fundo** (U²-Net local, 4,5 MB).
+- **YouTube** (resume vídeos pela legenda) e **Clima** (Open-Meteo) no chat.
+- **Loja de Modelos** mostra a velocidade estimada de cada modelo na sua placa.
+### Corrigido
+- **Pesquisa Profunda não achava o pacote `nous_search`** dentro do Open WebUI
+  (o pipe roda de um arquivo temporário); o registro grava a pasta real.
+### Mudado
+- `apply_branding.py` concatena `branding/modules/*.js` no `loader.js`
+  (painéis novos em arquivos próprios; `window.NousUI` expõe utilitários).
+
+## [2.6.0] - 2026-10-05
+Rodada de correções para quem instala e usa o Nous pela primeira vez.
+### Corrigido
+- **Instalador e verificação de saúde travavam** quando o Ollama estava
+  parado: `ollama list` abria o app do Ollama, que herdava a saída do script,
+  e o PowerShell esperava para sempre. Agora a checagem de modelos é pela API.
+- **Falhas apareciam como sucesso**: o instalador não conferia o resultado do
+  pip, do venv nem da instalação do Python, e o `instalar.bat` terminava em
+  "Pronto!" mesmo assim. Agora para com a mensagem em vermelho e código 1.
+- **PCs de 8 GB eram recusados** ("INCAPAZ"): o Windows reporta ~7,6 GB.
+  Mesma folga de 0,6 GB da Loja de Modelos.
+- **"O que há de novo" do Open WebUI, em inglês, era a 1ª tela após criar a
+  conta**, e o aviso "nova versão disponível" levava ao GitHub. Os dois somem.
+- **Link "Criar conta" morto** na tela de login (o Open WebUI ignora
+  `?mode=signup`): virou a explicação do caminho real (Painel Admin › Usuários).
+- **Assistente de primeiro uso** podia ficar em "Baixando… 0%" para sempre se o
+  pedido falhasse; agora mostra o erro e "Tentar de novo". Ao terminar, abre o
+  chat já com o modelo novo (antes podia cair no de embeddings).
+- **Card Recursos e botão de memória** apareciam na tela de login; no celular,
+  o wordmark encavalava no seletor de modelo e o card cobria as sugestões.
+- **Badge de VRAM** marcava em vermelho justamente o modelo já carregado
+  (comparava com a VRAM livre, não com a total).
+- `gemma4:e4b` aparecia com 9,6 GB (são ~6,6), o que distorcia a recomendação.
+- `stop-nous.ps1` só fechava a porta 8080; agora encerra todos os serviços.
+- Segundo clique no atalho durante a partida subia **outro servidor** contra o
+  mesmo banco; agora só reabre a tela de carregamento.
+- Se o servidor não sobe em 5 min, aparece um aviso em vez de silêncio.
+### Mudado
+- **O app passa a morar em `%LOCALAPPDATA%\Programs\Nous`**: o instalador copia
+  tudo para lá, e limpar a pasta Downloads não quebra mais o atalho.
+- **Nous aparece em Configurações › Aplicativos** (desinstalar como qualquer
+  programa) e ganha o atalho **"Parar Nous"** no Menu Iniciar.
+- **Servidor só em `127.0.0.1`** (antes `0.0.0.0`, visível na rede local).
+- **Monitor (8990)**: recusa DNS rebinding (header Host), aceita `/pull` só de
+  modelos do catálogo e ganha `/installed` — o painel não chama mais o Ollama
+  direto do navegador.
+- Reinstalar preserva no manifesto o que o Nous instalou antes (o "Remover
+  tudo" voltou a funcionar após reinstalação) e só grava o modelo se ele foi
+  escolhido de fato.
+- `nous-setup.iss` atualizado: copia o projeto inteiro, atalhos via `.vbs`,
+  desinstalação segura pelo próprio Inno.
+### Adicionado
+- `tools/lint.ps1` + workflow `lint` (GitHub Actions, Windows): scripts do
+  Windows em ASCII ou UTF-8 com BOM, sintaxe no PowerShell 5.1, Python, JSON e
+  JavaScript válidos.
+
 ## [2.5.0] - 2026-06-13
 ### Adicionado
 - **Assistente de Email (Nous Email)** — triagem, resumo e rascunho de resposta

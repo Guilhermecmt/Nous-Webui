@@ -26,33 +26,12 @@ echo Se aparecer um aviso do Windows, escolha "Sim".
 echo.
 pause
 
-REM Com argumentos (uso avancado) = repassa direto sem analise.
-if not "%~1"=="" (
-    powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0installer\install-nous.ps1" %*
-    goto fim
-)
-
-REM ---- Analisa o hardware (porteiro de capacidade) ----
+REM O instalador faz tudo - inclusive a analise da maquina - e sai com
+REM codigo 1 se algo essencial falhar. Argumentos (uso avancado) passam direto.
 echo.
-echo Analisando sua maquina...
-echo.
-powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0tools\check-system.ps1"
-set CHECK_EXIT=%errorlevel%
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0installer\install-nous.ps1" %*
+if errorlevel 1 goto erro
 
-REM EXIT 1 = INCAPAZ (pouca RAM ou disco)
-if %CHECK_EXIT%==1 (
-    echo.
-    echo ATENCAO: sua maquina nao atende os requisitos minimos.
-    echo Veja os detalhes acima. Instalacao cancelada.
-    echo.
-    pause
-    exit /b 1
-)
-
-echo.
-powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0installer\install-nous.ps1"
-
-:fim
 echo.
 echo ============================================
 echo  Pronto! Abrindo o Nous para voce...
@@ -60,5 +39,18 @@ echo  (na primeira vez, ele te ajuda a escolher
 echo   e baixar o modelo de IA ideal)
 echo ============================================
 echo.
-start "" wscript.exe "%~dp0launchers\nous-hidden.vbs"
+start "" wscript.exe "%LOCALAPPDATA%\Programs\Nous\launchers\nous-hidden.vbs"
 pause
+exit /b 0
+
+:erro
+echo.
+echo ============================================
+echo  A instalacao NAO terminou.
+echo  Leia a mensagem em vermelho acima, corrija
+echo  (quase sempre: a conexao com a internet)
+echo  e rode o instalar.bat de novo.
+echo ============================================
+echo.
+pause
+exit /b 1
