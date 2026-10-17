@@ -234,6 +234,7 @@
 
 	function start() {
 		injectStyle();
+		window.NousPdf = { open: open };
 		setInterval(ensureButton, 1000);
 	}
 

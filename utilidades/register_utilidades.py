@@ -29,6 +29,10 @@ FILTERS = [
      "Conversas longas: resume o inicio quando passa de ~60% do contexto do modelo."),
     ("nous_leitura", "Nous Leitura", "nous_leitura.py",
      "Le imagens (OCR local) e decodifica boletos pela linha digitavel no chat."),
+    ("nous_comandos", "Nous Comandos", "nous_comandos.py",
+     "Controle pelo chat: 'abre minha agenda', 'tema claro', 'libera a placa de video'."),
+    ("nous_guarda", "Nous Guarda", "nous_guarda.py",
+     "Confere se 'agendei'/'enviei' do modelo e' verdade; se nao, avisa o usuario."),
 ]
 
 sys.path.insert(0, os.path.join(HERE, "..", "history"))

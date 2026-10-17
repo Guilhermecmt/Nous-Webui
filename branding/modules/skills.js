@@ -196,6 +196,7 @@
 
 	function start() {
 		injectStyle();
+		window.NousSkills = { open: open };
 		setInterval(ensureButton, 1000);
 	}
 

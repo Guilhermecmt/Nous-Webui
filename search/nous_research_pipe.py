@@ -167,10 +167,13 @@ class Pipe:
                 sugg = [s for s in json.loads(raw).get("sugestoes", []) if isinstance(s, str)][:3]
             except Exception:
                 sugg = []
-            lines = "\n".join(f"- {s}" for s in sugg) or f"- O que é {question} e como funciona?"
+            sugg = sugg or [f"O que é {question} e como funciona?"]
+            lines = "\n".join(f"- {s}" for s in sugg)
+            # botoes (o loader do Nous transforma os marcadores): um clique pesquisa
+            botoes = " ".join(f"⟦opcao:{s.replace('|', '/').replace('⟧', '')}⟧" for s in sugg)
             yield (f"Sua pergunta sobre **{question}** está bem curta, e uma pesquisa profunda leva alguns "
                    f"minutos. Sobre o que exatamente você quer saber? Por exemplo:\n\n{lines}\n\n"
-                   "Escreva a pergunta completa que eu pesquiso.")
+                   f"Escreva a pergunta completa que eu pesquiso, ou escolha uma:\n\n{botoes}")
             return
 
         if not _searxng_available(self.valves.SEARXNG_URL):

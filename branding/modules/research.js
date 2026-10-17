@@ -98,6 +98,7 @@
 
 	function start() {
 		injectStyle();
+		window.NousReports = { open: open };
 		setInterval(ensureButton, 1000);
 	}
 

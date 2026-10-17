@@ -81,6 +81,7 @@ class Filter:
     def __init__(self):
         self.valves = self.Valves()
         self._pending = {}  # user_id -> (quando, contato) entre o inlet e o outlet
+        self._options = {}  # user_id -> (quando, [(rotulo, comando)]): botoes de escolha
         self._saved = {}    # hash da resposta -> draft id (regenerar nao duplica)
 
     def _ollama(self):
@@ -133,6 +134,9 @@ class Filter:
         exact = [c for c in matches if (c.get("name") or "").lower().split()[:1] == who.lower().split()[:1]]
         if len(matches) > 1 and len({c["email"] for c in matches}) > 1 and len(exact) != 1:
             opcoes = "; ".join(f"{c.get('name') or '?'} <{c['email']}>" for c in matches[:5])
+            # botoes na resposta: cada um repete o pedido ja' com o endereco certo
+            self._options[uid] = (time.time(), [
+                (c.get("name") or c["email"], f"manda o e-mail para {c['email']}") for c in matches[:5]])
             return (f"[Nous Email] Ha' mais de um contato para \"{who}\": {opcoes}. Pergunte qual deles. "
                     "Nao escreva o e-mail ainda.")
         c = exact[0] if len(exact) == 1 else matches[0]
@@ -198,6 +202,13 @@ class Filter:
 
     async def outlet(self, body: dict, __user__: Optional[dict] = None) -> dict:
         uid = (__user__ or {}).get("id")
+        opts = self._options.pop(uid, None) if uid else None
+        if opts and time.time() - opts[0] < 900:
+            asst = next((m for m in reversed(body.get("messages", [])) if m.get("role") == "assistant"), None)
+            if asst and isinstance(asst.get("content"), str):
+                asst["content"] += "\n\n" + " ".join(
+                    f"⟦opcao:{rot.replace('|', '/').replace('⟧', '')}|{cmd}⟧" for rot, cmd in opts[1])
+            return body
         pend = self._pending.pop(uid, None) if uid else None
         if not pend or time.time() - pend[0] > 900:
             return body

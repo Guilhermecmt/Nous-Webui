@@ -48,6 +48,12 @@ _QUERY = re.compile(
     r"(?:quais?|qual)\b[^?]{0,25}\b(?:compromisso|reuni[aã]o|reuni[oõ]es|lembrete|consulta|evento)s?\b"
     r"[^?]{0,25}\b(?:tenho|tem|h[aá])\b)", re.I)
 
+_OPEN_PANEL = re.compile(r"^\s*(?:abr[ae]|abrir|mostr[ae]|mostrar|me mostra|ver|quero ver)\s+(?:a |o |minha |meu )?"
+                         r"(?:agenda|calend[aá]rio|notas|lembretes|tarefas)\s*[.!?]*\s*$", re.I)
+_EMAIL_REQ = re.compile(r"\b(?:mand[ae]r?|envi[ae]r?|escrev[ae]r?|responde[r]?)\b.{0,25}\b(?:e-?mail|email)\b", re.I)
+_UNDO = re.compile(r"^\s*(?:↩\s*)?(desfaz(?:er|a)?|cancela(?:r)?(?: isso| esse| essa| o [uú]ltimo| a [uú]ltima)?|"
+                   r"apaga (?:isso|esse|essa|o que voc[eê] (?:criou|marcou|anotou|salvou)))\s*[.!]?\s*$", re.I)
+
 _DIAS = ["segunda", "terca", "quarta", "quinta", "sexta", "sabado", "domingo"]
 _EMBED = ("embed", "nomic", "minilm", "bge-", "e5-", "gte-")
 
@@ -256,7 +262,9 @@ class Filter:
 
     def __init__(self):
         self.valves = self.Valves()
-        self._done = {}  # hash(usuario+mensagem) -> (quando, texto). Regenerar nao duplica.
+        self._done = {}   # hash(usuario+mensagem) -> (quando, texto). Regenerar nao duplica.
+        self._last = {}   # usuario -> (quando, "notes"|"events", id, titulo): o que "desfazer" apaga
+        self._marks = {}  # usuario -> quando: a proxima resposta ganha o botao "Desfazer"
 
     # ---------------------------------------------------------- modelo local
     def _model(self, chat_model):
@@ -338,6 +346,7 @@ class Filter:
         if acao == "nota" or (acao == "lembrete" and not start):
             n = self._api("POST", "/notes", json={"user_id": uid, "title": titulo,
                                                   "body": detalhes})["note"]
+            self._last[uid] = (time.time(), "notes", n["id"], n["title"] or "nota")
             return (f"[Nous Agenda] {hoje}Nota salva: \"{n['title'] or n['body'][:60]}\"."
                     + (" O usuario pediu um lembrete mas nao disse quando; pergunte o dia e a "
                        "hora do aviso." if acao == "lembrete" else "")
@@ -350,6 +359,7 @@ class Filter:
                                                   "remind_at": int(start.timestamp()),
                                                   "due_at": int(start.timestamp()),
                                                   "repeat": repetir})["note"]
+            self._last[uid] = (time.time(), "notes", n["id"], n["title"])
             rep = f", repetindo ({repetir.replace('_', ' ')})" if repetir else ""
             return (f"[Nous Agenda] {hoje}Lembrete criado: \"{n['title']}\" para "
                     f"{_fmt(n['remind_at'])}{rep}. O Nous vai avisar no computador nessa hora. "
@@ -366,6 +376,7 @@ class Filter:
             if repetir:
                 body["repeat"] = repetir
             e = self._api("POST", "/events", json=body)["event"]
+            self._last[uid] = (time.time(), "events", e["id"], e["title"])
             return (f"[Nous Agenda] {hoje}Compromisso salvo: \"{e['title']}\" em "
                     f"{_fmt(e['start_at'], e['all_day'])}"
                     + (f" ({detalhes})" if detalhes else "")
@@ -386,12 +397,20 @@ class Filter:
         messages = body.get("messages", [])
         last = next((m for m in reversed(messages) if m.get("role") == "user"), None)
         msg = _text(last) if last else ""
+        if uid and msg and _UNDO.search(msg):
+            text = await asyncio.to_thread(self._undo, uid)
+            if text:
+                return _inject(body, messages, text)
         # "reuniao com a equipe segunda as 10h" nao diz "marca", mas e' agenda: palavra
         # de compromisso + data, fora de pergunta ("tenho consulta amanha, o que levo?")
         implicit = (_EVENT_WORDS.search(msg or "") and "?" not in (msg or "")
                     and _parse_when(msg, datetime.datetime.now())["start"] is not None)
         if not uid or not msg or not (_CREATE.search(msg) or _QUERY.search(msg) or implicit):
             return body
+        if _OPEN_PANEL.search(msg):
+            return body  # "abre minha agenda": quem resolve e' o Nous Comandos (abre o painel)
+        if _EMAIL_REQ.search(msg):
+            return body  # "manda um e-mail pra Maria marcando a reuniao de sexta" e' e-mail, nao agenda
 
         async def status(desc, done):
             if __event_emitter__:
@@ -421,11 +440,41 @@ class Filter:
         await status("Agenda atualizada." if text else "Nada para a agenda.", True)
         if not text:
             return body
+        if self._last.get(uid, (0,))[0] >= t:  # criou algo agora: a resposta ganha "Desfazer"
+            self._marks[uid] = time.time()
+        return _inject(body, messages, text)
 
-        if messages and messages[0].get("role") == "system":
-            base = (messages[0].get("content") or "").rstrip()
-            messages[0]["content"] = (base + "\n\n" + text) if base else text
-        else:
-            messages.insert(0, {"role": "system", "content": text})
-        body["messages"] = messages
+    def _undo(self, uid):
+        last = self._last.get(uid)
+        if not last or time.time() - last[0] > 1800:
+            return None  # nada recente: "desfazer" segue para o modelo normalmente
+        _t, kind, item_id, title = last
+        try:
+            self._api("POST", f"/{kind}/delete", json={"user_id": uid, "id": item_id})
+        except Exception as e:
+            return f"[Nous Agenda] Nao consegui desfazer ({e}). Avise o usuario."
+        self._last.pop(uid, None)
+        tipo = "o compromisso" if kind == "events" else "a nota/lembrete"
+        return (f"[Nous Agenda] Desfeito: {tipo} \"{title}\" foi apagado da agenda agora. "
+                "Confirme ao usuario em uma frase curta.")
+
+    async def outlet(self, body: dict, __user__: Optional[dict] = None) -> dict:
+        """Poe o botao "Desfazer" (marcador que o loader do Nous vira botao)."""
+        uid = (__user__ or {}).get("id")
+        if not uid or time.time() - self._marks.pop(uid, 0) > 900:
+            return body
+        msgs = body.get("messages", [])
+        asst = next((m for m in reversed(msgs) if m.get("role") == "assistant"), None)
+        if asst and isinstance(asst.get("content"), str) and "⟦opcao:↩ Desfazer" not in asst["content"]:
+            asst["content"] += "\n\n⟦opcao:↩ Desfazer|desfazer⟧"
         return body
+
+
+def _inject(body, messages, text):
+    if messages and messages[0].get("role") == "system":
+        base = (messages[0].get("content") or "").rstrip()
+        messages[0]["content"] = (base + "\n\n" + text) if base else text
+    else:
+        messages.insert(0, {"role": "system", "content": text})
+    body["messages"] = messages
+    return body

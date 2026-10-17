@@ -15,6 +15,7 @@ Rotas (todas com user_id, como a Memory API):
   GET  /subs?user_id=                  POST /subs   POST /subs/delete   POST /subs/sync
   GET  /tasks?user_id=                 POST /tasks  POST /tasks/update  POST /tasks/delete
   POST /tasks/run {user_id, id}        roda agora
+  GET  /recent?user_id=&secs=180       quantas notas/compromissos acabaram de ser criados
   GET  /settings?user_id=              POST /settings {aviso_email, ntfy_topico}
   POST /settings/test                  manda um aviso de teste pelos canais ligados
   GET  /notifications?user_id=         POST /notifications/seen {user_id, ids}
@@ -516,6 +517,20 @@ async def h_task_run(request):
     return _ok({"started": True})
 
 
+async def h_recent(request):
+    """Quantas notas/compromissos o usuario criou nos ultimos `secs` segundos
+    (o filtro Nous Guarda confere se um "agendei!" do modelo e' verdade)."""
+    uid = _uid(request.query)
+    since = db.now() - max(10, min(3600, int(_q(request, "secs", 180))))
+    cx = db.connect()
+    try:
+        n = cx.execute("SELECT COUNT(*) FROM notes WHERE user_id=? AND created_at>=?", (uid, since)).fetchone()[0]
+        e = cx.execute("SELECT COUNT(*) FROM events WHERE user_id=? AND created_at>=?", (uid, since)).fetchone()[0]
+        return _ok({"notes": n, "events": e})
+    finally:
+        cx.close()
+
+
 async def h_settings(request):
     uid = _uid(request.query)
     cx = db.connect()
@@ -591,6 +606,7 @@ def build_app():
         web.post("/tasks/update", h_task_update),
         web.post("/tasks/delete", h_task_delete),
         web.post("/tasks/run", h_task_run),
+        web.get("/recent", h_recent),
         web.get("/settings", h_settings),
         web.post("/settings", h_settings_save),
         web.post("/settings/test", h_settings_test),

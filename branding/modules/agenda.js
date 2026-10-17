@@ -774,6 +774,7 @@
 
 	function start() {
 		injectStyle();
+		window.NousAgenda = { open: open };
 		setInterval(ensureButton, 1000);
 		setTimeout(pollNotifs, 4000);
 		setInterval(pollNotifs, 30000);

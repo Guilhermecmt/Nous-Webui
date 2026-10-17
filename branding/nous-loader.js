@@ -1486,7 +1486,8 @@
 
 	/* Utilitarios para os modulos em branding/modules/*.js (agenda, skills...),
 	 * que o apply_branding.py concatena depois deste arquivo no loader.js. */
-	window.NousUI = { loadUserId: loadUserId, esc: _esc, onAuth: onAuth };
+	window.NousUI = { loadUserId: loadUserId, esc: _esc, onAuth: onAuth, openStore: openStore,
+		openMemory: function () { if (!memOpen) toggleMemPanel(); }, setTheme: setTheme };
 
 	if (document.readyState === 'loading') {
 		document.addEventListener('DOMContentLoaded', start);
