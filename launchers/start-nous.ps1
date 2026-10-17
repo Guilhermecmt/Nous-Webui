@@ -66,10 +66,13 @@ $env:DEFAULT_LOCALE          = "pt-BR"
 $env:YOUTUBE_LOADER_LANGUAGE = "pt,pt-BR,en"
 $env:ENABLE_CALENDAR         = "False"
 $env:ENABLE_AUTOMATIONS      = "False"
-# Embeddings multilingues so' com banco novo: trocar o modelo com documentos ja
-# indexados invalidaria a busca neles.
+# Embeddings multilingues (granite pelo Ollama, o mesmo do resto do Nous) so'
+# com banco novo: trocar o modelo com documentos ja' indexados invalidaria a
+# busca neles. Pelo Ollama porque o download do Hugging Face falha no Windows
+# sem Modo de Desenvolvedor (links simbolicos).
 if (-not (Test-Path (Join-Path $env:DATA_DIR "webui.db"))) {
-    $env:RAG_EMBEDDING_MODEL = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+    $env:RAG_EMBEDDING_ENGINE = "ollama"
+    $env:RAG_EMBEDDING_MODEL  = "granite-embedding:278m"
 }
 
 # Chave secreta ESTAVEL: sem ela, o open-webui gera uma nova a cada inicio e
@@ -295,13 +298,21 @@ function Register-Arena {
 
 # --- Email assistant (v2.5): serviço REST local na porta 8995 ---
 
-# Sobe o serviço de email (8995) apenas se a conta estiver configurada.
+# Sobe o servico de email (8995). Sempre (v2.8): ele tambem guarda contatos e os
+# rascunhos que o chat cria, e o painel conecta a conta por ele.
 function Start-EmailAPI {
-    $acct = Join-Path $env:DATA_DIR ".email_account.json"
     $api  = Join-Path $PSScriptRoot "..\email\nous_email_api.py"
-    if ((Test-Path $py) -and (Test-Path $api) -and (Test-Path $acct)) {
+    if ((Test-Path $py) -and (Test-Path $api)) {
         try { Invoke-RestMethod "http://127.0.0.1:8995/health" -TimeoutSec 2 | Out-Null }
         catch { Start-Process -FilePath $py -ArgumentList "`"$api`"" -WindowStyle Hidden }
+    }
+}
+
+# Filtro 'Nous Email' (e-mail pelo chat, sempre como rascunho), global e ativo.
+function Register-EmailChat {
+    $reg = Join-Path $PSScriptRoot "..\email\register_email_chat.py"
+    if ((Test-Path $py) -and (Test-Path $reg)) {
+        & $py "$reg" --data-dir "$env:DATA_DIR" | Out-Null
     }
 }
 
@@ -412,6 +423,7 @@ function Register-All {
     Register-Cloud; Register-Voice; Start-VoiceServer; Start-ComfyUI; Setup-Files
     Setup-History; Hide-EmbedModels; Set-ModelCtx; Start-MemoryAPI; Start-EmailAPI
     Register-Utilidades; Start-AgendaAPI; Register-Agenda; Start-SkillsAPI; Register-Skills
+    Register-EmailChat
 }
 
 function Show-Error([string]$msg) {

@@ -17,6 +17,10 @@ Expoe (em http://127.0.0.1:8990, so' para paginas locais - ver cors_mw):
   GET  /research/view?id=  -> o relatorio visual (HTML, CSP sem scripts)
   POST /research/delete    -> body {"id": ...}
   POST /image/remove-bg    -> corpo = bytes da imagem; devolve PNG sem fundo
+  POST /pdf/fields         -> corpo = PDF; campos preenchiveis
+  POST /pdf/fill           -> {pdf: base64, values, place?}; devolve o PDF preenchido/assinado
+  POST /pdf/autofill       -> {fields, facts}; sugere valores a partir das memorias
+  GET|POST /pdf/signature  -> assinatura desenhada (PNG em NousData); POST /pdf/signature/delete
 
 GPU: lido dos contadores de desempenho do Windows (funcionam em PT-BR com os
 nomes em ingles) + tamanho real da VRAM via registro (qwMemorySize).
@@ -678,6 +682,116 @@ async def h_remove_bg(request):
     return web.Response(body=png, content_type="image/png")
 
 
+# ------------------------------------------------- Formularios PDF (v2.8)
+# Preencher PDF preenchivel e carimbar a assinatura (documentos/pdf_tools.py).
+
+def _pdf_mod():
+    p = str(Path(__file__).resolve().parent.parent / "documentos")
+    if p not in sys.path:
+        sys.path.insert(0, p)
+    import pdf_tools
+    return pdf_tools
+
+
+async def h_pdf_fields(request):
+    data = await request.read()
+    if not data.startswith(b"%PDF"):
+        return web.json_response({"error": "isso nao e' um PDF"}, status=400)
+    try:
+        return web.json_response(await asyncio.get_event_loop().run_in_executor(None, _pdf_mod().fields, data))
+    except Exception:
+        return web.json_response({"error": "nao consegui abrir este PDF (protegido ou corrompido?)"}, status=400)
+
+
+async def h_pdf_fill(request):
+    import base64
+    try:
+        body = await request.json()
+        pdf = base64.b64decode(body.get("pdf") or "")
+    except Exception:
+        return web.json_response({"error": "pedido invalido"}, status=400)
+    pt = _pdf_mod()
+    sig = None
+    if body.get("place"):
+        if not os.path.isfile(pt.sig_path()):
+            return web.json_response({"error": "desenhe sua assinatura primeiro"}, status=400)
+        sig = Path(pt.sig_path()).read_bytes()
+    try:
+        out = await asyncio.get_event_loop().run_in_executor(
+            None, pt.fill, pdf, body.get("values") or {}, sig, body.get("place"))
+    except ValueError as e:
+        return web.json_response({"error": str(e)}, status=400)
+    except Exception as e:
+        print(f"[Nous][pdf] {e}", file=sys.stderr)
+        return web.json_response({"error": "nao consegui preencher este PDF"}, status=500)
+    return web.Response(body=out, content_type="application/pdf")
+
+
+async def h_pdf_sig_get(request):
+    p = _pdf_mod().sig_path()
+    if not os.path.isfile(p):
+        return web.json_response({"exists": False})
+    return web.Response(body=Path(p).read_bytes(), content_type="image/png")
+
+
+async def h_pdf_sig_save(request):
+    data = await request.read()
+    if not data.startswith(b"\x89PNG") or len(data) > 2 * 1024 * 1024:
+        return web.json_response({"error": "assinatura invalida"}, status=400)
+    p = Path(_pdf_mod().sig_path())
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_bytes(data)
+    return web.json_response({"ok": True})
+
+
+async def h_pdf_sig_delete(request):
+    p = Path(_pdf_mod().sig_path())
+    if p.is_file():
+        p.unlink()
+    return web.json_response({"ok": True})
+
+
+_AUTOFILL_PROMPT = """Preencha um formulario com os FATOS conhecidos sobre o usuario. So' use o que esta
+nos fatos; campo sem informacao fica "". Datas no formato dd/mm/aaaa.
+
+FATOS:
+{facts}
+
+CAMPOS (nome :: rotulo):
+{fields}
+
+Responda so' com JSON: um objeto com o nome de cada campo e o valor."""
+
+
+async def h_pdf_autofill(request):
+    """Sugere valores para os campos a partir das memorias (o usuario revisa)."""
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    flds = [f for f in (body.get("fields") or []) if f.get("type") == "text"][:60]
+    facts = [str(x) for x in (body.get("facts") or [])][:150]
+    if not flds or not facts:
+        return web.json_response({"values": {}})
+    schema = {"type": "object", "properties": {f["name"]: {"type": "string"} for f in flds}}
+    prompt = _AUTOFILL_PROMPT.format(facts="\n".join(f"- {x}" for x in facts),
+                                     fields="\n".join(f"{f['name']} :: {f.get('label', '')}" for f in flds))
+    models = await _installed_tags() or []
+    chat = [m for m in models if _is_chat(m) and "/" not in m]
+    if not chat:
+        return web.json_response({"error": "nenhum modelo de conversa instalado"}, status=400)
+    try:
+        timeout = aiohttp.ClientTimeout(total=180)
+        async with aiohttp.ClientSession(timeout=timeout) as s:
+            async with s.post(f"{OLLAMA}/api/generate", json={
+                    "model": chat[0], "prompt": prompt, "stream": False, "think": False, "format": schema,
+                    "options": {"temperature": 0, "num_ctx": int(os.environ.get("NOUS_NUM_CTX", "16384"))}}) as r:
+                values = json.loads((await r.json()).get("response") or "{}")
+    except Exception:
+        return web.json_response({"error": "o modelo nao respondeu"}, status=502)
+    return web.json_response({"values": {k: v for k, v in values.items() if isinstance(v, str) and v.strip()}})
+
+
 def build_app():
     app = web.Application(middlewares=[cors_mw], client_max_size=_MAX_IMG + 1024)
     app.add_routes([web.get("/stats", h_stats),
@@ -693,7 +807,13 @@ def build_app():
                     web.get("/research", h_research_list),
                     web.get("/research/view", h_research_view),
                     web.post("/research/delete", h_research_delete),
-                    web.post("/image/remove-bg", h_remove_bg)])
+                    web.post("/image/remove-bg", h_remove_bg),
+                    web.post("/pdf/fields", h_pdf_fields),
+                    web.post("/pdf/fill", h_pdf_fill),
+                    web.post("/pdf/autofill", h_pdf_autofill),
+                    web.get("/pdf/signature", h_pdf_sig_get),
+                    web.post("/pdf/signature", h_pdf_sig_save),
+                    web.post("/pdf/signature/delete", h_pdf_sig_delete)])
     return app
 
 

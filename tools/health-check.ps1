@@ -124,7 +124,8 @@ if ($hasVoice) {
 }
 
 # Email assistant (informativo — nunca falha o health-check)
-$emailAcct = Join-Path $dataDir ".email_account.json"
+$emailAcct = Join-Path $dataDir ".email_accounts.json"
+if (-not (Test-Path $emailAcct)) { $emailAcct = Join-Path $dataDir ".email_account.json" }
 if (Test-Path $emailAcct) {
     $emailUp = $false
     try {

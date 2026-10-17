@@ -27,6 +27,8 @@ FILTERS = [
      "Previsao do tempo no chat via Open-Meteo (gratuito, sem chave)."),
     ("nous_compactar", "Nous Compactar", "nous_compactar.py",
      "Conversas longas: resume o inicio quando passa de ~60% do contexto do modelo."),
+    ("nous_leitura", "Nous Leitura", "nous_leitura.py",
+     "Le imagens (OCR local) e decodifica boletos pela linha digitavel no chat."),
 ]
 
 sys.path.insert(0, os.path.join(HERE, "..", "history"))
@@ -73,7 +75,9 @@ def main():
             path = os.path.join(HERE, fname)
             if not os.path.isfile(path):
                 continue
-            content = open(path, encoding="utf-8").read()
+            # filtros que importam modulos daqui (leitura.py) recebem a pasta real:
+            # o Open WebUI roda o codigo a partir de um arquivo temporario
+            content = open(path, encoding="utf-8").read().replace("__NOUS_UTIL_DIR__", HERE)
             print(f"{name} {upsert(cx, func_id, name, content, desc, creator, now)} (id='{func_id}').")
         cx.commit()
     finally:

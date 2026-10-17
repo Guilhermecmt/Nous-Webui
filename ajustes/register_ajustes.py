@@ -11,9 +11,12 @@ na lista abaixo.
      em ingles do video)
   1  calendar.enable / automations.enable = False: o Nous tem a Agenda propria
      (lembretes com aviso do Windows, iCal, tarefas). Duas agendas confundem.
-  1  Embeddings de documentos multilingues (paraphrase-multilingual-MiniLM-L12-v2)
-     no lugar do all-MiniLM-L6-v2 (so' ingles), SO' se ainda nao ha nenhum
-     arquivo/conhecimento indexado (trocar o modelo invalida os vetores antigos).
+  1  Embeddings de documentos do Open WebUI pelo Ollama com granite-embedding:278m
+     (multilingue, o mesmo do resto do Nous) no lugar do all-MiniLM-L6-v2 (so'
+     ingles), SO' se ainda nao ha nenhum arquivo/conhecimento indexado (trocar o
+     modelo invalida os vetores antigos). Pelo Ollama e nao pelo sentence-
+     transformers: o download do Hugging Face falha no Windows sem Modo de
+     Desenvolvedor (WinError 1314, links simbolicos) e quebrava a busca.
 
 Os mesmos valores vao como variavel de ambiente no launcher, para instalacoes
 novas (onde a tabela config ainda nao tem a chave).
@@ -31,7 +34,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "evaluation"))
 from register_arena import _resolve_db, _read_config, _write_config, _set_nested  # noqa: E402
 
-MULTI_EMBED = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+NOUS_EMBED = "granite-embedding:278m"
 OLD_EMBED = "sentence-transformers/all-MiniLM-L6-v2"
 
 
@@ -64,8 +67,9 @@ def ajuste_1(cx, data, log):
     model = _get(data, "rag.embedding_model", OLD_EMBED)
     if engine in ("", None) and model in (OLD_EMBED, None):
         if _count(cx, "file") == 0 and _count(cx, "knowledge") == 0:
-            _set_nested(data, "rag.embedding_model", MULTI_EMBED)
-            log.append("embeddings de documentos multilingues")
+            _set_nested(data, "rag.embedding_engine", "ollama")
+            _set_nested(data, "rag.embedding_model", NOUS_EMBED)
+            log.append("embeddings de documentos multilingues (granite pelo Ollama)")
         else:
             log.append("embeddings mantidos (ja ha documentos indexados)")
 
