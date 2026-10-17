@@ -26,6 +26,23 @@ O Nous abre como um programa do computador: sem tela de login.
   só a coruja no canto, e o Nous lembra a escolha. Saem o card "Recursos", o
   botão flutuante da memória, o do tema, o NOUS do topo e o ícone do chat
   temporário.
+- **Nous Code** (`code/`): um IDE com agente de IA local, numa janela própria
+  (atalho "Nous Code" no Menu Iniciar, ou Código no painel do Nous). Editor
+  Monaco (o do VS Code) em português, árvore de arquivos com abas, Ctrl+P,
+  busca no projeto (Ctrl+Shift+F), Git (diff lado a lado, commit, descartar),
+  terminal PowerShell de verdade (ConPTY, Ctrl+`) e o agente ao lado (Ctrl+L
+  pergunta sobre a seleção). O agente lista, lê, procura, edita e roda
+  comandos, um passo por vez; editar e rodar esperam o seu OK com o diff na
+  frente, "Desfazer" volta os arquivos, e o editor mostra as mudanças dele
+  na hora (o serviço avisa por WebSocket quando um arquivo muda no disco).
+  Serviço em Node 22.18+ (TypeScript rodando direto, sem build) na porta
+  8998, aceitando só o Nous e a própria janela como origem; o instalador
+  baixa o Monaco, o xterm e o node-pty quando há Node. Feito para modelos
+  pequenos: lê chamadas escritas como JSON no texto (o qwen2.5-coder:14b
+  nunca usa o canal nativo), aceita edição com números de linha ou recuo
+  diferente, empurra quando o modelo anuncia e para, e encerra quando ele
+  anda em círculo. Com o qwen2.5-coder:14b, achou e corrigiu dois bugs com os
+  testes em cerca de 30 s.
 - **Casca:** marca maior na barra lateral, estrela ao lado do modelo no lugar
   de "Definir como padrão" e primeiro nome no lugar do nome inteiro cortado.
 ### Corrigido

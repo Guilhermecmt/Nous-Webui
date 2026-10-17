@@ -16,6 +16,12 @@
 (function () {
 	'use strict';
 
+	/* O Open WebUI lembra se os "Controles" do chat (parametros avancados) ficaram
+	 * abertos e reabre em toda visita, espremendo o chat junto com este painel.
+	 * Eles passam a comecar fechados; o icone de controles continua abrindo.
+	 * Roda antes do app ler a chave (o loader e' anterior ao Svelte). */
+	try { if (localStorage.getItem('showControls') === 'true') localStorage.setItem('showControls', 'false'); } catch (e) {}
+
 	var MON = 'http://127.0.0.1:8990';
 	var MEM = 'http://127.0.0.1:8993';
 	var AG = 'http://127.0.0.1:8996';
@@ -27,6 +33,7 @@
 	 * o painel so' repassa o clique (o card fica escondido, nao some). */
 	var FERR = [
 		['nous-docs-open', 'Documentos', 'doc'],
+		['nous-code-open', 'Código', 'code'],
 		['nous-agenda-open', 'Agenda', 'cal'],
 		['nous-email-open', 'E-mail', 'mail'],
 		['nous-reports-open', 'Pesquisas', 'globe'],
@@ -52,6 +59,7 @@
 		store: '<path d="M3 9 5 4h14l2 5M4 9v11h16V9M3 9h18M9 20v-6h6v6"/>',
 		mic: '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>',
 		pulse: '<path d="M3 12h4l3-8 4 16 3-8h4"/>',
+		code: '<path d="m8 8-5 4 5 4M16 8l5 4-5 4M14 5l-4 14"/>',
 		sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
 		moon: '<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>',
 		fechar: '<path d="m13 6 6 6-6 6M5 6l6 6-6 6"/>',

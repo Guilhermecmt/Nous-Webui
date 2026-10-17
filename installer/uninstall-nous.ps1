@@ -104,7 +104,7 @@ $lnkDirs = @([Environment]::GetFolderPath("Desktop"),
              [Environment]::GetFolderPath("CommonDesktopDirectory"),
              [Environment]::GetFolderPath("Programs"))
 foreach ($d in $lnkDirs) {
-    foreach ($lnk in "Nous.lnk", "Parar Nous.lnk") {
+    foreach ($lnk in "Nous.lnk", "Parar Nous.lnk", "Nous Code.lnk") {
         $lp = Join-Path $d $lnk
         if ($d -and (Test-Path $lp)) { Remove-Item $lp -Force; Ok "atalho removido: $lp" }
     }

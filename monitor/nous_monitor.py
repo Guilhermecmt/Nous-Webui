@@ -1108,6 +1108,8 @@ _SERVICOS = [
      "Abra o Nous pelo atalho. Sem este servico os lembretes nao avisam."),
     ("Habilidades", "http://127.0.0.1:8997/health", True,
      "Abra o Nous pelo atalho: ele inicia este servico sozinho."),
+    ("Nous Code (painel Codigo)", "http://127.0.0.1:8998/health", False,
+     "Opcional. Precisa do Node.js 22.18+ (winget install OpenJS.NodeJS.LTS); depois abra o Nous pelo atalho."),
     ("Voz (Piper)", "http://127.0.0.1:8994/health", False,
      "Opcional. Ative em Recursos > Ativar voz em PT-BR."),
     ("Busca na web (SearXNG)", "http://127.0.0.1:8888/healthz", False,

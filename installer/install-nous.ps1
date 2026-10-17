@@ -407,6 +407,32 @@ if (-not $desktopOk) {
 }
 $startOk = New-NousShortcut ([Environment]::GetFolderPath("Programs"))
 $null = New-NousShortcut ([Environment]::GetFolderPath("Programs")) "Parar Nous" "parar-nous.vbs"
+
+# Nous Code (IDE com agente de IA local): precisa do Node 22.18+. Baixa as pecas
+# do editor (Monaco, terminal) uma vez e cria o atalho "Nous Code". Opcional:
+# sem Node, o resto do Nous funciona igual.
+$nodeCmd = Get-Command node -ErrorAction SilentlyContinue
+$nodeOk = $false
+if ($nodeCmd) {
+    $nv = ((& $nodeCmd.Source --version) -replace '^v', '').Split('.')
+    $nodeOk = [int]$nv[0] -gt 22 -or ([int]$nv[0] -eq 22 -and [int]$nv[1] -ge 18)
+}
+$codeDir = Join-Path $REPO "code"
+if ($nodeOk -and (Test-Path (Join-Path $codeDir "package.json"))) {
+    if (-not (Test-Path (Join-Path $codeDir "node_modules\monaco-editor"))) {
+        Info "Nous Code: baixando as pecas do editor (~40 MB)..."
+        Push-Location $codeDir
+        & npm ci --omit=dev --no-audit --no-fund 2>&1 | Out-Null
+        $npmOk = $LASTEXITCODE -eq 0
+        Pop-Location
+        if (-not $npmOk) { Info "Nous Code: download nao concluido (rode o instalador de novo com internet)." }
+    }
+    $null = New-NousShortcut ([Environment]::GetFolderPath("Programs")) "Nous Code" "nous-code.vbs"
+    $null = New-NousShortcut ([Environment]::GetFolderPath("Desktop")) "Nous Code" "nous-code.vbs"
+    Ok "atalho 'Nous Code' (editor de codigo com IA local)"
+} else {
+    Info "Nous Code (opcional): instale o Node.js 22.18+ (winget install OpenJS.NodeJS.LTS) e rode o instalador de novo."
+}
 if ($desktopOk) { Ok "atalho 'Nous' na area de trabalho" }
 if ($startOk)   { Ok "atalhos 'Nous' e 'Parar Nous' no Menu Iniciar (tecla Windows > digite Nous)" }
 if (-not $desktopOk) {

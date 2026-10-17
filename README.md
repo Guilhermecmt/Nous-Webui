@@ -49,6 +49,7 @@ What you get over an ordinary AI chat:
 
 - **No login:** Nous opens straight into the chat, like any other program on your PC — no account or password to remember. It only accepts connections from the computer itself, so your Windows password is what protects it. Your existing conversations are kept.
 - **"Seu Nous" panel:** on the right, the owl inside a ring shows how much of your GPU is in use, followed by the private chat switch, upcoming reminders, what Nous knows about you and every tool by name. Closed, only the owl stays in the corner.
+- **⌨ Nous Code:** an IDE with a local-AI agent, in its own window: the VS Code editor (Monaco), files and tabs, search, Git and a terminal, with the agent alongside. Ask, for example, "the tests are failing, fix them": it reads the code, edits files and runs commands step by step; every change waits for your OK with the diff on screen, and can be undone. Open it from the **Nous Code** shortcut or **Código** in the panel. Needs Node.js 22.18 or newer.
 - **New home screen:** *"Boa tarde, Name"*, a Nous tip on every visit and a **Conversa privada** (private chat) button — the chat is not kept in history and never becomes memory.
 
 ### What's new in 2.9

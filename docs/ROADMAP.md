@@ -64,6 +64,10 @@ sem conhecimento tecnico, com tudo acontecendo em segundo plano.
   privada" (chat temporario que o filtro de memoria ignora).
 - Painel "Seu Nous" a' direita no lugar do card Recursos e dos botoes
   flutuantes: anel de uso da placa, agenda, memorias e ferramentas.
+- Nous Code: agente de programacao local (code/, Node sem dependencias),
+  aprovacao com diff, desfazer, feito para modelos pequenos. Proximos passos:
+  modo plano (so' le e propoe), varias chamadas por resposta para modelos
+  maiores, LSP/diagnosticos depois de editar, instalar o Node pelo instalador.
 
 ### v2.6 — Correcoes para o primeiro acesso
 - Instalador que nao trava nem mente ("Pronto!" so' quando deu certo), app em

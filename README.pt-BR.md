@@ -49,6 +49,7 @@ O que você ganha em relação a um chat de IA comum:
 
 - **Sem login:** o Nous abre direto no chat, como qualquer programa do computador — nada de conta nem senha para lembrar. Ele só aceita conexões do próprio PC, então quem protege é a senha do Windows. Suas conversas antigas continuam lá.
 - **Painel "Seu Nous":** à direita, a coruja num anel mostra quanto da placa de vídeo está em uso, e logo abaixo ficam a conversa privada, os próximos lembretes, o que o Nous sabe de você e todas as ferramentas com nome. Fechado, sobra só a coruja no canto.
+- **⌨ Nous Code:** um IDE com agente de IA local, numa janela própria: o editor do VS Code (Monaco), arquivos e abas, busca, Git e terminal, com o agente ao lado. Peça, por exemplo, "os testes estão falhando, corrija": ele lê o código, edita e roda comandos, um passo por vez; cada mudança espera o seu OK, com o diff na tela, e pode ser desfeita. Abra pelo atalho **Nous Code** ou por **Código** no painel. Precisa do Node.js 22.18 ou mais novo.
 - **Tela inicial nova:** *"Boa tarde, Fulano"*, uma dica do Nous a cada visita e o botão **Conversa privada** — a conversa não fica no histórico nem vira memória.
 
 ### Novidades da versão 2.9

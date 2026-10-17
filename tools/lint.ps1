@@ -58,6 +58,22 @@ if ($node) {
         & $node.Source --check (Join-Path $root $f)
         if ($LASTEXITCODE -ne 0) { Bad "$f nao e' JavaScript valido" }
     }
+
+    # Nous Code: checa os tipos (se o npm install do code/ foi feito) e roda os testes
+    $code = Join-Path $root "code"
+    if (Test-Path (Join-Path $code "servidor.ts")) {
+        Write-Host "== Nous Code (TypeScript)" -ForegroundColor Cyan
+        $tsc = Join-Path $code "node_modules\typescript\bin\tsc"
+        if (Test-Path $tsc) {
+            & $node.Source $tsc -p $code
+            if ($LASTEXITCODE -ne 0) { Bad "code/: erro de tipos" }
+        } else { Write-Host "  (tipos nao checados: rode npm install em code/)" -ForegroundColor DarkGray }
+        Push-Location $code
+        $out = & $node.Source --test "testes/*.test.ts" 2>&1 | Out-String
+        $ok = $LASTEXITCODE -eq 0
+        Pop-Location
+        if (-not $ok) { Write-Host $out; Bad "code/: testes falharam" }
+    }
 }
 
 Write-Host ""

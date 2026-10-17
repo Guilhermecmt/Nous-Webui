@@ -357,6 +357,22 @@ function Start-AgendaAPI {
     }
 }
 
+# --- Nous Code (v2.10): agente de programacao do painel Codigo (8998) ---
+# Servico em Node (roda o TypeScript direto, sem build). Sem Node 22.18+ o
+# painel explica como instalar; o resto do Nous segue normal.
+function Start-CodeAPI {
+    $srv = Join-Path $PSScriptRoot "..\code\servidor.ts"
+    if (-not (Test-Path $srv)) { return }
+    try { Invoke-RestMethod "http://127.0.0.1:8998/health" -TimeoutSec 2 | Out-Null; return } catch {}
+    $node = Get-Command node -ErrorAction SilentlyContinue
+    $exe = if ($node) { $node.Source } else { Join-Path $env:ProgramFiles "nodejs\node.exe" }
+    if (-not (Test-Path $exe)) { return }
+    $v = (& $exe --version) -replace '^v', ''
+    $p = $v.Split('.')
+    if ([int]$p[0] -lt 22 -or ([int]$p[0] -eq 22 -and [int]$p[1] -lt 18)) { return }
+    Start-Process -FilePath $exe -ArgumentList "`"$srv`"" -WorkingDirectory (Split-Path $srv) -WindowStyle Hidden
+}
+
 # Filtro 'Nous Agenda' (pedidos de agenda pelo chat), global e ativo.
 function Register-Agenda {
     $reg = Join-Path $PSScriptRoot "..\agenda\register_agenda.py"
@@ -434,7 +450,7 @@ function Register-All {
     Register-Cloud; Register-Voice; Start-VoiceServer; Start-ComfyUI; Setup-Files
     Setup-History; Hide-EmbedModels; Set-ModelCtx; Start-MemoryAPI; Start-EmailAPI
     Register-Utilidades; Start-AgendaAPI; Register-Agenda; Start-SkillsAPI; Register-Skills
-    Register-EmailChat
+    Register-EmailChat; Start-CodeAPI
 }
 
 function Show-Error([string]$msg) {

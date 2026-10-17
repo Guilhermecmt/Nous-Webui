@@ -60,3 +60,6 @@ config.local.*
 Thumbs.db
 desktop.ini
 .DS_Store
+
+# Nous Code (so' para checar tipos)
+node_modules/
