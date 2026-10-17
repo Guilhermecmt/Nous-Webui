@@ -143,16 +143,18 @@ function Ensure-FilesFolder {
     }
 }
 
-# Garante o modelo de embeddings (busca semantica nos arquivos). Baixa so' se faltar.
+# Garante o modelo de embeddings (busca semantica: arquivos, historico, memoria,
+# habilidades). Multilingue: em portugues separa o relevante do irrelevante bem
+# melhor que o nomic-embed-text. Baixa so' se faltar (~560 MB).
 function Ensure-EmbedModel {
     try {
         $tags = Invoke-RestMethod "http://127.0.0.1:11434/api/tags" -TimeoutSec 5
         $has = $false
-        foreach ($m in $tags.models) { if ($m.name -match "nomic-embed-text") { $has = $true } }
+        foreach ($m in $tags.models) { if ($m.name -eq "granite-embedding:278m") { $has = $true } }
         if (-not $has) {
             $ollamaExe = Join-Path $env:LOCALAPPDATA "Programs\Ollama\ollama.exe"
             if (-not (Test-Path $ollamaExe)) { $ollamaExe = "ollama" }
-            Start-Process -FilePath $ollamaExe -ArgumentList "pull nomic-embed-text" -WindowStyle Hidden
+            Start-Process -FilePath $ollamaExe -ArgumentList "pull granite-embedding:278m" -WindowStyle Hidden
         }
     } catch {}
 }

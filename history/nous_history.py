@@ -114,10 +114,10 @@ class Filter:
     class Valves(BaseModel):
         ENABLED: bool = Field(default=True, description="Liga/desliga o historico de conversas.")
         TOP_K: int = Field(default=3, description="Quantos dialogos anteriores injetar por pergunta.")
-        MIN_SIM: float = Field(default=0.60, description="Similaridade minima (0-1) para considerar relevante.")
+        MIN_SIM: float = Field(default=0.62, description="Similaridade minima (0-1) para considerar relevante (calibrado para o granite-embedding:278m).")
         MAX_CONTEXT_CHARS: int = Field(default=3000, description="Limite total de texto injetado.")
         RRF_K: int = Field(default=60, description="Constante do Reciprocal Rank Fusion.")
-        EMBED_MODEL: str = Field(default="nomic-embed-text", description="Modelo de embeddings (Ollama).")
+        EMBED_MODEL: str = Field(default="granite-embedding:278m", description="Modelo de embeddings (Ollama). Igual ao do indexador (NOUS_EMBED_MODEL).")
         OLLAMA_URL: str = Field(default="", description="URL do Ollama. Vazio = OLLAMA_BASE_URL ou 127.0.0.1:11434.")
 
     def __init__(self):
@@ -239,7 +239,7 @@ class Filter:
         best_sim = 0.0
         mat = _CACHE["mat"]
         if mat is not None:
-            qv = self._embed("search_query: " + query)
+            qv = self._embed(("search_query: " + query) if self.valves.EMBED_MODEL.startswith("nomic") else query)
             if qv is not None and np is not None:
                 q = np.asarray(qv, dtype="float32")
                 n = np.linalg.norm(q) or 1.0

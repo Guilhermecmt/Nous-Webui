@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Instala/atualiza os filtros de utilidades (YouTube e Clima) DIRETO no banco do
+Instala/atualiza os filtros de utilidades (YouTube, Clima, Compactar) DIRETO no banco do
 Open WebUI, como Filters GLOBAIS e ATIVOS. Mesmo padrao do register_history.py:
 idempotente, sem login, o arquivo em disco e' a fonte da verdade.
 
@@ -25,6 +25,8 @@ FILTERS = [
      "ou responder sobre o video."),
     ("nous_clima", "Nous Clima", "nous_clima.py",
      "Previsao do tempo no chat via Open-Meteo (gratuito, sem chave)."),
+    ("nous_compactar", "Nous Compactar", "nous_compactar.py",
+     "Conversas longas: resume o inicio quando passa de ~60% do contexto do modelo."),
 ]
 
 sys.path.insert(0, os.path.join(HERE, "..", "history"))

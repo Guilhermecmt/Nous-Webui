@@ -130,9 +130,9 @@ class Filter:
     class Valves(BaseModel):
         ENABLED: bool = Field(default=True, description="Liga/desliga as habilidades.")
         TOP_K: int = Field(default=1, description="Quantas habilidades injetar por pergunta.")
-        MIN_SIM: float = Field(default=0.55, description="Similaridade minima (0-1) para uma habilidade virar candidata; o modelo confirma.")
-        STRICT_SIM: float = Field(default=0.68, description="Sem modelo de chat para confirmar, so' usa acima desta similaridade.")
-        EMBED_MODEL: str = Field(default="nomic-embed-text", description="Modelo de embeddings (Ollama).")
+        MIN_SIM: float = Field(default=0.50, description="Similaridade minima (0-1) para uma habilidade virar candidata; o modelo confirma.")
+        STRICT_SIM: float = Field(default=0.58, description="Sem modelo de chat para confirmar, so' usa acima desta similaridade.")
+        EMBED_MODEL: str = Field(default="granite-embedding:278m", description="Modelo de embeddings (Ollama).")
         OLLAMA_URL: str = Field(default="", description="URL do Ollama. Vazio = OLLAMA_BASE_URL ou 127.0.0.1:11434.")
 
     def __init__(self):
@@ -158,6 +158,10 @@ class Filter:
         except Exception:
             return None
 
+    def _pre(self, prefix):
+        """Prefixo de tarefa so' para o nomic-embed-text."""
+        return prefix if self.valves.EMBED_MODEL.startswith("nomic") else ""
+
     def _dir(self, uid):
         return os.path.join(_data_dir(), "skills", _safe(uid))
 
@@ -181,18 +185,18 @@ class Filter:
     def _vec(self, s):
         mt = os.path.getmtime(s["path"])
         hit = self._emb.get(s["path"])
-        if hit and hit[0] == mt:
+        if hit and hit[0] == (mt, self.valves.EMBED_MODEL):
             return hit[1]
-        v = self._embed(f"search_document: {s['nome']}. {s['quando_usar']}")
+        v = self._embed(self._pre("search_document: ") + f"{s['nome']}. {s['quando_usar']}")
         if v is not None:
-            self._emb[s["path"]] = (mt, v)
+            self._emb[s["path"]] = ((mt, self.valves.EMBED_MODEL), v)
         return v
 
     def _match(self, uid, msg, chat_model=""):
         skills = self._skills(uid)
         if not skills:
             return []
-        q = self._embed("search_query: " + msg)
+        q = self._embed(self._pre("search_query: ") + msg)
         scored = []
         for s in skills:
             v = self._vec(s) if q is not None else None

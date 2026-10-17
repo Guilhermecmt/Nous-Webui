@@ -131,6 +131,9 @@
 			'width:5px;height:5px;border-radius:50%;background:#c8962e}' +
 			'.nous-ag-calhead{display:flex;align-items:center;gap:8px;margin-bottom:8px}' +
 			'.nous-ag-calhead b{flex:1;text-align:center;text-transform:capitalize}' +
+			'.nous-ag-list{opacity:.9}.nous-ag-chk{display:flex;gap:6px;align-items:center;cursor:pointer;margin:2px 0}' +
+			'.nous-ag-chk.on{text-decoration:line-through;opacity:.55}.nous-ag-chk input{accent-color:#c8962e;margin:0}' +
+			'#nous-ag-gear{background:none;border:none;color:#888;cursor:pointer;font-size:16px}#nous-ag-gear:hover{color:#e7c069}' +
 			'.nous-ag-tag{display:inline-block;font-size:10px;padding:1px 6px;border-radius:9px;' +
 			'background:' + g + '.18);color:#e7c069;margin-left:5px;font-weight:600}' +
 			'#nous-ag-toasts{position:fixed;top:16px;right:16px;z-index:10002;display:flex;flex-direction:column;gap:8px;' +
@@ -164,6 +167,7 @@
 		ov.className = 'nous-hidden';
 		ov.innerHTML =
 			'<div id="nous-ag"><div id="nous-ag-head"><span>📅 Agenda</span>' +
+			'<button id="nous-ag-gear" type="button" title="Onde receber os avisos">⚙</button>' +
 			'<button id="nous-ag-close" type="button" aria-label="Fechar">&#x2715;</button></div>' +
 			'<div id="nous-ag-tabs">' +
 			['hoje:Hoje', 'notas:Notas', 'cal:Calendario', 'tarefas:Tarefas'].map(function (t) {
@@ -174,6 +178,7 @@
 		document.body.appendChild(ov);
 		ov.addEventListener('click', function (e) { if (e.target === ov) close(); });
 		ov.querySelector('#nous-ag-close').addEventListener('click', close);
+		ov.querySelector('#nous-ag-gear').addEventListener('click', function () { show('avisos'); });
 		ov.querySelectorAll('.nous-ag-tab').forEach(function (b) {
 			b.addEventListener('click', function () { show(b.getAttribute('data-tab')); });
 		});
@@ -190,7 +195,7 @@
 	function close() { if (ov) ov.classList.add('nous-hidden'); }
 
 	function show(which) {
-		tab = which;
+		tab = which === 'avisos' ? tab : which;
 		ov.querySelectorAll('.nous-ag-tab').forEach(function (b) {
 			b.classList.toggle('on', b.getAttribute('data-tab') === which);
 		});
@@ -200,7 +205,49 @@
 			return;
 		}
 		box.innerHTML = '<div class="nous-ag-empty">Carregando...</div>';
-		({ hoje: renderToday, notas: renderNotes, cal: renderCal, tarefas: renderTasks })[which](box);
+		({ hoje: renderToday, notas: renderNotes, cal: renderCal, tarefas: renderTasks, avisos: renderSettings })[which](box);
+	}
+
+	/* ---------------------------------------------------------- Avisos */
+	function randomTopic() {
+		var a = new Uint8Array(9), s = 'nous-';
+		(window.crypto || {}).getRandomValues ? window.crypto.getRandomValues(a) : a.forEach(function (_, i) { a[i] = Math.random() * 255; });
+		a.forEach(function (b) { s += 'abcdefghijkmnpqrstuvwxyz23456789'[b % 32]; });
+		return s;
+	}
+
+	function renderSettings(box) {
+		api('GET', qs('/settings')).then(function (d) {
+			var s = d.settings;
+			box.innerHTML = '<div class="nous-ag-h">Onde receber os avisos</div>' +
+				'<div class="nous-ag-hint">Lembretes, compromissos e tarefas prontas sempre aparecem no Windows e aqui no Nous. ' +
+				'Se quiser, eles tambem chegam:</div><div class="nous-ag-form">' +
+				'<label class="nous-ag-lbl" style="font-size:12px;opacity:1"><input id="nous-ag-se" type="checkbox"' +
+				(s.aviso_email === '1' ? ' checked' : '') + '>No seu e-mail (precisa do Assistente de Email conectado)</label></div>' +
+				'<div class="nous-ag-form"><b style="font-size:12px">No celular, de graca (app ntfy)</b>' +
+				'<div class="nous-ag-hint">1. Instale o app <b>ntfy</b> (Android ou iPhone).<br>2. No app, toque em <b>+</b> e assine o codigo abaixo.<br>' +
+				'O codigo funciona como uma senha: quem souber dele recebe seus avisos. As mensagens passam pelo servidor publico ntfy.sh.</div>' +
+				'<div class="nous-ag-row"><input id="nous-ag-st" value="' + esc(s.ntfy_topico || '') + '" placeholder="desligado">' +
+				'<button class="nous-ag-btn ghost" id="nous-ag-sg" type="button" style="flex:.45">Gerar codigo</button></div>' +
+				'<button class="nous-ag-btn" id="nous-ag-ss2" type="button">Salvar</button> ' +
+				'<button class="nous-ag-btn ghost" id="nous-ag-tt" type="button">Mandar um teste</button>' +
+				'<span class="nous-ag-msg" id="nous-ag-sm2"></span></div>' +
+				'<button class="nous-ag-btn ghost" id="nous-ag-back" type="button">Voltar</button>';
+			box.querySelector('#nous-ag-sg').addEventListener('click', function () { box.querySelector('#nous-ag-st').value = randomTopic(); });
+			box.querySelector('#nous-ag-back').addEventListener('click', function () { show('hoje'); });
+			function save() {
+				return api('POST', '/settings', { aviso_email: box.querySelector('#nous-ag-se').checked, ntfy_topico: box.querySelector('#nous-ag-st').value.trim() });
+			}
+			box.querySelector('#nous-ag-ss2').addEventListener('click', function () {
+				save().then(function () { msg(box.querySelector('#nous-ag-sm2'), 'Salvo.'); })
+					.catch(function (e) { msg(box.querySelector('#nous-ag-sm2'), e.message, true); });
+			});
+			box.querySelector('#nous-ag-tt').addEventListener('click', function () {
+				save().then(function () { return api('POST', '/settings/test', {}); })
+					.then(function () { msg(box.querySelector('#nous-ag-sm2'), 'Teste enviado. Chegou?'); })
+					.catch(function (e) { msg(box.querySelector('#nous-ag-sm2'), e.message, true); });
+			});
+		}).catch(function () { offline(box); });
 	}
 
 	/* ---------------------------------------------------------- Hoje */
@@ -273,6 +320,41 @@
 	}
 
 	/* ---------------------------------------------------------- Notas */
+	var CHK = /^(\s*[-*] \[)( |x|X)(\] ?)(.*)$/;
+
+	/* Corpo da nota: linhas "- [ ] item" viram caixas de marcar clicaveis. */
+	function bodyHtml(n) {
+		if (!n.body) return '';
+		var lines = n.body.split('\n'), out = [], hasChk = false;
+		lines.slice(0, 40).forEach(function (l, i) {
+			var m = l.match(CHK);
+			if (m) {
+				hasChk = true;
+				var on = m[2] !== ' ';
+				out.push('<label class="nous-ag-chk' + (on ? ' on' : '') + '"><input type="checkbox" data-chk="' + n.id + ':' + i + '"' +
+					(on ? ' checked' : '') + '>' + esc(m[4]) + '</label>');
+			} else if (l.trim()) {
+				out.push('<div>' + esc(l.length > 300 ? l.slice(0, 300) + '...' : l) + '</div>');
+			}
+		});
+		if (lines.length > 40) out.push('<div>...</div>');
+		return '<div class="nous-ag-sub' + (hasChk ? ' nous-ag-list' : '') + '">' + out.join('') + '</div>';
+	}
+
+	/* Poe o texto na caixa de mensagem do chat (editor do Open WebUI). */
+	function toChat(text) {
+		var box = document.getElementById('chat-input') || document.querySelector('#chat-input, textarea');
+		if (!box) { alert('Abra uma conversa primeiro.'); return; }
+		close();
+		box.focus();
+		if (box.tagName === 'TEXTAREA') {
+			box.value = (box.value ? box.value + '\n' : '') + text;
+			box.dispatchEvent(new Event('input', { bubbles: true }));
+		} else {
+			document.execCommand('insertText', false, text);
+		}
+	}
+
 	function noteForm(n) {
 		n = n || {};
 		var rep = Object.keys(REPEAT_LABEL).map(function (k) {
@@ -281,6 +363,7 @@
 		return '<div class="nous-ag-form" id="nous-ag-nf">' +
 			'<input id="nous-ag-nt" placeholder="Titulo" value="' + esc(n.title || '') + '">' +
 			'<textarea id="nous-ag-nb" placeholder="Texto da nota">' + esc(n.body || '') + '</textarea>' +
+			'<button class="nous-ag-btn ghost" id="nous-ag-nl" type="button" style="margin:-3px 0 8px">☑ Item de lista</button>' +
 			'<div class="nous-ag-row"><div><span class="nous-ag-lbl">Avisar em (opcional)</span>' +
 			'<input id="nous-ag-nr" type="datetime-local" value="' + (n.remind_at ? localInput(n.remind_at) : '') + '"></div>' +
 			'<div><span class="nous-ag-lbl">Repetir</span><select id="nous-ag-np">' + rep + '</select></div></div>' +
@@ -305,8 +388,9 @@
 					(n.tags ? '<span class="nous-ag-tag">' + esc(n.tags) + '</span>' : '') +
 					(n.repeat ? '<span class="nous-ag-tag">' + REPEAT_LABEL[n.repeat] + '</span>' : '') + '</div>' +
 					(when ? '<div class="nous-ag-sub">' + when + '</div>' : '') +
-					(n.body ? '<div class="nous-ag-sub">' + esc(n.body.length > 400 ? n.body.slice(0, 400) + '...' : n.body) + '</div>' : '') +
+					bodyHtml(n) +
 					'</div>' +
+					'<button class="nous-ag-act" title="Usar no chat" data-chat="' + n.id + '">💬</button>' +
 					'<button class="nous-ag-act" title="' + (n.pinned ? 'Desafixar' : 'Fixar no topo') + '" data-pin="' + n.id +
 					'" data-v="' + (n.pinned ? 0 : 1) + '"' + (n.pinned ? '' : ' style="opacity:.3;filter:grayscale(1)"') + '>📌</button>' +
 					'<button class="nous-ag-act" title="Editar" data-edit="' + n.id + '">✎</button>' +
@@ -327,6 +411,25 @@
 			});
 			var c = box.querySelector('#nous-ag-nc');
 			if (c) c.addEventListener('click', function () { editNote = null; renderNotes(box, query); });
+			box.querySelector('#nous-ag-nl').addEventListener('click', function () {
+				var ta = box.querySelector('#nous-ag-nb');
+				ta.value = ta.value + (ta.value && !/\n$/.test(ta.value) ? '\n' : '') + '- [ ] ';
+				ta.focus();
+			});
+			box.querySelectorAll('[data-chk]').forEach(function (cb) {
+				cb.addEventListener('change', function () {
+					var p = cb.getAttribute('data-chk').split(':'), n = byId[p[0]];
+					var lines = n.body.split('\n');
+					lines[+p[1]] = lines[+p[1]].replace(CHK, function (_, a, _b, c2, d) { return a + (cb.checked ? 'x' : ' ') + c2 + d; });
+					api('POST', '/notes/update', { id: n.id, body: lines.join('\n') }).then(function () { renderNotes(box, query); });
+				});
+			});
+			box.querySelectorAll('[data-chat]').forEach(function (b) {
+				b.addEventListener('click', function () {
+					var n = byId[b.getAttribute('data-chat')];
+					toChat((n.title ? n.title + '\n' : '') + (n.body || ''));
+				});
+			});
 			var q = box.querySelector('#nous-ag-nq'), timer = null;
 			q.addEventListener('input', function () {
 				clearTimeout(timer);
@@ -519,7 +622,10 @@
 	}
 
 	/* ---------------------------------------------------------- Tarefas */
-	function taskForm() {
+	function taskForm(list) {
+		var chain = '<option value="">Nada</option>' + (list || []).map(function (t) {
+			return '<option value="' + esc(t.id) + '">' + esc(t.name) + '</option>';
+		}).join('');
 		var kinds = Object.keys(KIND_LABEL).map(function (k) {
 			return '<option value="' + k + '">' + KIND_LABEL[k] + '</option>';
 		}).join('');
@@ -542,6 +648,8 @@
 			'<div id="nous-ag-tm-wrap" style="display:none"><span class="nous-ag-lbl">Dia do mes</span><input id="nous-ag-tm" type="number" min="1" max="31" value="1"></div>' +
 			'<div id="nous-ag-to-wrap" style="display:none"><span class="nous-ag-lbl">Data</span><input id="nous-ag-to" type="date"></div>' +
 			'<div><span class="nous-ag-lbl">Hora</span><input id="nous-ag-th" type="time" value="08:00"></div></div>' +
+			'<span class="nous-ag-lbl">Quando terminar, rodar em seguida (recebe este resultado)</span>' +
+			'<select id="nous-ag-tc">' + chain + '</select>' +
 			'<label class="nous-ag-lbl"><input id="nous-ag-te" type="checkbox">Enviar o resultado para o meu e-mail (precisa do Assistente de Email)</label><br><br>' +
 			'<button class="nous-ag-btn" id="nous-ag-tb" type="button">Criar tarefa</button>' +
 			'<span class="nous-ag-msg" id="nous-ag-tmsg"></span></div>';
@@ -551,8 +659,11 @@
 		api('GET', qs('/tasks')).then(function (d) {
 			var html = '';
 			if (!d.tasks.length) html += '<div class="nous-ag-empty">Nenhuma tarefa agendada.</div>';
+			var names = {};
+			d.tasks.forEach(function (t) { names[t.id] = t.name; });
 			d.tasks.forEach(function (t) {
 				var running = d.running.indexOf(t.id) >= 0;
+				if (t.then_task && names[t.then_task]) t.quando += ' · depois: ' + names[t.then_task];
 				var last = running ? 'rodando agora...' : (t.last_run ? 'ultima vez: ' + dayLabel(t.last_run, Date.now() / 1000).toLowerCase() +
 					' ' + hm(t.last_run) + (t.last_status === 'erro' ? ' (falhou)' : '') : 'ainda nao rodou');
 				html += '<div class="nous-ag-item"><button class="nous-ag-act" title="' + (t.enabled ? 'Pausar' : 'Ativar') +
@@ -564,7 +675,7 @@
 					'<button class="nous-ag-act" title="Rodar agora" data-trun="' + t.id + '">⚡</button>' +
 					'<button class="nous-ag-act" title="Apagar" data-tdel="' + t.id + '">🗑</button></div>';
 			});
-			box.innerHTML = html + taskForm();
+			box.innerHTML = html + taskForm(d.tasks);
 			bindTasks(box, d.running.length > 0);
 		}).catch(function () { offline(box); });
 	}
@@ -598,7 +709,7 @@
 			api('POST', '/tasks', {
 				name: box.querySelector('#nous-ag-tn').value, kind: box.querySelector('#nous-ag-tk').value,
 				prompt: box.querySelector('#nous-ag-tp').value, schedule: sched,
-				email: box.querySelector('#nous-ag-te').checked
+				email: box.querySelector('#nous-ag-te').checked, then_task: box.querySelector('#nous-ag-tc').value || null
 			}).then(function () { renderTasks(box); })
 				.catch(function (e) { msg(box.querySelector('#nous-ag-tmsg'), e.message, true); });
 		});

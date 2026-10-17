@@ -108,17 +108,24 @@ def task_save(cx, user_id, d, tid=None):
     nxt = next_run(schedule, db.now())  # valida a agenda
     if nxt is None:
         raise ValueError("esse horario ja passou")
+    then_task = (d.get("then_task") or "").strip() or None
+    if then_task and then_task == tid:
+        raise ValueError("uma tarefa nao pode chamar ela mesma em seguida")
+    if then_task and not cx.execute(
+            "SELECT 1 FROM tasks WHERE id=? AND user_id=?", (then_task, user_id)).fetchone():
+        raise ValueError("a tarefa seguinte nao existe")
     t = db.now()
     fields = (name, kind, (d.get("prompt") or "").strip(), schedule,
-              1 if d.get("enabled", True) else 0, nxt, 1 if d.get("email") else 0)
+              1 if d.get("enabled", True) else 0, nxt, 1 if d.get("email") else 0, then_task)
     if tid:
         cx.execute("""UPDATE tasks SET name=?, kind=?, prompt=?, schedule=?, enabled=?,
-                          next_run=?, email=?, updated_at=? WHERE id=? AND user_id=?""",
+                          next_run=?, email=?, then_task=?, updated_at=? WHERE id=? AND user_id=?""",
                    (*fields, t, tid, user_id))
     else:
         tid = db.new_id()
         cx.execute("""INSERT INTO tasks (name, kind, prompt, schedule, enabled, next_run, email,
-                          id, user_id, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
+                          then_task, id, user_id, created_at, updated_at)
+                      VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
                    (*fields, tid, user_id, t, t))
     cx.commit()
     return task_get(cx, user_id, tid)
@@ -213,9 +220,14 @@ def _agenda_text(cx, user_id):
     return "\n".join(lines) or "(nada marcado para hoje)"
 
 
-def run_task(cx, task):
-    """Executa e devolve o texto do resultado (levanta excecao em falha)."""
+def run_task(cx, task, contexto=None):
+    """Executa e devolve o texto do resultado (levanta excecao em falha).
+    contexto = resultado da tarefa anterior quando esta roda em cadeia (a
+    pesquisa ignora: o texto da tarefa ja' e' a pergunta de busca)."""
     kind, prompt = task["kind"], task["prompt"]
+    if contexto and kind != "pesquisa":
+        prompt = (f"{prompt}\n\nUse como base o resultado da etapa anterior:\n"
+                  f"\"\"\"{contexto[:6000]}\"\"\"").strip()
     if kind == "pergunta":
         return llm(f"Hoje e' {_hoje()}. Responda em portugues do Brasil.\n\n{prompt}")
     if kind == "pesquisa":
@@ -273,12 +285,12 @@ def _friendly(e):
     return str(e)
 
 
-def execute(cx, task):
+def execute(cx, task, contexto=None):
     """Roda a tarefa e registra o resultado (nota + aviso). Devolve (ok, titulo)."""
     stamp = db.local_dt(db.now()).strftime("%d/%m %H:%M")
     title = f"{task['name']} - {stamp}"
     try:
-        text = run_task(cx, task)
+        text = run_task(cx, task, contexto)
         status = "ok"
     except Exception as e:
         text = "A tarefa nao pode ser concluida: " + _friendly(e)

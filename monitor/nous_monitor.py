@@ -55,7 +55,7 @@ def _data_dir():
 # polling reaproveite a leitura anterior em vez de abrir outro powershell.
 _GPU_TTL = 4.0
 # Modelos de apoio que o proprio Nous baixa (fora do catalogo da Loja).
-_EXTRA_PULLABLE = {"nomic-embed-text"}
+_EXTRA_PULLABLE = {"nomic-embed-text", "granite-embedding:278m"}
 
 # PowerShell que devolve a memoria da GPU (usada + total) em bytes, como JSON.
 _PS_GPU = r"""

@@ -439,7 +439,16 @@
 			'#nous-mem-add{background:rgba(200,150,46,.18);border:1px solid rgba(200,150,46,.4);' +
 			'color:#e7c069;border-radius:8px;padding:6px 10px;font-size:12px;cursor:pointer;' +
 			'font-weight:600;white-space:nowrap}' +
-			'#nous-mem-add:hover{background:rgba(200,150,46,.32)}';
+			'#nous-mem-add:hover{background:rgba(200,150,46,.32)}' +
+			'.nous-mem-pin{opacity:.3;filter:grayscale(1)}.nous-mem-pin.on{opacity:1;filter:none}' +
+			'#nous-mem-tidy{width:100%;margin-top:8px;padding:6px;border:1px dashed rgba(200,150,46,.4);border-radius:8px;' +
+			'background:transparent;color:#e7c069;cursor:pointer;font-size:12px}' +
+			'#nous-mem-tidy:hover{background:rgba(200,150,46,.12)}' +
+			'.nous-tidy-g{display:flex;gap:7px;align-items:flex-start;padding:7px 4px;font-size:12px;line-height:1.45;' +
+			'border-bottom:1px solid rgba(255,255,255,.06);cursor:pointer}' +
+			'.nous-tidy-g i{opacity:.5;font-style:normal}' +
+			'.nous-tidy-row{display:flex;gap:6px;margin-top:8px}.nous-tidy-row button{flex:1;padding:6px;border-radius:8px;' +
+			'cursor:pointer;border:1px solid rgba(200,150,46,.4);background:rgba(200,150,46,.18);color:#e7c069;font-size:12px}';
 		var st = document.createElement('style');
 		st.id = 'nous-mem-style';
 		st.textContent = css;
@@ -636,12 +645,76 @@
 			item.innerHTML =
 				'<span class="nous-mem-text">' + _esc(m.text) + '</span>' +
 				'<div class="nous-mem-acts">' +
+				'<button class="nous-mem-pin' + (m.pinned ? ' on' : '') + '" type="button" title="' +
+				(m.pinned ? 'Fixada: entra em toda conversa. Clique para soltar' : 'Fixar: entra em toda conversa') +
+				'">&#x1F4CC;</button>' +
 				'<button class="nous-mem-edit" title="Editar" type="button">&#x270F;</button>' +
 				'<button class="nous-mem-del" title="Deletar" type="button">&#x1F5D1;</button>' +
 				'</div>';
+			item.querySelector('.nous-mem-pin').addEventListener('click', function() { pinMem(m.id, !m.pinned); });
 			item.querySelector('.nous-mem-edit').addEventListener('click', function() { startEdit(item, m); });
 			item.querySelector('.nous-mem-del').addEventListener('click', function() { deleteMem(m.id); });
 			list.appendChild(item);
+		});
+		if (mems.length >= 2) {
+			var tidy = document.createElement('button');
+			tidy.type = 'button';
+			tidy.id = 'nous-mem-tidy';
+			tidy.textContent = '🧹 Organizar memorias';
+			tidy.title = 'O Nous procura memorias repetidas ou que se contradizem e propoe juntar. Voce aprova antes.';
+			tidy.addEventListener('click', tidyMemories);
+			list.appendChild(tidy);
+		}
+	}
+
+	function pinMem(id, pinned) {
+		if (!_nousUid) return;
+		fetch(MEM_URL + '/memories/' + id + '/pin', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ user_id: _nousUid, pinned: pinned })
+		}).then(function() { loadMemories(); }).catch(loadMemories);
+	}
+
+	/* Faxina: o modelo PROPOE, o usuario marca o que aceita e aplica. */
+	function tidyMemories() {
+		var list = memPanelEl.querySelector('#nous-mem-list');
+		list.innerHTML = '<div class="nous-mem-loading">Lendo as memorias... (pode levar um minuto)</div>';
+		fetch(MEM_URL + '/memories/tidy', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ user_id: _nousUid, persona: _activePer })
+		}).then(function(r) { return r.json(); }).then(function(d) {
+			if (d.error) throw new Error(d.error);
+			var gs = d.grupos || [];
+			if (!gs.length) {
+				list.innerHTML = '<div class="nous-mem-empty">Tudo em ordem: nada repetido nem contraditorio.</div>';
+				setTimeout(loadMemories, 2500);
+				return;
+			}
+			list.innerHTML = '<div class="nous-mem-empty" style="text-align:left">Marque o que pode juntar:</div>' +
+				gs.map(function(g, i) {
+					return '<label class="nous-tidy-g"><input type="checkbox" checked data-g="' + i + '">' +
+						'<span><b>' + (g.motivo === 'contradicao' ? 'Contradicao' : 'Repetida') + ':</b> ' +
+						g.antes.map(_esc).join(' <i>+</i> ') + '<br>&rarr; <b>' + _esc(g.texto) + '</b></span></label>';
+				}).join('') +
+				'<div class="nous-tidy-row"><button type="button" id="nous-tidy-ok">Aplicar</button>' +
+				'<button type="button" id="nous-tidy-no">Cancelar</button></div>';
+			list.querySelector('#nous-tidy-no').addEventListener('click', loadMemories);
+			list.querySelector('#nous-tidy-ok').addEventListener('click', function() {
+				var sel = [];
+				list.querySelectorAll('[data-g]').forEach(function(cb) {
+					if (cb.checked) sel.push(gs[+cb.getAttribute('data-g')]);
+				});
+				fetch(MEM_URL + '/memories/tidy/apply', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ user_id: _nousUid, grupos: sel })
+				}).then(loadMemories, loadMemories);
+			});
+		}).catch(function(e) {
+			list.innerHTML = '<div class="nous-mem-empty">' + _esc(e.message || 'Nao consegui organizar agora.') + '</div>';
+			setTimeout(loadMemories, 4000);
 		});
 	}
 

@@ -15,13 +15,17 @@ Rotas (todas com user_id, como a Memory API):
   GET  /subs?user_id=                  POST /subs   POST /subs/delete   POST /subs/sync
   GET  /tasks?user_id=                 POST /tasks  POST /tasks/update  POST /tasks/delete
   POST /tasks/run {user_id, id}        roda agora
+  GET  /settings?user_id=              POST /settings {aviso_email, ntfy_topico}
+  POST /settings/test                  manda um aviso de teste pelos canais ligados
   GET  /notifications?user_id=         POST /notifications/seen {user_id, ids}
 
 CORS apenas de origem local (mesmo padrao do monitor).
 """
 import os
 import sys
+import time
 import asyncio
+import sqlite3
 import subprocess
 import urllib.parse
 
@@ -130,6 +134,55 @@ def toast(title, body):
         pass
 
 
+# ----------------------------------------------------------------- outros canais
+NTFY_URL = os.environ.get("NOUS_NTFY_URL", "https://ntfy.sh").rstrip("/")
+
+
+def deliver(cx, uid, title, body):
+    """Alem do aviso do Windows: e-mail para a propria conta e/ou celular (ntfy),
+    se o usuario ligou em Agenda > Avisos. Falha de um canal nao afeta os outros."""
+    s = db.settings_get(cx, uid)
+    if s["aviso_email"] == "1":
+        try:
+            tasks.send_email_to_self("[Nous] " + title, body or title)
+        except Exception:
+            pass
+    if s["ntfy_topico"]:
+        try:
+            # JSON (e nao headers) para acentos chegarem certos no celular
+            requests.post(NTFY_URL + "/", json={"topic": s["ntfy_topico"], "title": "Nous - " + title,
+                                                "message": body or title, "tags": ["bell"]}, timeout=10)
+        except Exception:
+            pass
+
+
+# ----------------------------------------------------------------- GPU livre
+# Tarefas agendadas esperam o usuario parar de conversar: com uma GPU so', uma
+# tarefa rodando no meio da conversa deixaria as respostas lentas. Adia em
+# blocos de 5 min, no maximo 6 vezes (30 min), e depois roda de qualquer jeito.
+ACTIVE_SECS = 120
+DEFER_SECS = 300
+MAX_DEFERS = 6
+_defers = {}  # task_id -> quantas vezes ja' adiou
+
+
+def user_active():
+    p = os.path.join(db.data_dir(), "webui.db")
+    if not os.path.isfile(p):
+        return False
+    try:
+        wx = sqlite3.connect(f"file:{p}?mode=ro", uri=True, timeout=5)
+        try:
+            last = wx.execute("SELECT MAX(updated_at) FROM chat").fetchone()[0] or 0
+        finally:
+            wx.close()
+    except Exception:
+        return False
+    if last > 10 ** 12:  # alguns bancos guardam em ns/ms
+        last = last / (10 ** 9 if last > 10 ** 15 else 10 ** 3)
+    return (time.time() - last) < ACTIVE_SECS
+
+
 # ----------------------------------------------------------------- relogio
 def _sync_sub(cx, sub):
     try:
@@ -151,19 +204,49 @@ def _tick_sync():
     """Lembretes + tarefas vencidas. Roda numa thread (sqlite e rede bloqueiam)."""
     cx = db.connect()
     try:
-        for _uid_, title, body in db.due_reminders(cx):
+        for uid, title, body in db.due_reminders(cx):
             toast(title, body)
-        return [t for t in tasks.due_tasks(cx) if t["id"] not in _running]
+            deliver(cx, uid, title, body)
+        due = [t for t in tasks.due_tasks(cx) if t["id"] not in _running]
+        if due and user_active():
+            run = []
+            for t in due:
+                n = _defers.get(t["id"], 0)
+                if n < MAX_DEFERS:
+                    _defers[t["id"]] = n + 1
+                    cx.execute("UPDATE tasks SET next_run=?, enabled=1 WHERE id=?",
+                               (db.now() + DEFER_SECS, t["id"]))
+                else:
+                    run.append(t)
+            cx.commit()
+            due = run
+        for t in due:
+            _defers.pop(t["id"], None)
+        return due
     finally:
         cx.close()
 
 
-def _run_task_sync(task):
+def _run_task_sync(task, chain=None):
     _running.add(task["id"])
     cx = db.connect()
     try:
-        ok, title = tasks.execute(cx, task)
+        ok, title = tasks.execute(cx, task, contexto=(chain or {}).get("texto"))
         toast(("Tarefa pronta: " if ok else "Tarefa falhou: ") + task["name"], title)
+        if ok:
+            note = db.note_get(cx, task["user_id"], cx.execute(
+                "SELECT last_note FROM tasks WHERE id=?", (task["id"],)).fetchone()[0])
+            if db.settings_get(cx, task["user_id"])["ntfy_topico"]:
+                deliver(cx, task["user_id"], "Tarefa pronta: " + task["name"],
+                        (note or {}).get("body", "")[:900])
+            # Cadeia: a proxima tarefa recebe este resultado como contexto
+            nxt = task.get("then_task")
+            seen = set((chain or {}).get("seen", ())) | {task["id"]}
+            if nxt and nxt not in seen and len(seen) < 6:
+                t2 = tasks.task_get(cx, task["user_id"], nxt)
+                if t2:
+                    _running.discard(task["id"])
+                    _run_task_sync(t2, {"texto": (note or {}).get("body", ""), "seen": seen})
     finally:
         cx.close()
         _running.discard(task["id"])
@@ -433,6 +516,38 @@ async def h_task_run(request):
     return _ok({"started": True})
 
 
+async def h_settings(request):
+    uid = _uid(request.query)
+    cx = db.connect()
+    try:
+        return _ok({"settings": db.settings_get(cx, uid)})
+    finally:
+        cx.close()
+
+
+async def h_settings_save(request):
+    d = await _body(request)
+    cx = db.connect()
+    try:
+        return _ok({"settings": db.settings_set(cx, _uid(d), d)})
+    finally:
+        cx.close()
+
+
+async def h_settings_test(request):
+    d = await _body(request)
+    uid = _uid(d)
+
+    def run():
+        cx = db.connect()
+        try:
+            deliver(cx, uid, "Teste de aviso", "Se voce esta lendo isto, os avisos do Nous chegam aqui.")
+        finally:
+            cx.close()
+    await asyncio.get_event_loop().run_in_executor(None, run)
+    return _ok()
+
+
 async def h_notifs(request):
     uid = _uid(request.query)
     cx = db.connect()
@@ -476,6 +591,9 @@ def build_app():
         web.post("/tasks/update", h_task_update),
         web.post("/tasks/delete", h_task_delete),
         web.post("/tasks/run", h_task_run),
+        web.get("/settings", h_settings),
+        web.post("/settings", h_settings_save),
+        web.post("/settings/test", h_settings_test),
         web.get("/notifications", h_notifs),
         web.post("/notifications/seen", h_notifs_seen),
     ])

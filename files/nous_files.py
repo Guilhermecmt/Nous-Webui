@@ -104,10 +104,10 @@ class Filter:
         ENABLED: bool = Field(default=True, description="Liga/desliga o acesso aos arquivos.")
         FOLDER: str = Field(default="", description="Pasta a indexar (ex.: seu vault do Obsidian). Vazio = pasta padrao 'Nous' em Documentos.")
         TOP_K: int = Field(default=4, description="Quantos trechos injetar por pergunta.")
-        MIN_SIM: float = Field(default=0.70, description="Similaridade minima (0-1) para considerar relevante. O nomic-embed-text da ~0.68 para quase qualquer texto PT-PT; abaixo de 0.70 entram notas irrelevantes em perguntas que nada tem a ver com seus arquivos.")
+        MIN_SIM: float = Field(default=0.63, description="Similaridade minima (0-1) para considerar relevante. Calibrado para o granite-embedding:278m (pt-BR: relevantes >= 0.67, irrelevantes <= 0.59). Com nomic-embed-text use 0.70.")
         MAX_CONTEXT_CHARS: int = Field(default=4000, description="Limite total de texto injetado.")
         RRF_K: int = Field(default=60, description="Constante do Reciprocal Rank Fusion.")
-        EMBED_MODEL: str = Field(default="nomic-embed-text", description="Modelo de embeddings (Ollama).")
+        EMBED_MODEL: str = Field(default="granite-embedding:278m", description="Modelo de embeddings (Ollama). Igual ao do indexador (NOUS_EMBED_MODEL).")
         OLLAMA_URL: str = Field(default="", description="URL do Ollama. Vazio = OLLAMA_BASE_URL ou 127.0.0.1:11434.")
 
     def __init__(self):
@@ -230,7 +230,7 @@ class Filter:
         best_sim = 0.0
         mat = _CACHE["mat"]
         if mat is not None:
-            qv = self._embed("search_query: " + query)  # prefixo do nomic-embed-text
+            qv = self._embed(("search_query: " + query) if self.valves.EMBED_MODEL.startswith("nomic") else query)
             if qv is not None and np is not None:
                 q = np.asarray(qv, dtype="float32")
                 n = np.linalg.norm(q) or 1.0

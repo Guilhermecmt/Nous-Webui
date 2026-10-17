@@ -93,6 +93,11 @@ CREATE TABLE IF NOT EXISTS notif (
 );
 CREATE INDEX IF NOT EXISTS notif_user ON notif(user_id, seen);
 
+CREATE TABLE IF NOT EXISTS settings (
+    user_id TEXT NOT NULL, key TEXT NOT NULL, value TEXT,
+    PRIMARY KEY (user_id, key)
+);
+
 CREATE TABLE IF NOT EXISTS tasks (
     id TEXT PRIMARY KEY, user_id TEXT NOT NULL, name TEXT NOT NULL,
     kind TEXT NOT NULL DEFAULT 'pergunta', prompt TEXT NOT NULL DEFAULT '',
@@ -110,7 +115,41 @@ def connect():
     cx.row_factory = sqlite3.Row
     cx.execute("PRAGMA journal_mode=WAL")
     cx.executescript(_SCHEMA)
+    for ddl in ("ALTER TABLE tasks ADD COLUMN then_task TEXT",):  # v2.8: tarefas em cadeia
+        try:
+            cx.execute(ddl)
+        except sqlite3.OperationalError:
+            pass
     return cx
+
+
+# ------------------------------------------------------------------ preferencias
+
+SETTINGS = {"aviso_email": "0", "ntfy_topico": ""}
+
+
+def settings_get(cx, user_id):
+    out = dict(SETTINGS)
+    for r in cx.execute("SELECT key, value FROM settings WHERE user_id=?", (user_id,)):
+        if r["key"] in out:
+            out[r["key"]] = r["value"]
+    return out
+
+
+def settings_set(cx, user_id, d):
+    for k in SETTINGS:
+        if k in d:
+            v = d[k]
+            if k == "aviso_email":
+                v = "1" if v in (True, 1, "1", "true") else "0"
+            if k == "ntfy_topico":
+                v = re.sub(r"[^A-Za-z0-9_-]", "", str(v or ""))[:64]
+                if v and len(v) < 12:
+                    raise ValueError("use um codigo de pelo menos 12 letras/numeros (ele funciona como senha)")
+            cx.execute("INSERT OR REPLACE INTO settings (user_id, key, value) VALUES (?,?,?)",
+                       (user_id, k, v))
+    cx.commit()
+    return settings_get(cx, user_id)
 
 
 def now():
