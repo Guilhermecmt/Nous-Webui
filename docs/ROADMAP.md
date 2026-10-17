@@ -36,9 +36,19 @@ sem conhecimento tecnico, com tudo acontecendo em segundo plano.
   agenda pelo chat, tarefas agendadas, habilidades ("aprenda isso"), relatorio
   visual da pesquisa, editor de fotos com remover fundo local, YouTube e clima
   no chat, velocidade estimada na Loja. Codigo proprio (o Odysseus e' AGPL).
-- Pendente: validar o filtro da agenda e o "aprenda isso" com modelos de chat
-  pequenos (llama3.2:3b, qwen3:4b); ligar a galeria (wip-galeria) ao editor
-  via `window.NousEditor.openUrl`; sincronizacao CalDAV de duas vias.
+
+### v2.8 — O melhor do Odysseus, testado com modelo pequeno
+- Memoria com fixadas e "organizar", notas com checklist, avisos no celular
+  (ntfy) e no e-mail, tarefas encadeadas, conversas longas compactadas,
+  pesquisa para modelos pequenos, e-mail com varias contas/anexos/contatos e
+  pelo chat, OCR e boletos, formularios PDF, botoes e comandos no chat com
+  guarda, diagnostico, dicas, privacidade na tela, galeria com albuns,
+  "diga o que fazer" no editor e comparar 2-4 modelos com placar.
+- Validado com qwen3:4b: agenda, "aprenda isso", e-mail pelo chat, OCR,
+  pesquisa, compactacao (o que era pendente da v2.7).
+- Pendente: usar no celular (QR na rede de casa) - exige abrir o servidor
+  para a rede local, decisao do usuario; sincronizacao CalDAV de duas vias;
+  testar com IMAP real e com o ComfyUI instalado.
 
 ### v2.6 — Correcoes para o primeiro acesso
 - Instalador que nao trava nem mente ("Pronto!" so' quando deu certo), app em

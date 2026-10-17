@@ -111,9 +111,11 @@ Power users can install **any** model from [ollama.com/library](https://ollama.c
 
 As you chat, Nous identifies durable facts — name, city, work, preferences — and recalls them in later conversations. The **"O que o Nous sabe"** panel (brain button, bottom-right) lets you view, edit and delete every memory, and create **personas** with separate memory sets (work, studies, personal). Everything lives in `NousData`, on your disk.
 
+Identity and health facts (name, allergies, medication) are **pinned** and join every conversation; pin others with 📌. Past 30 memories, Nous brings only the pinned ones, the most recent and those related to the question. **🧹 Organizar memórias** finds duplicates and proposes merging them — nothing changes without your OK.
+
 ### Files — Nous reads your notes
 
-On first use, Nous creates the `Documents\Nous` folder. Any `.md` or `.txt` placed there automatically joins the search that runs before every reply — with source citations. To use your Obsidian vault, change the `FOLDER` valve of the **Nous Files** filter in the admin panel.
+On first use, Nous creates the `Documents\Nous` folder. Any `.md` or `.txt` placed there automatically joins the search that runs before every reply. Search uses **granite-embedding** (multilingual, understands Portuguese), downloaded automatically; indexes rebuild themselves if the model changes. To use your Obsidian vault, change the `FOLDER` valve of the **Nous Files** filter in the admin panel.
 
 ### Local image generation (optional)
 
@@ -125,14 +127,16 @@ Installs ComfyUI, the right PyTorch for your GPU and the Flux.1 Schnell models (
 
 ### Email assistant — local AI for your inbox (optional)
 
-Connect your email (Gmail, Outlook, Yahoo) via `conectar-email.bat` or the **✉ Assistente de Email** button in the Recursos panel. Nous will:
+Connect your email (Gmail, Outlook, Yahoo) via `conectar-email.bat` or the **✉ Assistente de Email** button in the Recursos panel. **Several accounts** can be connected, with one as default. Nous will:
 
 - **Triage** each email: Importante / Pode esperar / Promoção / Spam + 1-line summary.
-- **Summarize** the full message when you open it.
-- **Draft a reply** in polished PT-BR, ready for you to edit.
+- **Summarize** the full message when you open it — **attachments** included (PDF, spreadsheet, image).
+- **Draft a reply** in polished PT-BR, ready for you to edit, or **schedule** it.
+- **Write from the chat:** *"manda um e-mail para a Ana dizendo que atraso 10 minutos"* — the recipient comes from **contacts learned** from your mail (vCard import/export) and the text becomes a draft.
+- Meeting **invites** go to the Agenda in one click; the **Newsletters** tab helps you unsubscribe.
 - **Send** only after you review and confirm — no auto-sending ever.
 
-> **Privacy:** your emails are processed only by the **local Ollama model**. No email content ever leaves your machine, even if you have NVIDIA Cloud active. Credentials are stored in `NousData/.email_account.json` (never committed to git). Use an **app password**, not your main password — revocable at any time.
+> **Privacy:** your emails are processed only by the **local Ollama model**. No email content ever leaves your machine, even if you have NVIDIA Cloud active. Credentials are stored in `NousData/.email_accounts.json` (never committed to git). Use an **app password**, not your main password — revocable at any time.
 
 ---
 
@@ -146,11 +150,15 @@ Select **"Pesquisa Profunda (Nous)"** in the model dropdown and ask any research
 4. Writes a structured markdown report with inline citations `[n]` and a **Fontes** (Sources) section with clickable URLs.
 5. Saves a **visual report** (table of contents, clickable citations, source cards, print-ready) to the **Recursos › Relatórios** library, linked at the end of the answer.
 
+With small models (up to ~10B) it searches less and answers directly when the question is simple; vague questions get suggestion buttons, and you can follow up on the last report (*"e no Brasil?"*).
+
 All computation happens on your machine. No API key, no cloud. Requires the SearXNG container (runs automatically when Docker is available).
 
-### Blind model comparison — Compare Models
+### Blind model comparison and scoreboard
 
-Select **"Comparar Modelos (Nous)"** in the model dropdown and send your question. Two anonymous answers (A and B) appear side by side — you vote for the better one before the model names are revealed. Powered by Open WebUI's native Arena feature; requires at least two chat models installed.
+**Recursos › ⚖ Comparar modelos**: the same question to **2 to 4 models**, one at a time (each gets the whole GPU), with time and tokens/s for every answer. Blind by default: you vote for the best one and only then see the names. Votes build a **scoreboard** with each model's win rate and average speed on this machine.
+
+In the chat, **"Comparar Modelos (Nous)"** in the dropdown still runs the Arena A/B duel. Both need at least two chat models installed.
 
 ---
 
@@ -188,26 +196,36 @@ Ask in the chat: *"me lembre de pagar a luz sexta às 9h"* (remind me to pay the
 
 **Recursos › 📅 Agenda** has four tabs: **Hoje** (overdue + next 7 days), **Notas** (search, pin, complete, repeat), **Calendário** (month view, events with advance alerts, `.ics` import/export) and **Tarefas**. Google Calendar, Outlook or iCloud can be added by pasting the calendar's **iCal** address (read-only, refreshed hourly).
 
+Notes support **checklists** (`- [ ] item`) and a **💬 usar no chat** button. Under **⚙ Avisos**, reminders can also reach your **phone** (free ntfy app, no sign-up) and/or your **email**. If Nous saved something wrong from the chat, the **↩ Desfazer** button in the reply removes it. Dates and times (*"sexta às 9h"*, *"daqui a 2 horas"*, *"dia 20"*) are parsed by rules, not guessed by the model. Open WebUI's native Calendar and Automations are hidden so there aren't two of each.
+
 ### Scheduled tasks — Nous works on its own
 
-In **Agenda › Tarefas**: a morning briefing with today's agenda and emails, a weekly web research, an evening inbox summary. Tasks run on schedule even with the browser closed; the result becomes a note, a notification and, optionally, an email to yourself.
+In **Agenda › Tarefas**: a morning briefing with today's agenda and emails, a weekly web research, an evening inbox summary. Tasks run on schedule even with the browser closed; the result becomes a note, a notification and, optionally, an email to yourself. A task can **chain** another (the first result becomes the second one's context) and waits a few minutes while you are using the GPU.
 
 ### Skills — Nous learns how you like things done
 
-After getting something right in a conversation, say **"aprenda isso"** ("learn this"). Nous distills the procedure into a skill (a readable `.md` file in `NousData\skills`) and applies it to similar requests later. **Recursos › 🧠 Habilidades** lets you review, edit, create and import `SKILL.md` files from a GitHub link.
+After getting something right in a conversation, say **"aprenda isso"** ("learn this"). Nous distills the procedure into a skill (a readable `.md` file in `NousData\skills`) and applies it to similar requests later. **Recursos › 🧠 Habilidades** lets you review, edit, create and import `SKILL.md` files from a GitHub link. **✍ Ensinar meu jeito de escrever** reads samples of your writing and stores your style, applied whenever you ask Nous to write something.
 
 ### Chat utilities
 
 - **YouTube:** paste a link and ask for a summary — Nous reads the captions and answers with timestamps.
 - **Weather:** *"vai chover amanhã em Curitiba?"* — Open-Meteo forecast (free, no key).
+- **Read images and bills:** send a photo of a document, a screenshot or a Brazilian *boleto* — Nous reads the text locally (OCR), even with a model without vision. Boletos come out with bank, amount and due date, checked against the check digit.
+- **PDF forms** (**Recursos › 📄 Formulários**): lists the fields of a fillable PDF, suggests what it already knows about you and signs with your saved signature.
+- **Long conversations:** when a chat outgrows the model's context, Nous summarizes the beginning on its own and keeps the details.
+- **Chat control:** *"abre minha agenda"*, *"tema escuro"*, *"libera a placa de vídeo"*, *"abre a galeria"*. When there are choices, the reply shows **buttons**; and Nous checks that what the model claims to have done (*"anotei"*, *"rascunho pronto"*) really happened.
 
-### Photo editor
+### Photo editor and Gallery
 
-**Recursos › 🖼 Editor de fotos**, or the **"✎ Editar"** chip over chat images. Crop (free, 1:1, 4:3, 16:9, 9:16), rotate, flip, light/color, filters, resize, undo/redo, download PNG/JPG or copy. **Remove background** runs a 4.5 MB U²-Net model locally, downloaded on first use.
+**Recursos › 🖼 Editor de fotos**, or the **"✎ Editar"** chip over chat images. Crop (free, 1:1, 4:3, 16:9, 9:16), rotate, flip, light/color, filters, resize, undo/redo, download PNG/JPG or copy. **Remove background** runs a 4.5 MB U²-Net model locally, downloaded on first use. In **Diga o que fazer**, just write it: *"tira o fundo, deixa mais claro e corta quadrado"* (works without an AI model).
 
-### Resource panel
+The **Gallery** collects generated images: favorites ★, albums 📁, zoom, recycle bin and ✎ to open an image in the Editor.
 
-The **Recursos** card (bottom-left) shows live VRAM, the models loaded in memory, and the **"Parar modelos"** (frees the GPU instantly) and **"Baixar modelos"** (opens the Store, now with an **estimated speed** per model on your GPU) buttons, plus shortcuts to Agenda, Skills, Reports and the Photo editor.
+### Resource panel and diagnostics
+
+The **Recursos** card (bottom-left) shows live VRAM, the models loaded in memory, and the **"Parar modelos"** (frees the GPU instantly) and **"Baixar modelos"** (opens the Store, now with an **estimated speed** per model on your GPU) buttons, plus shortcuts to Agenda, Email, Skills, Reports, Gallery, Editor, PDF forms and Compare models.
+
+**🩺 Diagnóstico** answers *"what is working?"*: every part of Nous with ✓/✗ and what to do. It also holds **on-screen privacy** (CPF, card numbers, passwords and keys are blurred in chats until clicked) and **"Ver as dicas de novo"** — each panel shows a short tip the first time it opens.
 
 ---
 
@@ -267,7 +285,9 @@ Nous WebUI/
 ├─ email/       Email assistant: IMAP/SMTP client + REST API (port 8995)
 ├─ agenda/      notes, reminders, calendar and scheduled tasks (port 8996)
 ├─ skills/      skills: chat filter + panel API (port 8997)
-├─ utilidades/  YouTube and weather filters
+├─ utilidades/  chat filters: YouTube, weather, OCR/boletos, compaction, commands, guard
+├─ documentos/  PDF forms: fields, filling and signature
+├─ ajustes/     Open WebUI defaults for Nous (Portuguese, embeddings, hidden natives)
 ├─ tools/       capability check, backup, password reset, health check
 └─ docs/        roadmap, screenshots
 ```

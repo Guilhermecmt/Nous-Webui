@@ -1,5 +1,61 @@
 # Changelog
 
+## [2.8.0] - 2026-10-17
+O melhor do Odysseus que faltava, em seis ondas, e cada função testada de
+verdade com um modelo pequeno (qwen3:4b) numa instância isolada. Código
+próprio, o Nous continua MIT.
+### Novo
+- **Memória:** memórias fixadas (identidade e saúde fixam sozinhas), escolha
+  pelas que têm a ver com a pergunta quando passam de 30 e **🧹 Organizar
+  memórias**, que junta repetidas par a par com a sua aprovação.
+- **Agenda:** listas de verificação nas notas, "💬 usar no chat", avisos no
+  celular (ntfy) e no e-mail, **↩ Desfazer** no chat, tarefas encadeadas e
+  tarefas que esperam o computador ficar livre.
+- **Conversas longas** (filtro Nous Compactar): o começo vira um resumo
+  incremental e a conversa continua lembrando dos detalhes.
+- **Pesquisa Profunda:** modo para modelos pequenos, resposta curta para
+  perguntas simples, continuação sobre o último relatório, sugestões em
+  botões para perguntas vagas e relatório parcial quando algo falha.
+- **E-mail:** várias contas, anexos lidos, convites para a Agenda,
+  newsletters com descadastro, rascunhos agendados, contatos aprendidos
+  (vCard) e **e-mail pelo chat** (vira rascunho; nunca envia sozinho).
+- **Ler imagens e boletos** (filtro Nous Leitura): OCR local (RapidOCR) para
+  fotos e prints, também com modelos sem visão; boletos conferidos pelo
+  dígito verificador (banco, valor, vencimento).
+- **Formulários PDF** (`documentos/`): campos, sugestões pelas memórias e
+  assinatura salva.
+- **Modo agente leve:** botões nas respostas (`⟦opcao⟧`, `⟦abrir⟧`,
+  `⟦tema⟧`, `⟦acao⟧`), comandos pelo chat ("abre minha agenda", "tema
+  escuro", "libera a placa de vídeo") e a **guarda**, que confere se o que o
+  modelo diz ter feito foi mesmo feito.
+- **Primeiros passos:** 🩺 Diagnóstico, dicas na primeira vez de cada painel,
+  CPF/cartão/senhas borrados na tela e "✍ Ensinar meu jeito de escrever".
+- **Galeria** (vinda do wip-galeria): grade, lightbox com zoom, lixeira,
+  ComfyUI ligado sob demanda; agora com favoritas, álbuns e ✎ para o Editor.
+- **Editor:** "Diga o que fazer" — frases em português viram as ações.
+- **Comparar modelos** no painel: 2 a 4 modelos, tempo e tokens/s, voto às
+  cegas e placar acumulado.
+### Mudado
+- **Embeddings:** granite-embedding:278m (multilíngue) no lugar do
+  nomic-embed-text, também no RAG do Open WebUI (só onde ainda não há
+  arquivos); índices refeitos sozinhos ao trocar o modelo.
+- **Contexto de 16k** em todas as chamadas diretas ao Ollama e no
+  `OLLAMA_CONTEXT_LENGTH`: o Ollama 0.30 abria 262k (44 GB) e cada resposta
+  levava 140–210 s; agora 5–25 s.
+- **Português por padrão:** idioma da interface, legendas do YouTube e um
+  prompt de sistema em PT-BR para modelos sem prompt próprio.
+- Calendário e Automações nativos do Open WebUI escondidos (filtro de
+  ajustes em `ajustes/`); a Agenda e as Tarefas do Nous fazem isso.
+- Agenda pelo chat lê datas e horas por regra (não pelo modelo) e recusa
+  horário no passado.
+- Citações de Arquivos e Histórico não vão mais no fim da resposta
+  (decisão do wip-galeria).
+- SearXNG escuta só em 127.0.0.1.
+### Corrigido
+- qwen3 "pensando em voz alta" quebrava respostas estruturadas (agora com
+  JSON schema e `think` desligado).
+- Habilidades aprendidas ficavam específicas demais ("do João").
+
 ## [2.7.0] - 2026-10-16
 Funções inspiradas no Odysseus (PewDiePie), reescritas no estilo do Nous
 (o Odysseus é AGPL; nenhum código dele foi copiado e o Nous continua MIT).

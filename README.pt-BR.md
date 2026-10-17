@@ -111,9 +111,11 @@ Usuários avançados podem instalar **qualquer** modelo do catálogo [ollama.com
 
 Conversando normalmente, o Nous identifica fatos duráveis — nome, cidade, trabalho, gostos — e os recupera nas conversas seguintes. O painel **"O que o Nous sabe"** (botão de cérebro, canto inferior direito) permite ver, editar e apagar cada memória, além de criar **personas** com memórias separadas (trabalho, estudos, pessoal). Tudo fica em `NousData`, no seu disco.
 
+Fatos de identidade e de saúde (nome, alergias, remédios) ficam **fixados** e entram em toda conversa; dá para fixar outros com o 📌. Quando as memórias passam de 30, o Nous leva só as fixadas, as mais recentes e as que têm a ver com a pergunta. **🧹 Organizar memórias** encontra repetidas e propõe juntá-las — nada muda sem o seu OK.
+
 ### Arquivos — o Nous lê suas anotações
 
-No primeiro uso, o Nous cria a pasta `Documentos\Nous`. Qualquer `.md` ou `.txt` colocado ali entra automaticamente na busca que acontece antes de cada resposta — com citação da fonte. Para usar seu vault do Obsidian, altere o valve `FOLDER` do filtro **Nous Files** no painel de administração.
+No primeiro uso, o Nous cria a pasta `Documentos\Nous`. Qualquer `.md` ou `.txt` colocado ali entra automaticamente na busca que acontece antes de cada resposta. A busca usa o **granite-embedding** (multilíngue, entende português), baixado sozinho; os índices se refazem se o modelo mudar. Para usar seu vault do Obsidian, altere o valve `FOLDER` do filtro **Nous Files** no painel de administração.
 
 ### Geração de imagem local (opcional)
 
@@ -125,14 +127,16 @@ Instala o ComfyUI, o PyTorch certo para a sua GPU e os modelos Flux.1 Schnell (~
 
 ### Assistente de Email — IA local para sua caixa de entrada (opcional)
 
-Conecte seu email (Gmail, Outlook, Yahoo) via `conectar-email.bat` ou pelo botão **✉ Assistente de Email** no card Recursos. O Nous vai:
+Conecte seu email (Gmail, Outlook, Yahoo) via `conectar-email.bat` ou pelo botão **✉ Assistente de Email** no card Recursos. Dá para ligar **várias contas** e escolher a padrão. O Nous vai:
 
 - **Triar** cada email: Importante / Pode esperar / Promoção / Spam + resumo de 1 linha.
-- **Resumir** a mensagem completa quando você abre.
-- **Rascunhar uma resposta** em PT-BR educado, pronta para editar.
+- **Resumir** a mensagem completa quando você abre — inclusive o conteúdo dos **anexos** (PDF, planilha, imagem).
+- **Rascunhar uma resposta** em PT-BR educado, pronta para editar, ou **agendar** o envio.
+- **Escrever pelo chat:** *"manda um e-mail para a Ana dizendo que atraso 10 minutos"* — o destinatário vem dos **contatos aprendidos** dos seus e-mails (importa/exporta vCard) e o texto vira um rascunho.
+- **Convites** de reunião vão para a Agenda com um clique; a aba **Newsletters** ajuda a sair de listas.
 - **Enviar** somente após você revisar e confirmar — nunca envia automaticamente.
 
-> **Privacidade:** seus emails são processados apenas pelo **modelo Ollama local**. Nenhum conteúdo sai da máquina, mesmo com Nuvem NVIDIA ativa. As credenciais ficam em `NousData/.email_account.json` (fora do git). Use uma **senha de aplicativo**, não a senha principal — revogável a qualquer momento.
+> **Privacidade:** seus emails são processados apenas pelo **modelo Ollama local**. Nenhum conteúdo sai da máquina, mesmo com Nuvem NVIDIA ativa. As credenciais ficam em `NousData/.email_accounts.json` (fora do git). Use uma **senha de aplicativo**, não a senha principal — revogável a qualquer momento.
 
 ---
 
@@ -146,11 +150,15 @@ Selecione **"Pesquisa Profunda (Nous)"** no dropdown de modelos e faça qualquer
 4. Escreve um relatório em markdown com citações `[n]` e uma seção **Fontes** com URLs clicáveis.
 5. Salva um **relatório visual** (sumário, citações clicáveis, cartões das fontes, pronto para PDF) na biblioteca **Recursos › Relatórios**, com o link no fim da resposta.
 
+Com modelos pequenos (até ~10B) ela faz menos buscas e responde direto quando a pergunta é simples; pergunta vaga ganha sugestões em botões, e dá para continuar a conversa sobre o último relatório (*"e no Brasil?"*).
+
 Tudo roda na sua máquina. Sem chave de API, sem nuvem. Requer o container SearXNG (sobe automaticamente quando o Docker está disponível).
 
-### Comparar Modelos — teste cego A/B
+### Comparar Modelos — teste cego e placar
 
-Selecione **"Comparar Modelos (Nous)"** no dropdown e envie sua pergunta. Duas respostas anônimas (A e B) aparecem lado a lado — você vota na melhor antes de revelar os nomes dos modelos. Requer pelo menos dois modelos de chat instalados.
+**Recursos › ⚖ Comparar modelos**: a mesma pergunta para **2 a 4 modelos**, um de cada vez (a placa fica inteira para cada um), com o tempo e os tokens/s de cada resposta. Por padrão é às cegas: você vota na melhor e só então vê os nomes. Os votos formam um **placar** com o aproveitamento e a velocidade média de cada modelo nesta máquina.
+
+No chat, **"Comparar Modelos (Nous)"** no dropdown continua fazendo o duelo A/B da Arena. Os dois precisam de pelo menos dois modelos de chat instalados.
 
 ---
 
@@ -188,26 +196,36 @@ Peça no chat: *"me lembre de pagar a luz sexta às 9h"*, *"marca dentista dia 2
 
 O painel **Recursos › 📅 Agenda** tem quatro abas: **Hoje** (atrasados e próximos 7 dias), **Notas** (busca, fixar, concluir, repetir todo dia/dias úteis/semana/mês/ano), **Calendário** (mês, compromissos com aviso antes, importar/exportar `.ics`) e **Tarefas**. Dá para trazer o Google Agenda, o Outlook ou o iCloud colando o endereço **iCal** da agenda (só leitura, atualiza de hora em hora).
 
+Notas aceitam **listas de verificação** (`- [ ] item`) e o botão **💬 usar no chat**. Em **⚙ Avisos**, os lembretes também chegam no **celular** (app gratuito ntfy, sem cadastro) e/ou no seu **e-mail**. Se o Nous gravou algo errado pelo chat, o botão **↩ Desfazer** na resposta apaga. Datas e horas (*"sexta às 9h"*, *"daqui a 2 horas"*, *"dia 20"*) são lidas por regra, não adivinhadas pelo modelo. O Calendário e as Automações nativos do Open WebUI ficam escondidos para não haver dois de cada.
+
 ### Tarefas agendadas — o Nous trabalha sozinho
 
-Em **Agenda › Tarefas**: *"todo dia às 8h, bom dia com a agenda e os e-mails"*, *"toda segunda, pesquise novidades de IA"*, *"às 18h, resuma meus e-mails"*. Rodam no horário mesmo com o navegador fechado; o resultado vira uma nota, um aviso e, se quiser, um e-mail para você.
+Em **Agenda › Tarefas**: *"todo dia às 8h, bom dia com a agenda e os e-mails"*, *"toda segunda, pesquise novidades de IA"*, *"às 18h, resuma meus e-mails"*. Rodam no horário mesmo com o navegador fechado; o resultado vira uma nota, um aviso e, se quiser, um e-mail para você. Uma tarefa pode **encadear** outra (o resultado da primeira vira contexto da segunda) e espera alguns minutos se você estiver usando a placa de vídeo.
 
 ### Habilidades — o Nous aprende o seu jeito
 
-Depois de acertar algo numa conversa (o formato do relatório, o tom do e-mail de cobrança…), diga **"aprenda isso"**. O Nous resume o passo a passo numa habilidade (um arquivo `.md` legível em `NousData\skills`) e, nos próximos pedidos parecidos, segue sozinho. Em **Recursos › 🧠 Habilidades** você revisa, edita, cria e importa habilidades no formato `SKILL.md` de um link do GitHub.
+Depois de acertar algo numa conversa (o formato do relatório, o tom do e-mail de cobrança…), diga **"aprenda isso"**. O Nous resume o passo a passo numa habilidade (um arquivo `.md` legível em `NousData\skills`) e, nos próximos pedidos parecidos, segue sozinho. Em **Recursos › 🧠 Habilidades** você revisa, edita, cria e importa habilidades no formato `SKILL.md` de um link do GitHub. **✍ Ensinar meu jeito de escrever** lê textos seus e guarda o seu estilo, usado sempre que você pede para o Nous escrever algo.
 
 ### Utilidades no chat
 
 - **YouTube:** cole um link e peça "resuma" ou pergunte sobre o vídeo — o Nous lê a legenda (português, se houver) e responde citando os minutos.
 - **Clima:** *"vai chover amanhã em Curitiba?"* — previsão do Open-Meteo (gratuito, sem chave). Defina uma cidade padrão em Painel Admin › Funções › Nous Clima.
+- **Ler imagens e boletos:** mande a foto de um documento, print ou boleto — o Nous lê o texto na sua máquina (OCR) mesmo com um modelo sem visão. Boletos saem com banco, valor e vencimento, conferidos pelo dígito verificador.
+- **Formulários PDF** (**Recursos › 📄 Formulários**): mostra os campos de um PDF preenchível, sugere o que já sabe de você e assina com a sua assinatura salva.
+- **Conversas longas:** quando a conversa passa do que o modelo aguenta, o Nous resume o começo sozinho e segue lembrando dos detalhes.
+- **Controle pelo chat:** *"abre minha agenda"*, *"tema escuro"*, *"libera a placa de vídeo"*, *"abre a galeria"*. Quando há escolhas, a resposta traz **botões**; e o Nous confere se o que o modelo diz ter feito (*"anotei"*, *"rascunho pronto"*) foi mesmo feito.
 
-### Editor de fotos
+### Editor de fotos e Galeria
 
-**Recursos › 🖼 Editor de fotos**, ou o botão **"✎ Editar"** que aparece sobre as imagens do chat. Cortar (livre, 1:1, 4:3, 16:9, 9:16), girar, espelhar, brilho/contraste/saturação/temperatura, filtros, redimensionar, desfazer/refazer, baixar PNG/JPG ou copiar. **Remover fundo** usa um modelo U²-Net de 4,5 MB, baixado no primeiro uso e rodando na sua máquina.
+**Recursos › 🖼 Editor de fotos**, ou o botão **"✎ Editar"** que aparece sobre as imagens do chat. Cortar (livre, 1:1, 4:3, 16:9, 9:16), girar, espelhar, brilho/contraste/saturação/temperatura, filtros, redimensionar, desfazer/refazer, baixar PNG/JPG ou copiar. **Remover fundo** usa um modelo U²-Net de 4,5 MB, baixado no primeiro uso e rodando na sua máquina. Em **Diga o que fazer**, escreva do seu jeito: *"tira o fundo, deixa mais claro e corta quadrado"* (funciona sem modelo de IA).
 
-### Painel de recursos
+A **Galeria** reúne as imagens geradas: favoritas ★, álbuns 📁, zoom, lixeira e o ✎ que abre a imagem no Editor.
 
-O card **Recursos** (canto inferior esquerdo) mostra VRAM em tempo real, os modelos carregados na memória e os botões **"Parar modelos"** (libera a GPU na hora) e **"Baixar modelos"** (abre a Loja, que mostra a **velocidade estimada** de cada modelo na sua placa), além dos atalhos para Agenda, Habilidades, Relatórios e Editor de fotos.
+### Painel de recursos e diagnóstico
+
+O card **Recursos** (canto inferior esquerdo) mostra VRAM em tempo real, os modelos carregados na memória e os botões **"Parar modelos"** (libera a GPU na hora) e **"Baixar modelos"** (abre a Loja, que mostra a **velocidade estimada** de cada modelo na sua placa), além dos atalhos para Agenda, Email, Habilidades, Relatórios, Galeria, Editor, Formulários e Comparar modelos.
+
+**🩺 Diagnóstico** responde *"o que está funcionando?"*: cada parte do Nous com ✓/✗ e o que fazer. Ali também ficam a **privacidade na tela** (CPF, cartão, senhas e chaves aparecem borrados nas conversas até você clicar) e **"Ver as dicas de novo"** — cada painel mostra uma dica curta na primeira vez.
 
 ---
 
@@ -267,7 +285,9 @@ Nous WebUI/
 ├─ email/       Assistente de Email: cliente IMAP/SMTP + API REST (porta 8995)
 ├─ agenda/      notas, lembretes, calendário e tarefas agendadas (porta 8996)
 ├─ skills/      habilidades: filtro do chat + API do painel (porta 8997)
-├─ utilidades/  filtros de YouTube e clima
+├─ utilidades/  filtros do chat: YouTube, clima, OCR/boletos, compactar, comandos, guarda
+├─ documentos/  formulários PDF: campos, preenchimento e assinatura
+├─ ajustes/     padrões do Open WebUI para o Nous (português, embeddings, nativos escondidos)
 ├─ tools/       análise de capacidade, backup, reset de senha, health check
 └─ docs/        roadmap, screenshots
 ```
