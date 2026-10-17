@@ -28,7 +28,27 @@ isolada. O Nous continua MIT.
 - **Loja: "E se eu tivesse outra máquina?"** simula outra placa/RAM e mostra
   o que rodaria e a que velocidade (sem botão de baixar na simulação).
 - **Pesquisa Profunda:** relatórios baixam em PDF e Word (`/research/export`);
-  os novos guardam também o Markdown, os antigos saem do HTML.
+  os novos guardam também o Markdown, os antigos saem do HTML. Na biblioteca,
+  ✎ Editar abre o relatório nos Documentos e 📋 copia o texto com as fontes.
+- **Usabilidade dos painéis** (revisão com fotos no Chrome, desktop e celular):
+  - Documentos: revisão guiada ("sugestão 2 de 7", ‹ ›, Enter aceita, Delete
+    recusa, avança e conclui sozinha), **Desfazer** depois de aplicar, aviso
+    "A IA está escrevendo" com Cancelar, aviso de trecho selecionado, modelos
+    prontos (carta, currículo, e-mail, reclamação, ata) e "✨ Escrever com a IA"
+    no documento vazio, negrito/itálico/título/listas, palavras e tempo de
+    leitura, estado do salvamento, Ctrl+S guarda versão, busca na lista e
+    lista em gaveta no celular.
+  - Loja: filtros (cabem aqui, leves, conversa, raciocínio, programação,
+    entendem imagens), "ocupa ~X GB dos Y GB da placa", "Procurar outro modelo"
+    recolhido, confirmação antes de baixar modelo pesado e aviso quando o
+    download termina.
+  - Memória: busca a partir de 8 memórias, apagar com **Desfazer**, importar
+    com "marcar todas/nenhuma" e avisos de quantas foram guardadas/exportadas.
+  - Avisos (toasts) e confirmações no visual do Nous (`modules/_base.js`) no
+    lugar do `alert`/`confirm` do navegador; títulos dos painéis em Cinzel.
+### Corrigido
+- No celular, os botões das respostas alargavam a página inteira (todo painel
+  aparecia cortado à direita); agora viram só ícones em telas estreitas.
 ### Mudado
 - Modelos `hf.co/...` (GGUF baixado pelo Ollama) recebem a memória pessoal
   como os outros locais; só ids de nuvem com `/` continuam sem.

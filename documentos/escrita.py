@@ -152,13 +152,18 @@ def prompt(texto, instrucao, ini=None, fim=None):
         user = (f"INSTRUCAO: {instrucao}\n\nO trecho faz parte de um documento maior. "
                 f"Contexto em volta (NAO devolva):\n{contexto}\n\n"
                 f"TRECHO para reescrever:\n<<<\n{alvo}\n>>>\n\nDevolva so' o trecho reescrito.")
+    elif not texto.strip():
+        # documento vazio + pedido livre: "escreva uma carta pedindo reembolso..."
+        if instrucao in ATALHOS.values():
+            raise ValueError("O documento esta vazio. Escreva algo, cole topicos ou diga o que quer que a IA escreva.")
+        pre, alvo, suf = "", texto, ""
+        user = (f"Escreva do zero o texto pedido abaixo, completo e pronto para usar, em Markdown. "
+                f"Onde faltar um dado (nome, data, valor), deixe entre colchetes, ex.: [seu nome].\n\nPEDIDO: {instrucao}")
     else:
         pre, alvo, suf = "", texto, ""
         user = f"INSTRUCAO: {instrucao}\n\nTEXTO:\n<<<\n{alvo}\n>>>"
     if len(alvo) > MAX_TRECHO:
         raise ValueError("Trecho grande demais para o modelo de uma vez. Selecione uma parte do texto e peca de novo.")
-    if not alvo.strip() and "continu" not in instrucao.lower():
-        raise ValueError("O documento esta vazio. Escreva algo (ou cole topicos) primeiro.")
     return [{"role": "system", "content": SISTEMA}, {"role": "user", "content": user}], pre, alvo, suf
 
 

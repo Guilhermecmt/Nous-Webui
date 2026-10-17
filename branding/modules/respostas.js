@@ -21,11 +21,13 @@
 		var st = document.createElement('style');
 		st.id = 'nous-rw-style';
 		st.textContent =
-			'.nous-rw{display:inline-flex;gap:2px;align-self:center;margin-left:4px;transition:opacity .15s}' +
+			'.nous-rw{display:inline-flex;flex-wrap:wrap;gap:2px;align-self:center;margin-left:4px;min-width:0;transition:opacity .15s}' +
 			'.nous-rw.nous-rw-hover{opacity:0}[id^="message-"]:hover .nous-rw.nous-rw-hover{opacity:1}' +
 			'.nous-rw button{padding:3px 7px;border:none;border-radius:8px;background:none;cursor:pointer;' +
 			'font:500 11.5px Inter,system-ui,sans-serif;color:#8a6414;white-space:nowrap}' +
-			'.dark .nous-rw button{color:#c8962e}.nous-rw button:hover{background:rgba(200,150,46,.14)}';
+			'.dark .nous-rw button{color:#c8962e}.nous-rw button:hover{background:rgba(200,150,46,.14)}' +
+			/* celular: so' o icone (o texto fica no title); sem isto a fileira alargava a pagina */
+			'@media (max-width:640px){.nous-rw .nous-rw-t{display:none}.nous-rw button{padding:3px 6px;font-size:14px}}';
 		document.head.appendChild(st);
 	}
 
@@ -110,9 +112,9 @@
 			if (!box) {
 				box = document.createElement('span');
 				box.className = 'nous-rw';
-				box.innerHTML = '<button type="button" data-rw="curto" title="Pedir uma versao mais curta">✂ Mais curto</button>' +
-					'<button type="button" data-rw="simples" title="Pedir uma explicacao mais simples">🙂 Mais simples</button>' +
-					'<button type="button" data-rw="doc" title="Abrir esta resposta nos Documentos para editar e baixar em Word/PDF">📝 Documento</button>';
+				box.innerHTML = '<button type="button" data-rw="curto" title="Mais curto: pedir uma versao mais curta">✂<span class="nous-rw-t"> Mais curto</span></button>' +
+					'<button type="button" data-rw="simples" title="Mais simples: pedir uma explicacao mais simples">🙂<span class="nous-rw-t"> Mais simples</span></button>' +
+					'<button type="button" data-rw="doc" title="Documento: abrir esta resposta para editar e baixar em Word/PDF">📝<span class="nous-rw-t"> Documento</span></button>';
 				box.addEventListener('click', function (e) {
 					var b = e.target.closest('[data-rw]');
 					if (b) acao(b.getAttribute('data-rw'), msg);
