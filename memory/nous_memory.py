@@ -310,8 +310,13 @@ class Filter:
                 pass
         return body
 
-    async def outlet(self, body: dict, __user__: Optional[dict] = None, __event_emitter__=None) -> dict:
+    async def outlet(self, body: dict, __user__: Optional[dict] = None, __event_emitter__=None,
+                     __metadata__: Optional[dict] = None) -> dict:
         if not (self.valves.ENABLED and self.valves.EXTRACT):
+            return body
+        # "Conversa privada" (chat temporario, id "local:..."): nao fica no
+        # historico, entao tambem nao vira memoria.
+        if str((__metadata__ or {}).get("chat_id") or body.get("chat_id") or "").startswith("local:"):
             return body
         user_id = (__user__ or {}).get("id") or "default"
         persona = _get_active_persona(user_id)

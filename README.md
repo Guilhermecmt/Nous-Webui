@@ -9,7 +9,7 @@
 Chat · Documents · Agenda · Email · Vision · Images · Research — 100% on your PC.  
 No cloud. No subscription. Your conversations never leave your machine.
 
-[![version](https://img.shields.io/badge/version-2.9.0-c8962e)](CHANGELOG.md)
+[![version](https://img.shields.io/badge/version-2.10.0-c8962e)](CHANGELOG.md)
 [![license](https://img.shields.io/badge/license-MIT-black)](LICENSE)
 [![platform](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6)](#requirements)
 [![local](https://img.shields.io/badge/100%25-local%20%26%20private-2ea44f)](#why-nous)
@@ -44,6 +44,11 @@ What you get over an ordinary AI chat:
 - **Photo editor and Gallery.** Remove backgrounds, crop and adjust — or just type *"remove the background and crop it square"* (Portuguese phrases).
 - **Resource panel.** Live VRAM, loaded models, a one-click button to free your GPU, and a **Diagnostics** view that tells you what is working.
 - **No terminal windows.** Opens from a shortcut, runs in the background, stops with "Parar Nous".
+
+### What's new in 2.10
+
+- **No login:** Nous opens straight into the chat, like any other program on your PC — no account or password to remember. It only accepts connections from the computer itself, so your Windows password is what protects it. Your existing conversations are kept.
+- **New home screen:** *"Boa tarde, Name"*, a Nous tip on every visit and a **Conversa privada** (private chat) button — the chat is not kept in history and never becomes memory.
 
 ### What's new in 2.9
 
@@ -91,7 +96,7 @@ Nous is installed to `%LOCALAPPDATA%\Programs\Nous`, so the downloaded folder ca
 
 ## First run
 
-**1. Create your account.** Any name, email and password — the account exists only on your machine, and the first one created is the administrator.
+**1. Just open it.** There is no account or password: Nous opens straight into the chat. If several people share the computer, create one account each in **Admin Panel › Users** — with two or more accounts the login screen comes back and each person sees only their own chats.
 
 **2. Let the assistant work.** On first launch, Nous notices there is no AI model installed yet and shows a welcome screen with the **model recommended for your computer**. One click on **"Download and start"** and it handles the rest, showing progress.
 
@@ -279,7 +284,10 @@ Open Nous from the shortcut (not by typing the address in the browser) — the s
 **The install failed / I want to start over**  
 Double-click `desinstalar.bat` → option **[1] Safe removal** → run `instalar.bat` again. Conversations and notes are preserved.
 
-**I forgot my password**  
+**I want the login screen back**  
+Create an empty file named `.exigir_login` inside `%USERPROFILE%\NousData` and open Nous again. Your account goes back to the email and password it had before. Delete the file to remove the login again.
+
+**I forgot my password** (only with the login on)  
 From `%LOCALAPPDATA%\Programs\Nous`:
 ```powershell
 python tools\reset-password.py --email you@example.com

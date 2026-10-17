@@ -1,5 +1,26 @@
 # Changelog
 
+## [2.10.0] - 2026-10-17
+O Nous abre como um programa do computador: sem tela de login.
+### Novo
+- **Sem login** (`ajustes/acesso_local.py`, chamado pelo launcher antes de
+  subir o servidor). O Nous só escuta em 127.0.0.1, então a senha só protegia
+  contra quem já está no Windows. O Open WebUI 0.9.6 só desliga o login
+  (`WEBUI_AUTH=False`) se a única conta for a fixa `admin@localhost`; por isso,
+  com **uma** conta, ela é convertida nessa (mesmo id: conversas, memórias,
+  documentos e configurações ficam) e o e-mail e a senha originais vão para
+  `NousData/.conta_original.json`. Com **duas ou mais** contas (família no
+  mesmo PC) ou com o arquivo `NousData/.exigir_login`, o login continua e a
+  conta convertida volta ao que era. Na dúvida (erro), login ligado. Conta
+  nova criada sem login ganha o nome do Windows no lugar de "User".
+- **Tela inicial** (`branding/modules/inicio.js`): saudação pela hora e pelo
+  nome, frase de privacidade, uma dica do Nous a cada visita e o botão
+  **Conversa privada** (o chat temporário do Open WebUI). Sem login, o "Sair"
+  do menu da conta e o aviso "Você agora está logado" somem.
+### Corrigido
+- **Memória:** o filtro não aprende nada de conversa temporária (id
+  `local:...`); antes ela sumia do histórico mas ainda podia virar memória.
+
 ## [2.9.0] - 2026-10-17
 As funções de IA local que os usuários mais elogiam e que ainda faltavam,
 em código próprio, testadas com um modelo pequeno (qwen3:4b) numa instância

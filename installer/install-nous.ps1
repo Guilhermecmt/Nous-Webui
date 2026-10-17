@@ -486,8 +486,8 @@ Write-Host ""
 Write-Host " 1. Abra pelo atalho 'Nous' na area de trabalho" -ForegroundColor White
 Write-Host "    (ou tecla Windows > digite Nous; ou clique duplo em iniciar.bat)." -ForegroundColor DarkGray
 Write-Host ""
-Write-Host " 2. Crie sua conta - a primeira conta e' a administradora." -ForegroundColor White
-Write-Host "    Nao precisa de email real; use qualquer nome e senha." -ForegroundColor DarkGray
+Write-Host " 2. Sem conta e sem senha: o Nous abre direto no chat." -ForegroundColor White
+Write-Host "    (Varias pessoas no mesmo PC? Crie uma conta para cada uma no Painel do Admin.)" -ForegroundColor DarkGray
 Write-Host ""
 if ($WithModel) {
     Write-Host " 3. O modelo $Model ja foi baixado. Ele aparece no seletor" -ForegroundColor White

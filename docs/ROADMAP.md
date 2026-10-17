@@ -57,6 +57,12 @@ sem conhecimento tecnico, com tudo acontecendo em segundo plano.
   Face (tamanho e encaixe conferidos antes) e simulacao de outra maquina;
   relatorios da pesquisa em PDF/Word.
 
+### v2.10 — Sem login
+- Abre direto no chat (a conta unica vira a conta fixa do Open WebUI, mesmo
+  id, conversas preservadas; 2+ contas ou `NousData\.exigir_login` mantem o
+  login e desfazem a conversao). Tela inicial com saudacao, dica e "Conversa
+  privada" (chat temporario que o filtro de memoria ignora).
+
 ### v2.6 — Correcoes para o primeiro acesso
 - Instalador que nao trava nem mente ("Pronto!" so' quando deu certo), app em
   `%LOCALAPPDATA%\Programs\Nous`, entrada em Aplicativos instalados.

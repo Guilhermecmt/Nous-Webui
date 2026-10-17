@@ -9,7 +9,7 @@
 Chat · Documentos · Agenda · E-mail · Visão · Imagens · Pesquisa — 100% no seu PC.  
 Sem nuvem. Sem mensalidade. Suas conversas nunca saem da sua máquina.
 
-[![version](https://img.shields.io/badge/version-2.9.0-c8962e)](CHANGELOG.md)
+[![version](https://img.shields.io/badge/version-2.10.0-c8962e)](CHANGELOG.md)
 [![license](https://img.shields.io/badge/license-MIT-black)](LICENSE)
 [![platform](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6)](#requisitos)
 [![local](https://img.shields.io/badge/100%25-local%20%26%20privado-2ea44f)](#por-que-o-nous)
@@ -44,6 +44,11 @@ O que você ganha em relação a um chat de IA comum:
 - **Editor de fotos e Galeria.** Remova o fundo, corte e ajuste — ou só escreva *"tira o fundo e corta quadrado"*.
 - **Painel de recursos.** VRAM em tempo real, modelos carregados, um botão para liberar a placa de vídeo e um **Diagnóstico** que diz o que está funcionando.
 - **Sem janelas de terminal.** Abre por um atalho, roda em segundo plano, fecha pelo "Parar Nous".
+
+### Novidades da versão 2.10
+
+- **Sem login:** o Nous abre direto no chat, como qualquer programa do computador — nada de conta nem senha para lembrar. Ele só aceita conexões do próprio PC, então quem protege é a senha do Windows. Suas conversas antigas continuam lá.
+- **Tela inicial nova:** *"Boa tarde, Fulano"*, uma dica do Nous a cada visita e o botão **Conversa privada** — a conversa não fica no histórico nem vira memória.
 
 ### Novidades da versão 2.9
 
@@ -91,7 +96,7 @@ O Nous fica instalado em `%LOCALAPPDATA%\Programs\Nous`: depois da instalação,
 
 ## Primeiro uso
 
-**1. Crie sua conta.** Qualquer nome, e-mail e senha — a conta existe só na sua máquina, e a primeira criada é a administradora.
+**1. Abra e pronto.** Não tem conta nem senha: o Nous abre direto no chat. Se várias pessoas dividem o computador, crie uma conta para cada uma em **Painel do Admin › Usuários** — com duas ou mais contas o login volta e cada pessoa vê só as próprias conversas.
 
 **2. Deixe o assistente trabalhar.** Na primeira abertura, o Nous percebe que ainda não há um modelo de IA instalado e mostra uma tela de boas-vindas com o **modelo recomendado para o seu computador**. Um clique em **"Baixar e começar"** e ele cuida do download, mostrando o progresso.
 
@@ -279,7 +284,10 @@ Abra o Nous pelo atalho (não pelo endereço direto no navegador) — o atalho i
 **A instalação falhou / quero recomeçar**  
 Clique duplo em `desinstalar.bat` → opção **[1] Remoção segura** → rode `instalar.bat` de novo. Suas conversas e notas são preservadas.
 
-**Esqueci minha senha**  
+**Quero a tela de login de volta**  
+Crie um arquivo vazio chamado `.exigir_login` dentro de `%USERPROFILE%\NousData` e abra o Nous de novo. A sua conta volta ao e-mail e à senha que tinha antes. Para tirar o login outra vez, apague o arquivo.
+
+**Esqueci minha senha** (só com o login ligado)  
 Em `%LOCALAPPDATA%\Programs\Nous`:
 ```powershell
 python tools\reset-password.py --email seuemail@exemplo.com
