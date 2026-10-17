@@ -50,6 +50,13 @@ sem conhecimento tecnico, com tudo acontecendo em segundo plano.
   para a rede local, decisao do usuario; sincronizacao CalDAV de duas vias;
   testar com IMAP real e com o ComfyUI instalado.
 
+### v2.9 — Documentos, memoria portatil e qualquer modelo
+- Documentos com a IA sugerindo mudancas para aceitar/recusar, versoes e
+  Word/PDF; botoes Mais curto / Mais simples / Documento nas respostas;
+  importar e exportar memorias; Loja com qualquer modelo do Ollama/Hugging
+  Face (tamanho e encaixe conferidos antes) e simulacao de outra maquina;
+  relatorios da pesquisa em PDF/Word.
+
 ### v2.6 — Correcoes para o primeiro acesso
 - Instalador que nao trava nem mente ("Pronto!" so' quando deu certo), app em
   `%LOCALAPPDATA%\Programs\Nous`, entrada em Aplicativos instalados.

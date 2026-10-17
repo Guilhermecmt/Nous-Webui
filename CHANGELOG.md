@@ -1,5 +1,41 @@
 # Changelog
 
+## [2.9.0] - 2026-10-17
+As funções de IA local que os usuários mais elogiam e que ainda faltavam,
+em código próprio, testadas com um modelo pequeno (qwen3:4b) numa instância
+isolada. O Nous continua MIT.
+### Novo
+- **📝 Documentos** (`documentos/escrita.py`, painel `escrita.js`): escrever
+  ao lado do chat com pedidos prontos (corrigir, mais formal, mais simples,
+  mais curto, tópicos em texto, organizar com títulos, continuar) ou do seu
+  jeito. A IA reescreve e o Nous compara palavra por palavra (parágrafo
+  inteiro quando ela reescreve muito): cada mudança é uma sugestão para
+  aceitar ou recusar. Seleção = só o trecho muda. Salva sozinho, guarda até
+  25 versões, abre `.docx`/`.pdf`/`.txt`/`.md` e exporta para Word, PDF e
+  Markdown (`documentos/exportar.py`, sem dependência nova). *"Abre meus
+  documentos"* funciona no chat.
+- **Botões nas respostas** (`respostas.js`): ✂ Mais curto, 🙂 Mais simples e
+  📝 Documento (abre a resposta, com o Markdown original, nos Documentos).
+- **Memória: importar e exportar.** O modelo propõe fatos a partir de um
+  arquivo ou texto colado (currículo, "sobre mim", memórias do ChatGPT, até em
+  inglês) e você escolhe; o que já sabia vem marcado. O backup exportado volta
+  sem passar pelo modelo, com as fixadas.
+- **Loja: qualquer modelo.** Nome do Ollama, link do ollama.com ou repositório
+  GGUF do Hugging Face: o tamanho vem do manifesto do registro (nada é
+  baixado), com selo de "cabe na máquina", velocidade estimada, se entende
+  imagens e espaço em disco. Fora do catálogo, o monitor só baixa o que foi
+  conferido na última hora e cabe no disco.
+- **Loja: "E se eu tivesse outra máquina?"** simula outra placa/RAM e mostra
+  o que rodaria e a que velocidade (sem botão de baixar na simulação).
+- **Pesquisa Profunda:** relatórios baixam em PDF e Word (`/research/export`);
+  os novos guardam também o Markdown, os antigos saem do HTML.
+### Mudado
+- Modelos `hf.co/...` (GGUF baixado pelo Ollama) recebem a memória pessoal
+  como os outros locais; só ids de nuvem com `/` continuam sem.
+- No monitor, "modelo local" = tudo o que o Ollama lista menos os `:cloud`
+  (antes, qualquer nome com `/` era tratado como nuvem).
+- API de memória aceita pedidos de até 21 MB (importar arquivo).
+
 ## [2.8.0] - 2026-10-17
 Seis ondas de funções novas, e cada função testada de
 verdade com um modelo pequeno (qwen3:4b) numa instância isolada. Código
