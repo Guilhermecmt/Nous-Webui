@@ -36,6 +36,9 @@ from nous_email import (
 
 PORT = 8995
 OLLAMA_URL = os.environ.get("OLLAMA_BASE_URL", "http://127.0.0.1:11434").rstrip("/")
+# Mesmo num_ctx do chat (monitor/register_model_ctx.py): com outro valor o
+# Ollama recarrega o modelo (no 0.30 o padrao chega a 256k = estoura a VRAM).
+NUM_CTX = int(os.environ.get("NOUS_NUM_CTX", "16384"))
 
 # Cache simples em memória: uid → {category, summary, draft, ts}
 _cache: dict = {}
@@ -65,7 +68,7 @@ def _llm(prompt: str, timeout: int = 60) -> str:
         r = _req.post(
             f"{OLLAMA_URL}/api/generate",
             json={"model": model, "prompt": prompt, "stream": False,
-                  "options": {"temperature": 0.3}},
+                  "options": {"temperature": 0.3, "num_ctx": NUM_CTX}},
             timeout=timeout,
         )
         r.raise_for_status()

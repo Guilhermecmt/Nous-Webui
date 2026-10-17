@@ -21,6 +21,10 @@ import aiohttp
 from typing import Optional
 from pydantic import BaseModel, Field
 
+# Mesmo num_ctx do chat (monitor/register_model_ctx.py): com outro valor o
+# Ollama recarrega o modelo (no 0.30 o padrao chega a 256k e estoura a VRAM).
+NUM_CTX = int(os.environ.get("NOUS_NUM_CTX", "16384"))
+
 
 def _data_dir() -> str:
     """Mesma pasta de dados do Nous/Open WebUI (fora do site-packages, gitignored)."""
@@ -256,7 +260,7 @@ class Filter:
             "model": self.valves.EXTRACT_MODEL,
             "prompt": prompt,
             "stream": False,
-            "options": {"temperature": 0},
+            "options": {"temperature": 0, "num_ctx": NUM_CTX},
             # 5m para nao descarregar o modelo logo apos a extracao de memoria
             # (em geral e' o mesmo modelo da conversa; descarregar anularia o
             # keep_alive da conversa e forcaria um recarregamento lento).

@@ -26,6 +26,9 @@ import agenda_db as db
 
 OLLAMA_URL = os.environ.get("OLLAMA_BASE_URL", "http://127.0.0.1:11434").rstrip("/")
 EMAIL_URL = "http://127.0.0.1:8995"
+# Mesmo num_ctx do chat (monitor/register_model_ctx.py): com outro valor o
+# Ollama recarrega o modelo (no 0.30 o padrao chega a 256k e estoura a VRAM).
+NUM_CTX = int(os.environ.get("NOUS_NUM_CTX", "16384"))
 KINDS = ("pergunta", "pesquisa", "emails", "resumo_dia")
 _EMBED = ("embed", "nomic", "minilm", "bge-", "e5-", "gte-")
 _DIAS = ["segunda", "terca", "quarta", "quinta", "sexta", "sabado", "domingo"]
@@ -177,7 +180,7 @@ def local_model():
 def llm(prompt, timeout=300):
     r = requests.post(f"{OLLAMA_URL}/api/generate",
                       json={"model": local_model(), "prompt": prompt, "stream": False,
-                            "options": {"temperature": 0.4}}, timeout=timeout)
+                            "options": {"temperature": 0.4, "num_ctx": NUM_CTX}}, timeout=timeout)
     r.raise_for_status()
     return (r.json().get("response") or "").strip()
 

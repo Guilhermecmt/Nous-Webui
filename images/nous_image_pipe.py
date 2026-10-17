@@ -28,6 +28,10 @@ from typing import Optional
 import aiohttp
 from pydantic import BaseModel, Field
 
+# Mesmo num_ctx do chat (monitor/register_model_ctx.py): com outro valor o
+# Ollama recarrega o modelo (no 0.30 o padrao chega a 256k e estoura a VRAM).
+NUM_CTX = int(os.environ.get("NOUS_NUM_CTX", "16384"))
+
 
 # --------------------------------------------------------------------------
 # Workflow embutido (Flux Schnell, formato API do ComfyUI).
@@ -297,8 +301,9 @@ class Pipe:
         payload = {"model": self.valves.TEXT_MODEL,
                    "messages": _ollama_messages(messages), "stream": True,
                    "keep_alive": self.valves.KEEP_ALIVE}
+        payload["options"] = {"num_ctx": NUM_CTX}
         if body.get("temperature") is not None:
-            payload["options"] = {"temperature": body["temperature"]}
+            payload["options"]["temperature"] = body["temperature"]
         timeout = aiohttp.ClientTimeout(total=900)
         try:
             async with aiohttp.ClientSession(timeout=timeout) as s:

@@ -12,6 +12,7 @@ description: >
   O modelo do chat so' confirma. Tudo fica na maquina.
 """
 import re
+import os
 import json
 import time
 import asyncio
@@ -20,6 +21,10 @@ import datetime
 from typing import Optional
 
 from pydantic import BaseModel, Field
+
+# Mesmo num_ctx do chat (monitor/register_model_ctx.py): com outro valor o
+# Ollama recarrega o modelo (no 0.30 o padrao chega a 256k e estoura a VRAM).
+NUM_CTX = int(os.environ.get("NOUS_NUM_CTX", "16384"))
 
 try:
     import requests
@@ -36,35 +41,194 @@ _CREATE = re.compile(
     r"(?:coloc|p[oõ]e|bot)[ae]? (?:isso )?na (?:minha )?agenda|"
     r"adicion[ae] (?:na|ao|no) (?:minha |meu )?(?:agenda|calend[aá]rio))\b", re.I)
 _QUERY = re.compile(
-    r"\b((?:o que|quais?|que) (?:eu )?(?:tenho|tem|h[aá]) (?:marcado|agendado|na agenda|hoje|"
-    r"amanh[aã]|essa semana|esta semana|pra|para)|minha agenda|meus compromissos|"
-    r"meus lembretes|minhas notas|estou livre|t[oô] livre)\b", re.I)
+    r"\b((?:o que|quais?|que|qual) (?:eu )?(?:tenho|tem|h[aá]|vou ter)\b(?: \w+){0,4}? "
+    r"(?:marcad|agendad|na agenda|hoje|amanh[aã]|semana|dias|m[eê]s|compromisso|lembrete|reuni)|"
+    r"minha agenda|meus compromissos|meus lembretes|minhas notas|estou livre|t[oô] livre|"
+    r"tenho algo (?:hoje|amanh[aã]|marcado)|"
+    r"(?:quais?|qual)\b[^?]{0,25}\b(?:compromisso|reuni[aã]o|reuni[oõ]es|lembrete|consulta|evento)s?\b"
+    r"[^?]{0,25}\b(?:tenho|tem|h[aá])\b)", re.I)
 
 _DIAS = ["segunda", "terca", "quarta", "quinta", "sexta", "sabado", "domingo"]
 _EMBED = ("embed", "nomic", "minilm", "bge-", "e5-", "gte-")
 
-_PROMPT = """Voce extrai pedidos de agenda de mensagens em portugues. Agora e' {agora} ({dia}).
-Mensagem do usuario: \"\"\"{msg}\"\"\"
+# O modelo so' CLASSIFICA e da o titulo. Datas sao calculadas por _parse_when
+# (modelo pequeno erra conta de calendario: "sexta que vem" virava hoje).
+_PROMPT = """Classifique a mensagem do usuario (agenda pessoal, em portugues).
 
-Responda SO' com um JSON neste formato:
-{{"acao": "lembrete" | "nota" | "evento" | "consulta" | "nenhuma",
-  "titulo": "curto, sem a data",
-  "detalhes": "resto do conteudo (pode ser vazio)",
-  "quando": "AAAA-MM-DDTHH:MM ou AAAA-MM-DD ou vazio",
-  "fim": "AAAA-MM-DDTHH:MM ou vazio",
-  "dia_inteiro": true | false,
-  "repetir": "nenhum" | "diario" | "dias_uteis" | "semanal" | "mensal" | "anual",
-  "avisar_min_antes": numero ou null,
-  "periodo_dias": numero}}
+Responda SO' com JSON: {{"acao": "...", "titulo": "...", "detalhes": "...", "repetir": "..."}}
+- acao: "lembrete" (quer ser AVISADO numa hora) | "evento" (compromisso marcado: consulta,
+  reuniao, aniversario, viagem, aula) | "nota" (guardar uma ideia/informacao) |
+  "consulta" (quer SABER o que tem na agenda) | "nenhuma" (nao e' pedido de agenda)
+- titulo: curto, SEM data, SEM hora e SEM verbos como "me lembre", "marca", "anota"
+- detalhes: o resto do conteudo util (local, observacoes) ou ""
+- repetir: "nenhum" | "diario" | "dias_uteis" | "semanal" | "mensal" | "anual"
 
-Regras:
-- "lembrete": o usuario quer ser AVISADO de algo numa hora (me lembre, me avise).
-- "evento": compromisso com hora marcada (consulta, reuniao, aniversario, viagem).
-- "nota": guardar uma informacao/ideia, sem aviso.
-- "consulta": quer SABER o que tem na agenda; periodo_dias = quantos dias olhar (hoje=1, amanha=2, semana=7).
-- "nenhuma": a mensagem nao e' um pedido de agenda (ex.: pergunta geral que so' cita a palavra).
-- Datas relativas (amanha, sexta, dia 20, semana que vem) viram datas absolutas a partir de agora.
-- Se o usuario disser so' o dia de um lembrete, use 09:00."""
+Exemplos:
+"me lembre de tomar o remedio todo dia as 8h" -> {{"acao":"lembrete","titulo":"Tomar o remedio","detalhes":"","repetir":"diario"}}
+"marca dentista dia 28 as 14h30 na clinica Sorriso" -> {{"acao":"evento","titulo":"Dentista","detalhes":"Clinica Sorriso","repetir":"nenhum"}}
+"anota: ideia de presente para a Ana, um livro" -> {{"acao":"nota","titulo":"Ideia de presente para a Ana","detalhes":"um livro","repetir":"nenhum"}}
+"o que eu tenho amanha?" -> {{"acao":"consulta","titulo":"","detalhes":"","repetir":"nenhum"}}
+"qual a marca de carro mais vendida?" -> {{"acao":"nenhuma","titulo":"","detalhes":"","repetir":"nenhum"}}
+
+Mensagem: \"\"\"{msg}\"\"\""""
+
+_MESES = {"janeiro": 1, "fevereiro": 2, "marco": 3, "março": 3, "abril": 4, "maio": 5,
+          "junho": 6, "julho": 7, "agosto": 8, "setembro": 9, "outubro": 10,
+          "novembro": 11, "dezembro": 12}
+_WD = {"segunda": 0, "terca": 1, "terça": 1, "quarta": 2, "quinta": 3, "sexta": 4,
+       "sabado": 5, "sábado": 5, "domingo": 6}
+_EVENT_WORDS = re.compile(r"\b(marc|agend|consulta|reuni|compromisso|dentista|m[eé]dic|"
+                          r"entrevista|anivers|aula|viagem|voo|exame|culto|missa|jantar|almo[cç]o)", re.I)
+_NOTE_WORDS = re.compile(r"\b(anot|nota\b|guard[ae]|salv[ae] (?:isso|a ideia))", re.I)
+_CMD_PREFIX = re.compile(r"^\s*(me lembr[ae] (?:de|que)?|lembr[ae]-me (?:de)?|lembrete(?: de| para| pra)?|"
+                         r"marc[ae]r?|agend[ae]r?|anot[ae]r?:?|cri[ae] (?:uma |um )?(?:nota|lembrete|evento))\s*",
+                         re.I)
+
+
+def _parse_when(msg, now):
+    """Datas em portugues -> {"start": datetime|None, "has_time": bool, "end": datetime|None}.
+    Determinístico: hoje/amanha/depois de amanha, dia da semana (+ "que vem"),
+    "dia 28", "28 de outubro", "28/10[/2026]", "daqui a N min/horas/dias/semanas",
+    horas "9h", "9h30", "14:30", "as 9 da noite", "meio-dia", periodos "de manha/a tarde/a noite"."""
+    t = " " + (msg or "").lower() + " "
+    t = t.replace("ã", "a").replace("á", "a").replace("à", "a").replace("â", "a").replace("ç", "c") \
+         .replace("é", "e").replace("ê", "e").replace("í", "i").replace("ó", "o").replace("ú", "u")
+    day = None
+    hour = minute = None
+
+    m = re.search(r"\bdaqui a (\d+|uma?|dois|duas|tres) (minutos?|horas?|dias?|semanas?)\b", t) or \
+        re.search(r"\bem (\d+) (minutos?|horas?)\b", t)
+    if m:
+        n = {"um": 1, "uma": 1, "dois": 2, "duas": 2, "tres": 3}.get(m.group(1)) or int(m.group(1))
+        unit = m.group(2)
+        if unit.startswith("minuto"):
+            s = now + datetime.timedelta(minutes=n)
+            return {"start": s.replace(second=0, microsecond=0), "has_time": True, "end": None}
+        if unit.startswith("hora"):
+            s = now + datetime.timedelta(hours=n)
+            return {"start": s.replace(second=0, microsecond=0), "has_time": True, "end": None}
+        day = (now + datetime.timedelta(days=n * (7 if unit.startswith("semana") else 1))).date()
+
+    if day is None:
+        m = re.search(r"\b(\d{1,2})/(\d{1,2})(?:/(\d{2,4}))?\b", t)
+        if m:
+            d, mo = int(m.group(1)), int(m.group(2))
+            y = int(m.group(3)) if m.group(3) else now.year
+            y = y + 2000 if y < 100 else y
+            try:
+                day = datetime.date(y, mo, d)
+                if not m.group(3) and day < now.date():
+                    day = datetime.date(y + 1, mo, d)
+            except ValueError:
+                day = None
+    if day is None:
+        m = re.search(r"\b(?:dia )?(\d{1,2}) de (" + "|".join(k for k in _MESES if "ç" not in k) + r")\b", t)
+        if m:
+            try:
+                day = datetime.date(now.year, _MESES[m.group(2)], int(m.group(1)))
+                if day < now.date():
+                    day = datetime.date(now.year + 1, day.month, day.day)
+            except ValueError:
+                day = None
+    if day is None:
+        m = re.search(r"\bdia (\d{1,2})\b", t)
+        if m:
+            d = int(m.group(1))
+            y, mo = now.year, now.month
+            for _ in range(3):
+                try:
+                    cand = datetime.date(y, mo, d)
+                    if cand >= now.date():
+                        day = cand
+                        break
+                except ValueError:
+                    pass
+                mo, y = (1, y + 1) if mo == 12 else (mo + 1, y)
+    if day is None:
+        if re.search(r"\bdepois de amanha\b", t):
+            day = (now + datetime.timedelta(days=2)).date()
+        elif re.search(r"\bamanha\b", t):
+            day = (now + datetime.timedelta(days=1)).date()
+        elif re.search(r"\bhoje\b|\bhj\b", t):
+            day = now.date()
+    if day is None:
+        m = re.search(r"\b(proxim[ao] )?(segunda|terca|quarta|quinta|sexta|sabado|domingo)(?:-feira)?( que vem| da semana que vem)?\b", t)
+        if m:
+            delta = (_WD[m.group(2)] - now.weekday()) % 7
+            # proxima ocorrencia; "sexta" numa sexta e' hoje, salvo "que vem"/"proxima"
+            if delta == 0 and (m.group(1) or m.group(3)):
+                delta = 7
+            day = (now + datetime.timedelta(days=delta)).date()
+    if day is None and re.search(r"\bsemana que vem\b|\bproxima semana\b", t):
+        day = (now + datetime.timedelta(days=7)).date()
+
+    # ---- hora
+    # o horario que aparece PRIMEIRO na frase (fora de "ate ..."), seja "14h30", "9h" ou "as 9"
+    cands = []
+    for pat in (r"\b(\d{1,2})(?::|h)(\d{2})\b", r"\b(\d{1,2}) ?h(?:oras?)?\b", r"\bas (\d{1,2})\b(?! de )(?!/)"):
+        for mm in re.finditer(pat, t):
+            if not re.search(r"\bate (?:as )?$", t[max(0, mm.start() - 7):mm.start()]):
+                cands.append(mm)
+    m = min(cands, key=lambda x: x.start()) if cands else None
+    if m:
+        hour = int(m.group(1))
+        minute = int(m.group(2)) if m.lastindex and m.lastindex >= 2 and m.group(2) else 0
+        tail = t[m.end():m.end() + 16]
+        if hour < 12 and re.match(r"\s*(da tarde|da noite|pm)", tail):
+            hour += 12
+        if hour > 23 or minute > 59:
+            hour = minute = None
+    elif re.search(r"\bmeio[- ]dia\b", t):
+        hour, minute = 12, 0
+    elif re.search(r"\bmeia[- ]noite\b", t):
+        hour, minute = 0, 0
+    elif re.search(r"\bde manha\b|\bpela manha\b", t):
+        hour, minute = 9, 0
+    elif re.search(r"\b(a|de|pela) tarde\b", t):
+        hour, minute = 15, 0
+    elif re.search(r"\b(a|de|pela) noite\b", t):
+        hour, minute = 20, 0
+
+    if day is None and hour is None:
+        return {"start": None, "has_time": False, "end": None}
+    if day is None:  # so' a hora: hoje, ou amanha se ja passou
+        cand = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+        if cand <= now:
+            cand += datetime.timedelta(days=1)
+        return {"start": cand, "has_time": True, "end": None}
+    start = datetime.datetime.combine(day, datetime.time(hour or 0, minute or 0))
+    end = None
+    m = re.search(r"\bate (?:as )?(\d{1,2})(?::|h)?(\d{2})?\b", t)
+    if hour is not None and m:
+        try:
+            end = datetime.datetime.combine(day, datetime.time(int(m.group(1)), int(m.group(2) or 0)))
+            end = end if end > start else None
+        except ValueError:
+            end = None
+    return {"start": start, "has_time": hour is not None, "end": end}
+
+
+_DATE_BITS = re.compile(
+    r"\b(?:(?:proxim[ao]|pr[oó]xim[ao]) )?(?:segunda|ter[cç]a|quarta|quinta|sexta|s[aá]bado|domingo)(?:-feira)?"
+    r"(?: que vem)?\b|\b(?:hoje|amanh[aã]|depois de amanh[aã]|semana que vem|que vem)\b|"
+    r"\bdia \d{1,2}(?: de \w+)?\b|\b\d{1,2}/\d{1,2}(?:/\d{2,4})?\b|"
+    r"\b(?:[aà]s |at[eé] (?:[aà]s )?)\d{1,2}(?:(?::|h)\d{2}|h)?\b(?: da (?:manh[aã]|tarde|noite))?|"
+    r"\b\d{1,2}(?::|h)\d{2}\b|\b\d{1,2}h\b|"
+    r"\b(?:de|pela|[aà]) (?:manh[aã]|tarde|noite)\b|\bmeio[- ]dia\b|\bdaqui a \S+ \w+\b", re.I)
+
+
+def _clean_details(detalhes):
+    """Tira datas/horas dos detalhes (ja estao no horario do lembrete)."""
+    rest = _DATE_BITS.sub(" ", detalhes or "")
+    rest = re.sub(r"\s+", " ", rest).strip(" ,.;:-")
+    return rest if len(re.sub(r"\W", "", rest)) >= 3 else ""
+
+
+def _clean_title(titulo, msg):
+    t = _CMD_PREFIX.sub("", (titulo or "").strip()).strip(" .:-")
+    if not t:
+        t = _CMD_PREFIX.sub("", msg).strip(" .:-")[:80]
+    return (t[:1].upper() + t[1:])[:200] if t else "Lembrete"
 
 
 def _text(m):
@@ -81,14 +245,6 @@ def _fmt(ts, all_day=False):
     d = datetime.datetime.fromtimestamp(ts)
     s = f"{_DIAS[d.weekday()]} {d.strftime('%d/%m/%Y')}"
     return s if all_day else s + d.strftime(" as %H:%M")
-
-
-def _iso_ok(s):
-    try:
-        datetime.datetime.fromisoformat(s)
-        return True
-    except Exception:
-        return False
 
 
 class Filter:
@@ -120,13 +276,11 @@ class Filter:
         model = self._model(chat_model)
         if not model:
             return None
-        now = datetime.datetime.now()
-        prompt = _PROMPT.format(agora=now.strftime("%Y-%m-%dT%H:%M"),
-                                dia=_DIAS[now.weekday()], msg=msg[:2000])
+        prompt = _PROMPT.format(msg=msg[:2000])
         r = requests.post(f"{self.valves.OLLAMA_URL}/api/generate",
                           json={"model": model, "prompt": prompt, "stream": False,
                                 "format": "json", "think": False,
-                                "options": {"temperature": 0}}, timeout=120)
+                                "options": {"temperature": 0, "num_ctx": NUM_CTX}}, timeout=120)
         r.raise_for_status()
         return json.loads(r.json().get("response") or "{}")
 
@@ -138,21 +292,35 @@ class Filter:
             raise RuntimeError(data.get("error") or "erro na agenda")
         return data
 
-    def _apply(self, d, uid):
+    def _apply(self, d, uid, msg="", now=None):
         """Executa a acao e devolve o texto para o modelo confirmar (ou None)."""
+        now = now or datetime.datetime.now()
+        hoje = f"Hoje e' {_DIAS[now.weekday()]}, {now:%d/%m/%Y}, {now:%H:%M}. "
         acao = (d.get("acao") or "nenhuma").lower()
-        titulo = (d.get("titulo") or "").strip()[:200]
-        detalhes = (d.get("detalhes") or "").strip()
-        quando = (d.get("quando") or "").strip()
+        detalhes = _clean_details(d.get("detalhes"))
         repetir = d.get("repetir") if d.get("repetir") in (
             "diario", "dias_uteis", "semanal", "mensal", "anual") else None
-        if quando and not _iso_ok(quando):
-            quando = ""
-        if quando and len(quando) == 10 and acao == "lembrete":
-            quando += "T09:00"
+        w = _parse_when(msg, now)
+        start = w["start"]
+        # O modelo pequeno confunde os tipos: as palavras do usuario decidem
+        if acao == "consulta" or (_QUERY.search(msg) and not _CREATE.search(msg)):
+            acao = "consulta"
+        elif acao in ("lembrete", "nota", "evento"):
+            if _NOTE_WORDS.search(msg) and not start:
+                acao = "nota"
+            elif start and _EVENT_WORDS.search(msg) and not re.search(r"\b(lembr|avis)", msg, re.I):
+                acao = "evento"
+            elif acao == "nota" and start and re.search(r"\b(lembr|avis)", msg, re.I):
+                acao = "lembrete"
+        titulo = _clean_title(d.get("titulo"), msg) if acao != "consulta" else ""
+        if start and start <= now and acao in ("lembrete", "evento") and not repetir:
+            return (f"[Nous Agenda] {hoje}O horario pedido ({_fmt(start.timestamp())}) ja passou. "
+                    "Nada foi salvo: pergunte ao usuario para quando ele quer.")
 
         if acao == "consulta":
-            dias = max(1, min(31, int(d.get("periodo_dias") or 1)))
+            t = msg.lower()
+            dias = (1 if re.search(r"\bhoje\b", t) else 2 if re.search(r"\bamanh", t)
+                    else 31 if re.search(r"\bm[eê]s\b", t) else 7)
             up = self._api("GET", "/today", params={"user_id": uid, "days": dias})
             lines = []
             for e in up["events"]:
@@ -163,47 +331,50 @@ class Filter:
                 atraso = " [ATRASADO]" if ts < up["now"] else ""
                 lines.append(f"- lembrete {_fmt(ts)}: {n['title'] or n['body'][:80]}{atraso}")
             corpo = "\n".join(lines) or "(nada marcado nesse periodo)"
-            return (f"[Nous Agenda] Agenda do usuario nos proximos {dias} dia(s), lida "
-                    f"agora do Nous:\n{corpo}\nResponda a pergunta com base nisso, de "
-                    "forma organizada. Nao invente compromissos.")
+            return (f"[Nous Agenda] {hoje}Agenda do usuario nos proximos {dias} dia(s), lida "
+                    f"agora do Nous:\n{corpo}\nResponda a pergunta com base nisso, de forma "
+                    "organizada. As datas acima estao certas; nao comente o ano. Nao invente compromissos.")
 
-        if acao == "nota" or (acao == "lembrete" and not quando):
+        if acao == "nota" or (acao == "lembrete" and not start):
             n = self._api("POST", "/notes", json={"user_id": uid, "title": titulo,
                                                   "body": detalhes})["note"]
-            return (f"[Nous Agenda] Nota salva: \"{n['title'] or n['body'][:60]}\"."
-                    + (" O usuario pediu um lembrete mas sem data; pergunte quando ele "
-                       "quer ser avisado." if acao == "lembrete" else "")
+            return (f"[Nous Agenda] {hoje}Nota salva: \"{n['title'] or n['body'][:60]}\"."
+                    + (" O usuario pediu um lembrete mas nao disse quando; pergunte o dia e a "
+                       "hora do aviso." if acao == "lembrete" else "")
                     + " Confirme em uma frase curta.")
 
         if acao == "lembrete":
+            if not w["has_time"]:
+                start = start.replace(hour=9, minute=0)
             n = self._api("POST", "/notes", json={"user_id": uid, "title": titulo, "body": detalhes,
-                                                  "remind_at": quando, "due_at": quando,
+                                                  "remind_at": int(start.timestamp()),
+                                                  "due_at": int(start.timestamp()),
                                                   "repeat": repetir})["note"]
             rep = f", repetindo ({repetir.replace('_', ' ')})" if repetir else ""
-            return (f"[Nous Agenda] Lembrete criado: \"{n['title']}\" para "
-                    f"{_fmt(n['remind_at'])}{rep}. O Nous vai avisar no computador nessa "
-                    "hora. Confirme ao usuario em uma frase curta, com a data por extenso.")
+            return (f"[Nous Agenda] {hoje}Lembrete criado: \"{n['title']}\" para "
+                    f"{_fmt(n['remind_at'])}{rep}. O Nous vai avisar no computador nessa hora. "
+                    "Confirme ao usuario em uma frase curta, repetindo exatamente essa data.")
 
-        if acao == "evento" and quando:
-            dia_inteiro = bool(d.get("dia_inteiro")) or len(quando) == 10
-            fim = (d.get("fim") or "").strip()
-            aviso = d.get("avisar_min_antes")
-            aviso = int(aviso) if isinstance(aviso, (int, float)) else self.valves.AVISO_PADRAO_MIN
+        if acao == "evento" and start:
+            dia_inteiro = not w["has_time"]
+            aviso = None if dia_inteiro else self.valves.AVISO_PADRAO_MIN
             body = {"user_id": uid, "title": titulo, "description": detalhes,
-                    "start_at": quando, "all_day": dia_inteiro, "remind_min": aviso}
-            if fim and _iso_ok(fim):
-                body["end_at"] = fim
+                    "location": "", "start_at": int(start.timestamp()),
+                    "all_day": dia_inteiro, "remind_min": aviso}
+            if w["end"]:
+                body["end_at"] = int(w["end"].timestamp())
             if repetir:
                 body["repeat"] = repetir
             e = self._api("POST", "/events", json=body)["event"]
-            return (f"[Nous Agenda] Compromisso salvo: \"{e['title']}\" em "
+            return (f"[Nous Agenda] {hoje}Compromisso salvo: \"{e['title']}\" em "
                     f"{_fmt(e['start_at'], e['all_day'])}"
-                    + (f", com aviso {aviso} min antes" if not dia_inteiro and aviso else "")
-                    + ". Confirme ao usuario em uma frase curta.")
+                    + (f" ({detalhes})" if detalhes else "")
+                    + (f", com aviso {aviso} min antes" if aviso else "")
+                    + ". Confirme ao usuario em uma frase curta, repetindo exatamente essa data.")
 
         if acao == "evento":
-            return ("[Nous Agenda] O usuario quer marcar um compromisso mas nao disse "
-                    "quando. Pergunte o dia e a hora.")
+            return (f"[Nous Agenda] {hoje}O usuario quer marcar um compromisso mas nao disse "
+                    "quando. Pergunte o dia e a hora. Nada foi salvo ainda.")
         return None
 
     # ---------------------------------------------------------- ciclo
@@ -215,7 +386,11 @@ class Filter:
         messages = body.get("messages", [])
         last = next((m for m in reversed(messages) if m.get("role") == "user"), None)
         msg = _text(last) if last else ""
-        if not uid or not msg or not (_CREATE.search(msg) or _QUERY.search(msg)):
+        # "reuniao com a equipe segunda as 10h" nao diz "marca", mas e' agenda: palavra
+        # de compromisso + data, fora de pergunta ("tenho consulta amanha, o que levo?")
+        implicit = (_EVENT_WORDS.search(msg or "") and "?" not in (msg or "")
+                    and _parse_when(msg, datetime.datetime.now())["start"] is not None)
+        if not uid or not msg or not (_CREATE.search(msg) or _QUERY.search(msg) or implicit):
             return body
 
         async def status(desc, done):
@@ -234,7 +409,7 @@ class Filter:
             await status("Verificando a agenda...", False)
             try:
                 data = await asyncio.to_thread(self._extract, msg, body.get("model") or "")
-                text = await asyncio.to_thread(self._apply, data or {}, uid) if data else None
+                text = await asyncio.to_thread(self._apply, data or {}, uid, msg) if data else None
                 if text:
                     self._done[key] = (t, text)  # so' sucesso: falha tenta de novo
             except requests.exceptions.ConnectionError:

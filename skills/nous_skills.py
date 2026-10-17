@@ -24,6 +24,10 @@ from typing import Optional
 
 from pydantic import BaseModel, Field
 
+# Mesmo num_ctx do chat (monitor/register_model_ctx.py): com outro valor o
+# Ollama recarrega o modelo (no 0.30 o padrao chega a 256k e estoura a VRAM).
+NUM_CTX = int(os.environ.get("NOUS_NUM_CTX", "16384"))
+
 try:
     import numpy as np
 except Exception:
@@ -51,11 +55,22 @@ Conversa (a ultima mensagem e' o pedido para aprender):
 \"\"\"{conversa}\"\"\"
 
 Responda SO' com JSON:
-{{"nome": "nome curto da habilidade (ate 6 palavras)",
-  "quando_usar": "uma frase: em que tipo de pedido aplicar (ex.: quando o usuario pedir um relatorio de vendas)",
-  "passos": "passo a passo em Markdown (lista numerada), com as preferencias e regras que o usuario deixou claras, formato de saida e exemplos curtos se ajudarem"}}
+{{"nome": "nome curto da habilidade (ate 6 palavras, em portugues normal)",
+  "quando_usar": "uma frase: em que TIPO de pedido aplicar",
+  "passos": ["regra ou passo 1", "regra ou passo 2", "..."]}}
 
-Nao invente preferencias que nao aparecem na conversa. Escreva em portugues."""
+Regras:
+- GENERALIZE: a habilidade vale para pedidos parecidos no futuro. Nada de nomes de
+  pessoas, valores ou datas da conversa em "nome" e "quando_usar"; nos passos, use
+  [cliente], [valor], [data] no lugar deles.
+- Copie EXATAMENTE os textos fixos que o usuario definiu (assinatura, saudacao, formato).
+- Nao invente preferencias que nao aparecem na conversa. Escreva em portugues.
+
+Exemplo: conversa sobre um relatorio de vendas de marco em que o usuario pediu tabela e 3
+destaques ->
+{{"nome": "Relatorio de vendas", "quando_usar": "quando o usuario pedir um relatorio ou resumo de vendas",
+  "passos": ["Abrir com uma tabela Produto | Quantidade | Receita", "Terminar com 3 destaques em topicos",
+             "Valores em R$ com duas casas decimais"]}}"""
 
 
 def _data_dir():
@@ -207,16 +222,20 @@ class Filter:
             return None
         lista = "\n".join(f"{i + 1}) {s['nome']}: usar {s['quando_usar']}" for i, s in enumerate(cands))
         prompt = (f"Pedido do usuario: \"{msg[:600]}\"\n\nHabilidades salvas:\n{lista}\n\n"
-                  "Quais habilidades se aplicam DIRETAMENTE a este pedido? Responda so' com os "
-                  "numeros separados por virgula, ou 0 se nenhuma.")
+                  "Quais habilidades se aplicam DIRETAMENTE a este pedido? Responda em JSON: "
+                  "{\"aplicam\": [numeros]} (lista vazia se nenhuma).")
+        # Saida estruturada: sem ela o qwen3 "pensa em voz alta" mesmo com think=false
+        schema = {"type": "object", "required": ["aplicam"],
+                  "properties": {"aplicam": {"type": "array", "items": {"type": "integer"}}}}
         try:
             r = requests.post(f"{self._ollama()}/api/generate",
                               json={"model": model, "prompt": prompt, "stream": False, "think": False,
-                                    "options": {"temperature": 0, "num_predict": 12}}, timeout=60)
-            ans = r.json().get("response") or ""
+                                    "format": schema,
+                                    "options": {"temperature": 0, "num_predict": 40, "num_ctx": NUM_CTX}}, timeout=60)
+            picks = json.loads(r.json().get("response") or "{}").get("aplicam") or []
         except Exception:
             return None
-        picks = [int(n) for n in re.findall(r"\d+", ans)]
+        picks = [int(n) for n in picks if isinstance(n, (int, float))]
         return [cands[n - 1] for n in picks if 1 <= n <= len(cands)]
 
     # ---------------------------------------------------------- aprender
@@ -243,15 +262,18 @@ class Filter:
         r = requests.post(f"{self._ollama()}/api/generate",
                           json={"model": model, "prompt": _DISTILL.format(conversa="\n\n".join(parts)),
                                 "stream": False, "format": "json", "think": False,
-                                "options": {"temperature": 0.2}}, timeout=180)
+                                "options": {"temperature": 0.2, "num_ctx": NUM_CTX}}, timeout=180)
         r.raise_for_status()
         d = json.loads(r.json().get("response") or "{}")
-        nome = (d.get("nome") or "").strip()[:80]
+        nome = re.sub(r"[_\s]+", " ", d.get("nome") or "").strip()[:80]
+        nome = nome[:1].upper() + nome[1:]
         quando = (d.get("quando_usar") or "").strip()[:300]
         passos = d.get("passos")
-        if isinstance(passos, list):
-            passos = "\n".join(f"{i + 1}. {p}" for i, p in enumerate(passos))
-        passos = (passos or "").strip()
+        if isinstance(passos, str):
+            passos = [p for p in passos.splitlines() if p.strip()]
+        # numera de novo: modelos pequenos mandam "1. ..." dentro da lista ("1. 1. ...")
+        passos = [re.sub(r"^\s*(?:[-*]|\d+[.)])\s*", "", str(p)).strip() for p in (passos or [])]
+        passos = "\n".join(f"{i + 1}. {p}" for i, p in enumerate(p for p in passos if p))
         if not (nome and quando and passos):
             return ("[Nous Skills] Nao consegui resumir uma habilidade desta conversa. "
                     "Peca ao usuario para explicar em uma frase o que deve ser lembrado.")

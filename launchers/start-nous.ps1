@@ -20,6 +20,15 @@ $env:OLLAMA_BASE_URL     = "http://127.0.0.1:11434"
 # o modelo sair e a proxima resposta demorar muito. 5 min cobre conversas
 # normais sem recarregar e ainda libera a VRAM sozinho quando voce para.
 $env:OLLAMA_KEEP_ALIVE   = "5m"
+# Contexto padrao do Ollama. Sem isto o Ollama 0.30 carrega modelos pequenos com
+# contexto maximo (qwen3:4b = 262k = ~44 GB, metade na RAM) sempre que alguma
+# chamada nao manda num_ctx, e recarrega o modelo a cada troca: respostas de
+# 3 min em vez de 15 s. Mesmo valor do register_model_ctx.py. Gravado tambem na
+# conta do usuario para o Ollama aberto pela bandeja (vale no proximo inicio dele).
+$env:OLLAMA_CONTEXT_LENGTH = "16384"
+if (-not [Environment]::GetEnvironmentVariable("OLLAMA_CONTEXT_LENGTH", "User")) {
+    [Environment]::SetEnvironmentVariable("OLLAMA_CONTEXT_LENGTH", "16384", "User")
+}
 $env:ENABLE_WEB_SEARCH   = "True"
 $env:WEB_SEARCH_ENGINE   = "duckduckgo"
 $env:WEB_SEARCH_RESULT_COUNT = "5"
@@ -49,6 +58,19 @@ $env:ENABLE_OPENAI_API = "True"
 
 # Forca o idioma do Whisper para portugues (env-only na 0.9.6).
 $env:WHISPER_LANGUAGE = "pt"
+
+# Padroes do Nous sobre o Open WebUI (valem em instalacao nova; nas existentes
+# o ajustes/register_ajustes.py grava uma vez na tabela config). Calendario e
+# automacoes nativos ficam escondidos: o Nous tem a Agenda propria.
+$env:DEFAULT_LOCALE          = "pt-BR"
+$env:YOUTUBE_LOADER_LANGUAGE = "pt,pt-BR,en"
+$env:ENABLE_CALENDAR         = "False"
+$env:ENABLE_AUTOMATIONS      = "False"
+# Embeddings multilingues so' com banco novo: trocar o modelo com documentos ja
+# indexados invalidaria a busca neles.
+if (-not (Test-Path (Join-Path $env:DATA_DIR "webui.db"))) {
+    $env:RAG_EMBEDDING_MODEL = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+}
 
 # Chave secreta ESTAVEL: sem ela, o open-webui gera uma nova a cada inicio e
 # desloga voce. Guardamos uma chave local (em NousData, fora do git) e a reusamos.
@@ -281,6 +303,15 @@ function Start-EmailAPI {
     }
 }
 
+# --- Ajustes (v2.8): padroes do Nous gravados uma vez na tabela config ---
+
+function Register-Ajustes {
+    $reg = Join-Path $PSScriptRoot "..\ajustes\register_ajustes.py"
+    if ((Test-Path $py) -and (Test-Path $reg)) {
+        & $py "$reg" --data-dir "$env:DATA_DIR" | Out-Null
+    }
+}
+
 # --- Utilidades (v2.7): YouTube e Clima, Filters globais registrados no banco ---
 
 function Register-Utilidades {
@@ -375,7 +406,7 @@ function Test-ServerProcess {
 }
 
 function Register-All {
-    Ensure-Branding; Register-Memory; Register-Pipe; Register-Research; Register-Arena
+    Ensure-Branding; Register-Ajustes; Register-Memory; Register-Pipe; Register-Research; Register-Arena
     Register-Cloud; Register-Voice; Start-VoiceServer; Start-ComfyUI; Setup-Files
     Setup-History; Hide-EmbedModels; Set-ModelCtx; Start-MemoryAPI; Start-EmailAPI
     Register-Utilidades; Start-AgendaAPI; Register-Agenda; Start-SkillsAPI; Register-Skills

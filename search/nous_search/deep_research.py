@@ -19,6 +19,7 @@ from typing import Callable, Optional
 
 from .search import search_web
 from .rag import fetch_page, build_context, OLLAMA_URL, NOUS_MODEL, SYSTEM_PROMPT
+from .rag import NUM_CTX
 
 PLAN_PROMPT = """\
 Você é um assistente de pesquisa. Decomponha a pergunta abaixo em {n} sub-perguntas
@@ -61,7 +62,7 @@ def _llm_call(prompt: str, model: str, timeout: int = 90) -> str:
         "model": model,
         "prompt": prompt,
         "stream": False,
-        "options": {"temperature": 0.2},
+        "options": {"temperature": 0.2, "num_ctx": NUM_CTX},
     }
     try:
         r = requests.post(f"{OLLAMA_URL}/api/generate", json=payload, timeout=timeout)
