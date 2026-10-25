@@ -227,9 +227,10 @@
 		var web = links.filter(function (l) { return /^https?:/i.test(l); })[0];
 		var link = mail || web;
 		if (!link) return;
-		window.NousUI.pede('Descadastrar de "' + sender + '"?' + (mail ? '\n\nO Nous vai enviar um e-mail de descadastro em seu nome.' : '\n\nVai abrir a pagina de descadastro do remetente.')).then(function (sim) {
+		var dest = mail ? decodeURIComponent(mail.replace(/^mailto:/i, '').split('?')[0]) : '';
+		window.NousUI.pede('Descadastrar de "' + sender + '"?' + (mail ? '\n\nO Nous vai enviar um e-mail de descadastro em seu nome para ' + dest + '.' : '\n\nVai abrir a pagina de descadastro do remetente.')).then(function (sim) {
 			if (!sim) return;
-			api('POST', '/unsubscribe', { link: link }).then(function (d) {
+			api('POST', '/unsubscribe', { link: link, confirmado: true }).then(function (d) {
 				if (d.how === 'link') window.open(d.url, '_blank', 'noopener');
 				else window.NousUI.aviso(d.message);
 			}).catch(function (e) { window.NousUI.aviso(e.message, 'erro'); });
@@ -269,7 +270,7 @@
 				var p = payload();
 				window.NousUI.pede('Enviar este e-mail para ' + p.to + '?').then(function (sim) {
 					if (!sim) return;
-					save().then(function (dr) { return api('POST', '/drafts/send', { id: dr.id }); })
+					save().then(function (dr) { return api('POST', '/drafts/send', { id: dr.id, confirmado: true }); })
 						.then(function () { badge(); box().innerHTML = '<div class="nous-em-empty nous-em-ok">✓ E-mail enviado.</div>'; })
 						.catch(function (e) { box().querySelector('#nous-em-cm').innerHTML = '<span class="nous-em-bad">' + esc(e.message) + '</span>'; });
 				});
@@ -307,7 +308,7 @@
 					window.NousUI.pede('Enviar para ' + x.to + '?\n\nAssunto: ' + x.subject).then(function (sim) {
 						if (!sim) return;
 						b.disabled = true;
-						api('POST', '/drafts/send', { id: x.id }).then(function () { badge(); renderDrafts(); })
+						api('POST', '/drafts/send', { id: x.id, confirmado: true }).then(function () { badge(); renderDrafts(); })
 							.catch(function (e) { window.NousUI.aviso(e.message, 'erro'); renderDrafts(); });
 					});
 				});
@@ -318,7 +319,7 @@
 			box().querySelectorAll('[data-sched]').forEach(function (b) {
 				b.addEventListener('click', function () {
 					var id = b.getAttribute('data-sched'), v = box().querySelector('[data-when="' + id + '"]').value;
-					api('POST', '/drafts/schedule', { id: id, send_at: Math.floor(new Date(v).getTime() / 1000) })
+					api('POST', '/drafts/schedule', { id: id, send_at: Math.floor(new Date(v).getTime() / 1000), confirmado: true })
 						.then(function () { badge(); renderDrafts(); }).catch(function (e) { window.NousUI.aviso(e.message, 'erro'); });
 				});
 			});
@@ -416,13 +417,27 @@
 			'<div class="nous-em-form"><span class="nous-em-lbl">Endereco de e-mail</span><input id="nous-em-addr" type="email" placeholder="voce@gmail.com">' +
 			'<span class="nous-em-lbl">Senha de aplicativo (nao a senha principal)</span><input id="nous-em-pwd" type="password" placeholder="xxxx xxxx xxxx xxxx">' +
 			'<div class="nous-em-hint">Gere em: Gmail > Seguranca > Senhas de app. Outlook > Conta > Seguranca > Senha de app.</div>' +
+			'<details style="margin:6px 0"><summary class="nous-em-hint" style="cursor:pointer">Outro provedor (servidores manuais)</summary>' +
+			'<span class="nous-em-lbl">Servidor de entrada (IMAP)</span><input id="nous-em-imap" placeholder="imap.seuprovedor.com.br">' +
+			'<span class="nous-em-lbl">Porta de entrada</span><input id="nous-em-imapp" inputmode="numeric" placeholder="993">' +
+			'<span class="nous-em-lbl">Servidor de saida (SMTP)</span><input id="nous-em-smtp" placeholder="smtp.seuprovedor.com.br">' +
+			'<span class="nous-em-lbl">Porta de saida</span><input id="nous-em-smtpp" inputmode="numeric" placeholder="465 ou 587"></details>' +
 			'<button class="nous-em-btn" id="nous-em-conn" type="button">Conectar</button><span class="nous-em-msg" id="nous-em-cerr"></span></div>';
 		box().innerHTML = html;
 		box().querySelector('#nous-em-conn').addEventListener('click', function () {
 			var b = this, err = box().querySelector('#nous-em-cerr');
 			b.disabled = true; err.textContent = 'Testando a conexao...';
-			api('POST', '/connect', { user: box().querySelector('#nous-em-addr').value.trim(), app_password: box().querySelector('#nous-em-pwd').value.trim(), account: null })
-				.then(function (d) { account = d.user; open('caixa'); })
+			function campo(id) { return box().querySelector(id).value.trim(); }
+			var dados = { user: campo('#nous-em-addr'), app_password: campo('#nous-em-pwd'), account: null };
+			if (campo('#nous-em-imap')) dados.imap = campo('#nous-em-imap');
+			if (campo('#nous-em-smtp')) dados.smtp = campo('#nous-em-smtp');
+			if (campo('#nous-em-imapp')) dados.imap_port = campo('#nous-em-imapp');
+			if (campo('#nous-em-smtpp')) dados.smtp_port = campo('#nous-em-smtpp');
+			api('POST', '/connect', dados)
+				.then(function (d) {
+					account = d.user; open('caixa');
+					if (d.aviso) window.NousUI.aviso(d.aviso, 'erro');
+				})
 				.catch(function (e) { b.disabled = false; err.innerHTML = '<span class="nous-em-bad">' + esc(e.message) + '</span>'; });
 		});
 		box().querySelectorAll('[data-def]').forEach(function (b) {

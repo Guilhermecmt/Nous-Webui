@@ -12,15 +12,15 @@ vale a conta padrão):
   GET  /inbox                   20 mais recentes + triagem LLM local (aprende contatos)
   GET  /message?uid=            corpo + resumo + anexos + convite
   POST /draft?uid=              gera rascunho de resposta (LLM local); NÃO envia
-  POST /send                    {to, subject, body, in_reply_to?} → envia após confirmação
+  POST /send                    {to, subject, body, in_reply_to?, confirmado: true} → envia (sem "confirmado": true, recusa)
   GET  /attachment?uid=&idx=    baixa um anexo
   POST /attachment/read         {uid, idx} → texto + resumo do anexo (PDF, DOCX, planilha, imagem)
   POST /invite/add              {uid, user_id} → convite (.ics) vai para a Agenda do Nous
   GET  /newsletters             remetentes em massa com link de descadastro
-  POST /unsubscribe             {sender, link} → descadastra (mailto: envia; http: devolve o link)
+  POST /unsubscribe             {link, confirmado?} → descadastra (mailto: envia, com "confirmado": true; http: devolve o link)
   GET  /drafts                  rascunhos esperando aprovação (o chat cria, o usuário envia)
   POST /drafts                  {to, subject, body, to_name?, origem?}
-  POST /drafts/update | /drafts/send | /drafts/schedule {id, send_at} | /drafts/delete
+  POST /drafts/update | /drafts/send {id, confirmado: true} | /drafts/schedule {id, send_at, confirmado: true} | /drafts/delete
   GET  /contacts?q=             POST /contacts | /contacts/update | /contacts/delete
   GET  /contacts/resolve?q=     melhor contato para um nome ("Maria")
   POST /contacts/import         {vcf}   GET /contacts/export
@@ -45,8 +45,8 @@ for _p in (_HERE, os.path.join(os.path.dirname(_HERE), "utilidades")):
 
 from nous_email import (  # noqa: E402
     load_account, save_account, delete_account, list_accounts, set_default,
-    test_connection, list_recent, get_message, get_attachment, send_message,
-    detect_servers,
+    test_connection, test_smtp, list_recent, get_message, get_attachment, send_message,
+    detect_servers, addresses, one_line,
 )
 import contacts as ct  # noqa: E402
 import drafts  # noqa: E402
@@ -61,10 +61,45 @@ AGENDA_URL = "http://127.0.0.1:8996"
 # Cache simples em memória: "conta|uid" → {category, summary, draft, ts}
 _cache: dict = {}
 _CACHE_TTL = 3600  # 1h
+_SEM_RESUMO = "Não foi possível gerar o resumo."
+_SEM_RASCUNHO = "Não foi possível gerar o rascunho."
+_SEM_CLASSE = "Não classificado"
+
+
+def _cache_get(key, campo):
+    c = _cache.get(key) or {}
+    if campo in c and time.time() - c.get(campo + "_ts", 0) < _CACHE_TTL:
+        return c[campo]
+    return None
+
+
+def _cache_put(key, **campos):
+    """Guarda so' o que deu certo: um Ollama fora do ar naquele minuto nao pode
+    deixar 'Não foi possível...' preso na tela ate reiniciar o Nous."""
+    c = _cache.setdefault(key, {})
+    for k, v in campos.items():
+        c[k], c[k + "_ts"] = v, time.time()
+    if len(_cache) > 2000:                       # nao cresce para sempre
+        for k in sorted(_cache, key=lambda x: min([v for kk, v in _cache[x].items() if kk.endswith("_ts")] or [0]))[:500]:
+            _cache.pop(k, None)
+
+
+def _key(request, uid, body=None):
+    """Chave 'conta|uid'. Usa a conta de verdade (a padrao, se nenhuma foi pedida):
+    o UID so' vale dentro de uma caixa, e a padrao pode mudar."""
+    acc = load_account(_acct(request, body))
+    return f"{acc['user'] if acc else ''}|{uid}"
 _TRIAGE_SCHEMA = {"type": "object", "required": ["categoria", "resumo"],
                   "properties": {"categoria": {"type": "string", "enum": [
                       "Importante", "Pode esperar", "Promoção", "Notificação", "Spam"]},
                       "resumo": {"type": "string"}}}
+
+
+def _is_cloud_model(m: dict) -> bool:
+    """Modelo que roda fora da maquina: id com '/' (provedor), nome com 'cloud'
+    (os modelos de nuvem do Ollama, como gpt-oss:120b-cloud) ou com remote_host."""
+    return "/" in m.get("name", "") or "cloud" in m.get("name", "").lower() \
+        or bool(m.get("remote_host") or m.get("remote_model"))
 
 
 def _local_model() -> str:
@@ -76,8 +111,7 @@ def _local_model() -> str:
         _embed = ("embed", "nomic", "minilm", "bge-", "e5-", "gte-")
         for m in models:
             name = m.get("name", "")
-            # id com '/' = modelo de nuvem — nunca usar aqui
-            if "/" not in name and not any(p in name.lower() for p in _embed):
+            if not _is_cloud_model(m) and not any(p in name.lower() for p in _embed):
                 return name
     except Exception:
         pass
@@ -109,9 +143,9 @@ def _triage(subject: str, sender: str, snippet: str, bulk: bool = False) -> tupl
     raw = _llm(prompt, timeout=60, fmt=_TRIAGE_SCHEMA)
     try:
         data = json.loads(raw)
-        return data.get("categoria", "Não classificado"), data.get("resumo", "")
+        return data.get("categoria", _SEM_CLASSE), data.get("resumo", "")
     except Exception:
-        return "Não classificado", ""
+        return _SEM_CLASSE, ""
 
 
 def _summarize(body: str, subject: str) -> str:
@@ -119,7 +153,7 @@ def _summarize(body: str, subject: str) -> str:
         f"Resuma o seguinte email com assunto '{subject}' em 3-5 frases em português, "
         f"destacando as ações necessárias, se houver:\n\n{body[:4000]}"
     )
-    return _llm(prompt, timeout=90) or "Não foi possível gerar o resumo."
+    return _llm(prompt, timeout=90) or _SEM_RESUMO
 
 
 def _draft_reply(body: str, subject: str, sender: str) -> str:
@@ -128,7 +162,7 @@ def _draft_reply(body: str, subject: str, sender: str) -> str:
         f"De: {sender}\nAssunto: {subject}\n\nConteúdo do email:\n{body[:3000]}\n\n"
         "Escreva APENAS o corpo da resposta, sem saudação genérica, pronto para edição."
     )
-    return _llm(prompt, timeout=120) or "Não foi possível gerar o rascunho."
+    return _llm(prompt, timeout=120) or _SEM_RASCUNHO
 
 
 # ---- CORS + Host (DNS rebinding) ---------------------------------------------
@@ -238,15 +272,23 @@ async def h_connect(request):
     if not user or not pwd:
         return web.json_response({"error": "user e app_password são obrigatórios"}, status=400)
 
+    if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", user):
+        return web.json_response({"error": "Esse não parece um endereço de e-mail (nome@provedor.com)."}, status=400)
+
     detected = detect_servers(user)
-    acc = {
-        "user": user,
-        "app_password": pwd,
-        "imap": body.get("imap") or detected.get("imap", ""),
-        "smtp": body.get("smtp") or detected.get("smtp", ""),
-        "imap_port": int(body.get("imap_port") or detected.get("imap_port", 993)),
-        "smtp_port": int(body.get("smtp_port") or detected.get("smtp_port", 465)),
-    }
+    try:
+        acc = {
+            "user": user,
+            "app_password": pwd,
+            "imap": (body.get("imap") or detected.get("imap", "")).strip(),
+            "smtp": (body.get("smtp") or detected.get("smtp", "")).strip(),
+            "imap_port": int(body.get("imap_port") or detected.get("imap_port", 993)),
+            "smtp_port": int(body.get("smtp_port") or detected.get("smtp_port", 465)),
+        }
+    except (TypeError, ValueError):
+        return web.json_response({"error": "Porta inválida: use só números (por exemplo 993 e 465)."}, status=400)
+    if body.get("smtp_security") in ("ssl", "starttls"):
+        acc["smtp_security"] = body["smtp_security"]
     if not acc["imap"] or not acc["smtp"]:
         return web.json_response(
             {"error": "Não reconheço este provedor. Informe imap e smtp manualmente."},
@@ -258,7 +300,12 @@ async def h_connect(request):
         return web.json_response({"error": msg}, status=401)
 
     save_account(acc)
-    return web.json_response({"ok": True, "user": user})
+    out = {"ok": True, "user": user}
+    # Ler deu certo; o envio e' outro servidor. Se ele recusar, avisa agora e nao so' no dia de enviar.
+    ok_smtp, msg_smtp = await _run(test_smtp, acc)
+    if not ok_smtp:
+        out["aviso"] = "Conectei para ler, mas não consegui entrar no servidor para enviar: " + msg_smtp
+    return web.json_response(out)
 
 
 async def h_disconnect(request):
@@ -281,18 +328,16 @@ async def h_inbox(request):
     if msgs and "error" in msgs[0]:
         return web.json_response({"error": msgs[0]["error"]}, status=502)
 
-    now = time.time()
     for m in msgs:
         key = f"{acc['user']}|{m.get('uid', '')}"
-        cached = _cache.get(key)
-        if cached and "category" in cached and (now - cached.get("ts", 0)) < _CACHE_TTL:
-            m["category"] = cached["category"]
-            m["summary"] = cached["summary"]
+        cached = _cache_get(key, "triage")
+        if cached:
+            m["category"], m["summary"] = cached
         else:
             cat, summ = await _run(_triage, m["subject"], m["from"], m["snippet"], m.get("bulk", False))
-            m["category"] = cat
-            m["summary"] = summ
-            _cache.setdefault(key, {}).update(category=cat, summary=summ, ts=now)
+            m["category"], m["summary"] = cat, summ
+            if cat != _SEM_CLASSE:
+                _cache_put(key, triage=(cat, summ))
     try:
         await _run(_learn, msgs, [a["user"] for a in list_accounts()])
     except Exception:
@@ -309,13 +354,14 @@ async def h_message(request):
     if "error" in msg:
         return web.json_response(msg, status=502)
 
-    key = f"{account or ''}|{uid}"
-    cached = _cache.get(key, {})
-    if "summary_full" in cached:
-        msg["summary"] = cached["summary_full"]
+    key = _key(request, uid)
+    cached = _cache_get(key, "summary_full")
+    if cached:
+        msg["summary"] = cached
     else:
         msg["summary"] = await _run(_summarize, msg.get("body", ""), msg.get("subject", ""))
-        _cache.setdefault(key, {})["summary_full"] = msg["summary"]
+        if msg["summary"] != _SEM_RESUMO:
+            _cache_put(key, summary_full=msg["summary"])
     return web.json_response(msg)
 
 
@@ -328,25 +374,39 @@ async def h_draft(request):
     if "error" in msg:
         return web.json_response(msg, status=502)
 
-    key = f"{account or ''}|{uid}"
-    cached = _cache.get(key, {})
-    if "draft" in cached:
-        return web.json_response({"draft": cached["draft"]})
+    key = _key(request, uid)
+    cached = _cache_get(key, "draft")
+    if cached:
+        return web.json_response({"draft": cached})
     draft = await _run(_draft_reply, msg.get("body", ""), msg.get("subject", ""), msg.get("from", ""))
-    _cache.setdefault(key, {})["draft"] = draft
+    if draft != _SEM_RASCUNHO:
+        _cache_put(key, draft=draft)
     return web.json_response({"draft": draft})
+
+
+def _sem_confirmacao():
+    return web.json_response(
+        {"error": "Envio precisa de confirmação explícita do usuário (confirmado: true)."}, status=400)
+
+
+def _confirmado(body) -> bool:
+    """Regra do Nous: nenhum e-mail sai sem o OK do usuario. Quem chama so' manda
+    confirmado=true depois de perguntar (a tela do Nous pergunta); sem isso, nada sai."""
+    return (body or {}).get("confirmado") is True
 
 
 async def h_send(request):
     body = await _json_body(request)
     if not body:
         return web.json_response({"error": "JSON inválido"}, status=400)
+    if not _confirmado(body):
+        return _sem_confirmacao()
     to = (body.get("to") or "").strip()
     subject = (body.get("subject") or "").strip()
     text = (body.get("body") or "").strip()
     if not to or not subject or not text:
         return web.json_response({"error": "to, subject e body são obrigatórios"}, status=400)
-    if "@" not in to:
+    if not addresses(to):
         return web.json_response({"error": "Endereço de destino inválido."}, status=400)
     ok, msg = await _run(send_message, to, subject, text, body.get("in_reply_to"), _acct(request, body))
     if not ok:
@@ -440,11 +500,15 @@ async def h_unsubscribe(request):
     body = await _json_body(request) or {}
     link = (body.get("link") or "").strip()
     if link.lower().startswith("mailto:"):
+        if not _confirmado(body):      # o link vem de um e-mail de fora: so' envia se o usuario viu e aceitou
+            return _sem_confirmacao()
         u = urllib.parse.urlparse(link)
         to = urllib.parse.unquote(u.path)
+        if len(addresses(to)) != 1:
+            return web.json_response({"error": "link de descadastro inválido"}, status=400)
         qs = urllib.parse.parse_qs(u.query)
-        subject = (qs.get("subject") or ["unsubscribe"])[0]
-        text = (qs.get("body") or ["Por favor, remova meu endereco desta lista. / Please unsubscribe me."])[0]
+        subject = one_line((qs.get("subject") or ["unsubscribe"])[0])[:200] or "unsubscribe"
+        text = (qs.get("body") or ["Por favor, remova meu endereco desta lista. / Please unsubscribe me."])[0][:1000]
         ok, msg = await _run(send_message, to, subject, text, None, _acct(request, body))
         if not ok:
             return web.json_response({"error": msg}, status=502)
@@ -470,11 +534,16 @@ async def h_draft_create(request):
 
 async def h_draft_update(request):
     b = await _json_body(request) or {}
+    atual = drafts.get(b.get("id"))
+    if atual and atual["status"] in ("enviado", "enviando"):
+        return web.json_response({"error": "este e-mail já foi enviado"}, status=409)
     d = drafts.update(b.get("id"), {k: b[k] for k in ("to", "subject", "body", "account") if k in b})
     return web.json_response({"draft": d}) if d else web.json_response({"error": "não encontrado"}, status=404)
 
 
 def _send_draft(d):
+    """Envia um rascunho que ja' foi 'reservado' (drafts.claim): so' uma chamada por vez
+    consegue, entao dois cliques (ou o clique e o relogio) nao mandam duas vezes."""
     ok, msg = send_message(d["to"], d["subject"], d["body"], d.get("in_reply_to"), d.get("account"))
     drafts.update(d["id"], {"status": "enviado" if ok else "erro", "error": None if ok else msg,
                             "sent_at": int(time.time()) if ok else None})
@@ -483,18 +552,27 @@ def _send_draft(d):
 
 async def h_draft_send(request):
     b = await _json_body(request) or {}
-    d = drafts.get(b.get("id"))
-    if not d:
+    if not _confirmado(b):
+        return _sem_confirmacao()
+    if not drafts.get(b.get("id")):
         return web.json_response({"error": "rascunho não encontrado"}, status=404)
+    d = drafts.claim(b.get("id"))
+    if not d:
+        return web.json_response({"error": "este e-mail já foi enviado (ou está sendo enviado agora)"}, status=409)
     ok, msg = await _run(_send_draft, d)
     return web.json_response({"ok": ok, "message": msg}, status=200 if ok else 502)
 
 
 async def h_draft_schedule(request):
     b = await _json_body(request) or {}
+    if not _confirmado(b):
+        return _sem_confirmacao()
     send_at = int(b.get("send_at") or 0)
     if send_at <= time.time():
         return web.json_response({"error": "escolha um horário no futuro"}, status=400)
+    atual = drafts.get(b.get("id"))
+    if atual and atual["status"] in ("enviado", "enviando"):
+        return web.json_response({"error": "este e-mail já foi enviado"}, status=409)
     d = drafts.update(b.get("id"), {"status": "agendado", "send_at": send_at, "error": None})
     return web.json_response({"draft": d}) if d else web.json_response({"error": "não encontrado"}, status=404)
 
@@ -505,18 +583,26 @@ async def h_draft_delete(request):
     return web.json_response({"ok": True})
 
 
+async def _tick():
+    """Uma volta do relogio: envia os rascunhos agendados cuja hora chegou (o usuario
+    ja' aprovou ao agendar). Rascunho 'pendente' nunca sai por aqui."""
+    for d in drafts.due():
+        d = drafts.claim(d["id"])
+        if d:
+            await _run(_send_draft, d)
+
+
 async def scheduler(app):
-    """Envia os rascunhos agendados (o usuario ja' aprovou ao agendar)."""
     while True:
         try:
-            for d in drafts.due():
-                await _run(_send_draft, d)
+            await _tick()
         except Exception as e:
             print(f"[Nous][email] agendador: {e}", file=sys.stderr)
         await asyncio.sleep(30)
 
 
 async def _start(app):
+    drafts.recover()
     app["sched"] = asyncio.get_event_loop().create_task(scheduler(app))
 
 
