@@ -381,12 +381,16 @@ function Invoke-Aplicar {
         $pinNovo = ([regex]::Match((Get-Content -LiteralPath (Join-Path $AppDir "installer\install-nous.ps1") -Raw), '\$OPENWEBUI_PIN\s*=\s*"([\d.]+)"')).Groups[1].Value
         $vpy = Join-Path $Venv "Scripts\python.exe"
         if ($pinNovo -and $pinNovo -ne $pinAntigo -and (Test-Path -LiteralPath $vpy)) {
+            # O atualizador do Open WebUI faz o backup do NousData, migra o banco num
+            # servidor de teste, confere os dados e volta atras sozinho se falhar.
             Set-Estado @{ mensagem = "Atualizando o Open WebUI para a versao $pinNovo (pode levar varios minutos)..." }
-            & $vpy -m pip install "open-webui==$pinNovo" --quiet 2>&1 | Out-Null
-            if ($LASTEXITCODE -ne 0) {
-                & $vpy -m pip install "open-webui==$pinAntigo" --quiet 2>&1 | Out-Null
-                & $reverter "Nao consegui atualizar o Open WebUI."; return 1
-            }
+            $upd = Join-Path $AppDir "installer\atualizar-openwebui.ps1"
+            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $upd -Venv $Venv -DataDir $DataDir -Pin $pinNovo -Repo $AppDir 2>&1 | ForEach-Object { Log "  owui: $_" }
+            $codOwui = $LASTEXITCODE
+            # 1 = nao atualizou, mas o Open WebUI antigo segue funcionando e o Nous novo
+            # e' compativel com ele; so' a volta que falhou (2) desfaz o app.
+            if ($codOwui -eq 1) { Log "Open WebUI continua na versao anterior; o resto da atualizacao segue" }
+            elseif ($codOwui -eq 2) { & $reverter "Nao consegui atualizar o Open WebUI (o backup dos seus dados esta em bkp)."; return 1 }
         }
         $lockNovo = Get-FileHash -LiteralPath (Join-Path $AppDir "code\package-lock.json") -ErrorAction SilentlyContinue
         $node = Get-Command npm.cmd -ErrorAction SilentlyContinue
