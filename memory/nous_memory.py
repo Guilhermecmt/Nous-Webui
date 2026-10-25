@@ -59,6 +59,33 @@ def _get_active_persona(user_id: str) -> str:
         return "default"
 
 
+def _primeira_mensagem(messages: list) -> bool:
+    return sum(1 for m in messages if m.get("role") == "user") == 1
+
+
+_avisos_pendentes: set = set()
+
+
+async def _aviso_rapido(emit, texto: str, segundos: float = 2.0) -> None:
+    """Mostra o aviso enquanto o pedido sai e some logo depois: nao fica em
+    cima da resposta. O status "hidden" esconde o bloco no Open WebUI 0.12."""
+    try:
+        await emit({"type": "status", "data": {"description": texto, "done": False}})
+    except Exception:
+        return
+
+    async def _some():
+        await asyncio.sleep(segundos)
+        try:
+            await emit({"type": "status", "data": {"description": texto, "done": True, "hidden": True}})
+        except Exception:
+            pass
+
+    t = asyncio.create_task(_some())
+    _avisos_pendentes.add(t)  # sem referencia o asyncio pode descartar a tarefa
+    t.add_done_callback(_avisos_pendentes.discard)
+
+
 class Filter:
     class Valves(BaseModel):
         ENABLED: bool = Field(default=True, description="Liga/desliga a memoria.")
@@ -299,15 +326,9 @@ class Filter:
             messages.insert(0, {"role": "system", "content": block})
         body["messages"] = messages
 
-        if __event_emitter__:
-            try:
-                await __event_emitter__({
-                    "type": "status",
-                    "data": {"description": f"Nous lembrou de {len(mems)} detalhe(s) sobre voce.",
-                             "done": True},
-                })
-            except Exception:
-                pass
+        # So' na primeira mensagem da conversa: repetir a cada pergunta cansa.
+        if __event_emitter__ and _primeira_mensagem(messages):
+            await _aviso_rapido(__event_emitter__, f"Nous lembrou de {len(mems)} detalhe(s) sobre você.")
         return body
 
     async def outlet(self, body: dict, __user__: Optional[dict] = None, __event_emitter__=None,

@@ -176,3 +176,12 @@ body.nous-shell-mark::after { opacity: 0; }
         display: none !important;
     }
 }
+
+/* Conversa limpa (como ChatGPT/Claude): sem o nome do modelo e sem o avatar em
+   cima de cada resposta. O modelo em uso continua no seletor da caixa de texto;
+   com varios modelos na mesma pergunta, as abas do Open WebUI mostram o nome. */
+div:has(> div > #response-message-model-name),
+div:has(> #response-message-model-name),
+div:has(> .assistant-message-profile-image) {
+    display: none !important;
+}
