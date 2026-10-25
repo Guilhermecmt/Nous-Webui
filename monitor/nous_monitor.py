@@ -53,7 +53,7 @@ import aiohttp
 from aiohttp import web
 
 OLLAMA = "http://127.0.0.1:11434"
-PORT = 8990
+PORT = int(os.environ.get("NOUS_MONITOR_PORT") or 8990)
 GB = 1073741824
 CATALOG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "catalog.json")
 
@@ -215,6 +215,45 @@ async def _start_comfyui() -> bool:
 async def h_comfyui_start(request):
     ok = await _start_comfyui()
     return web.json_response({"ok": ok})
+
+
+# Motor de imagem ocioso: depois de N minutos sem fila nem geracao, o ComfyUI e'
+# encerrado (libera RAM e a VRAM que o Windows reserva ao processo). O Pipe o
+# sobe de novo no proximo pedido de imagem. NOUS_COMFY_IDLE_MIN=0 desliga.
+_COMFY_IDLE_MIN = float(os.environ.get("NOUS_COMFY_IDLE_MIN") or 10)
+
+
+async def _comfy_busy():
+    """True/False se o ComfyUI responde; None se esta fora do ar."""
+    try:
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=4)) as s:
+            async with s.get("http://127.0.0.1:8188/queue") as r:
+                q = await r.json()
+        return bool(q.get("queue_running") or q.get("queue_pending"))
+    except Exception:
+        return None
+
+
+async def _comfy_idle_loop():
+    last_busy = None
+    while True:
+        await asyncio.sleep(30)
+        if _COMFY_IDLE_MIN <= 0:
+            continue
+        busy = await _comfy_busy()
+        now = asyncio.get_event_loop().time()
+        if busy is None:
+            last_busy = None
+        elif busy or last_busy is None:
+            last_busy = now
+        elif now - last_busy >= _COMFY_IDLE_MIN * 60:
+            print("[Nous][imagens] ComfyUI ocioso: encerrando", file=sys.stderr)
+            await _stop_comfyui()
+            last_busy = None
+
+
+async def _start_background(app):
+    app["comfy_idle"] = asyncio.get_event_loop().create_task(_comfy_idle_loop())
 
 
 async def _stop_comfyui():
@@ -1688,6 +1727,7 @@ async def h_research_export(request):
 
 def build_app():
     app = web.Application(middlewares=[cors_mw], client_max_size=_MAX_IMG + 1024)
+    app.on_startup.append(_start_background)
     app.add_routes([web.get("/stats", h_stats),
                     web.post("/unload", h_unload),
                     web.get("/health", h_health),
