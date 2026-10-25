@@ -76,9 +76,16 @@ _VERBS = (r"cri[ae]|gere|gera|gerar|desenh[ae]|fa[cç]a|fazer|ilustr[ae]|pinte|"
           r"create|generate|draw|make|paint|render|show|give\s+me|want")
 _NOUNS = (r"imagem|imagens|logo|logotipo|[ií]cone|foto|retrato|paisagem|wallpaper|"
           r"arte|ilustra[cç][aã]o|desenho|cena|p[oô]ster|poster|capa|avatar|"
-          r"image|picture|portrait|landscape|illustration|drawing|art|icon|photo")
+          r"pintura|quadro|banner|mascote|personagem|figurinha|"
+          r"image|picture|portrait|landscape|illustration|drawing|art|icon|photo|"
+          r"painting|poster|banner|mascot|character|sticker")
 # Verbo + substantivo na mesma sentença
 _INTENT_RE = re.compile(rf"\b(?:{_VERBS})\b[^.?!\n]{{0,60}}\b(?:{_NOUNS})\b", re.IGNORECASE)
+# Verbos que so' fazem sentido para imagem: "desenhe um farol" nao precisa de
+# substantivo. No comeco da frase (opcionalmente apos "por favor"/"pode"/"quero que voce").
+_STRONG_RE = re.compile(
+    r"^\s*(?:(?:por\s+favor|pode|poderia|consegue|quero\s+que\s+voc[eê]|please|can\s+you|could\s+you)[\s,]+)*"
+    r"(?:desenh(?:[ae]|ar)|pint(?:e|ar)|ilustr(?:e|ar)|imagin(?:e|ar)|draw|paint|illustrate)\b", re.IGNORECASE)
 # Prefixo /img, /imagine etc.
 _PREFIX_RE = re.compile(r"^\s*(?:/(?:img|image|imagem)\b|imagine\b)", re.IGNORECASE)
 # "uma foto de X", "uma imagem de X" sem verbo explícito
@@ -160,6 +167,12 @@ class Pipe:
         USE_LLM_CLASSIFIER: bool = Field(default=False)
         # Tempo que o Gemma fica na VRAM apos a ultima mensagem (libera rapido).
         KEEP_ALIVE: str = Field(default="30s")
+        # Flux + T5 ocupam ~11 GB. Se sobrar menos que isto na placa, o modelo
+        # de linguagem e' descarregado antes de gerar (senao a geracao vaza
+        # para a RAM e leva o dobro do tempo). 0 desliga a conferencia.
+        NEEDED_VRAM_GB: float = Field(default=12.0)
+        # Depois da imagem, o ComfyUI solta a VRAM (o chat volta a ter espaco).
+        FREE_VRAM_AFTER: bool = Field(default=True)
 
     def __init__(self):
         self.type = "manifold"
@@ -188,7 +201,8 @@ class Pipe:
 
     # ----------------------------------------------------------- deteccao
     def _is_image_request(self, text: str) -> bool:
-        return bool(_PREFIX_RE.search(text) or _INTENT_RE.search(text) or _NOUN_LEAD_RE.search(text))
+        return bool(_PREFIX_RE.search(text) or _STRONG_RE.search(text)
+                    or _INTENT_RE.search(text) or _NOUN_LEAD_RE.search(text))
 
     # ----------------------------------------------------------- imagem (ComfyUI)
     def _load_workflow(self):
@@ -255,6 +269,43 @@ class Pipe:
                     return bool(data.get("ok"))
         except Exception:
             return False
+
+    async def _make_room(self):
+        """Descarrega os modelos do Ollama se a VRAM livre nao comporta o Flux.
+        So' mexe no Ollama quando falta espaco de verdade."""
+        need = float(self.valves.NEEDED_VRAM_GB or 0) * 1024 ** 3
+        if need <= 0:
+            return
+        base = self.valves.COMFYUI_URL.rstrip("/")
+        try:
+            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=8)) as s:
+                async with s.get(f"{base}/system_stats") as r:
+                    dev = (await r.json())["devices"][0]
+                free = (dev.get("vram_free") or 0) + (dev.get("torch_vram_free") or 0)
+                if free >= need:
+                    return
+                ollama = self.valves.OLLAMA_URL.rstrip("/")
+                async with s.get(f"{ollama}/api/ps") as r:
+                    loaded = [m.get("name") or m.get("model")
+                              for m in (await r.json()).get("models", [])]
+                for name in filter(None, loaded):
+                    async with s.post(f"{ollama}/api/generate",
+                                      json={"model": name, "keep_alive": 0}) as r:
+                        await r.read()
+                await asyncio.sleep(2)  # o Windows leva um instante para devolver a VRAM
+        except Exception:
+            pass  # sem Ollama/ComfyUI legivel: segue e deixa a geracao decidir
+
+    async def _free_comfy(self):
+        """Pede ao ComfyUI para soltar os modelos da VRAM (o processo continua no ar)."""
+        base = self.valves.COMFYUI_URL.rstrip("/")
+        try:
+            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=15)) as s:
+                async with s.post(f"{base}/free",
+                                  json={"unload_models": True, "free_memory": True}) as r:
+                    await r.read()
+        except Exception:
+            pass
 
     async def _comfy_generate(self, prompt) -> Optional[bytes]:
         base = self.valves.COMFYUI_URL.rstrip("/")
@@ -329,6 +380,7 @@ class Pipe:
             await self._emit(emit, "ComfyUI offline", True)
             yield f"*(O ComfyUI não está acessível em {self.valves.COMFYUI_URL} e não foi possível iniciá-lo automaticamente. Verifique a instalação.)*"
             return
+        await self._make_room()
         await self._emit(emit, "🎨 Gerando imagem com Flux…", False)
         try:
             data = await self._comfy_generate(prompt)
@@ -336,13 +388,16 @@ class Pipe:
             await self._emit(emit, "Falha na geração", True)
             yield f"*(Falha ao gerar imagem via ComfyUI em {self.valves.COMFYUI_URL}: {e})*"
             return
+        finally:
+            if self.valves.FREE_VRAM_AFTER:
+                await self._free_comfy()
         if not data:
             await self._emit(emit, "Sem imagem", True)
             yield "*(O ComfyUI não retornou a imagem dentro do tempo limite.)*"
             return
         url = await self._save_image(data, request, user, metadata)
         await self._emit(emit, "Imagem pronta", True)
-        aviso = "\n\n*⚠️ [Leia o Termo de Responsabilidade](docs/TERMO-RESPONSABILIDADE-IMAGEM.md) antes de usar.* O Flux não tem restrições — você é responsável pelo conteúdo gerado."
+        aviso = "\n\n*⚠️ Imagem feita por IA, sem filtros: confira antes de usar. Você é responsável pelo conteúdo gerado.*"
         yield f"![{prompt}]({url}){aviso}"
 
     # ----------------------------------------------------------- texto (Ollama)

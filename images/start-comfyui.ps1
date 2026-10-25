@@ -35,4 +35,11 @@ Start-Process -FilePath $py `
     -WorkingDirectory $cu -WindowStyle Hidden
 
 Write-Host "ComfyUI iniciando (segundo plano) em http://localhost:8188 ..."
-Write-Host "Os modelos carregam na 1a geracao (~30s)."
+# Espera ficar pronto (a 1a subida leva ~20 s). Quem so' quer disparar pode ignorar.
+$pronto = $false
+for ($i = 0; $i -lt 40 -and -not $pronto; $i++) {
+    Start-Sleep -Seconds 3
+    try { Invoke-RestMethod "http://127.0.0.1:8188/system_stats" -TimeoutSec 2 | Out-Null; $pronto = $true } catch {}
+}
+if ($pronto) { Write-Host "ComfyUI pronto. Os modelos carregam na 1a imagem (~30 s)." }
+else { Write-Host "ComfyUI ainda nao respondeu; confira em instantes." -ForegroundColor Yellow }

@@ -43,6 +43,26 @@ if (-not (Test-Path $py311)) {
 }
 Ok "pre-requisitos presentes"
 
+# Roda um comando nativo e para com mensagem clara se ele falhar.
+function Run($what, [scriptblock]$cmd) {
+    & $cmd
+    if ($LASTEXITCODE -ne 0) { throw "Falhou: $what (codigo $LASTEXITCODE). Veja as mensagens acima." }
+}
+
+# Espaco em disco: ComfyUI + PyTorch (~8 GB) + modelos (~12 GB) = ~22 GB.
+$drvName = (Split-Path -Qualifier $ComfyDir).TrimEnd(":")
+$drv = Get-PSDrive -Name $drvName -ErrorAction SilentlyContinue
+if ($drv) {
+    $need = 24GB
+    if ($SkipModels) { $need = 10GB }
+    $have = $drv.Free + 0
+    if (Test-Path (Join-Path $ComfyDir "main.py")) { $need = [math]::Max(2GB, $need - 8GB) }
+    if ($have -lt $need) {
+        throw ("Pouco espaco em {0}: livres {1:N1} GB, preciso de ~{2:N0} GB. Libere espaco e rode de novo." -f $drvName, ($have / 1GB), ($need / 1GB))
+    }
+    Ok ("espaco livre em ${drvName}: {0:N0} GB" -f ($have / 1GB))
+}
+
 # 1) Detecta a GPU ----------------------------------------------------------
 Step "Detectando a GPU"
 $gpuName = ((Get-CimInstance Win32_VideoController -ErrorAction SilentlyContinue).Name) -join " | "
@@ -93,15 +113,15 @@ else {
     switch ($backend) {
         "cuda" {
             Info "baixando PyTorch CUDA (cu124)..."
-            & $vpy -m pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
+            Run "PyTorch CUDA" { & $vpy -m pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124 }
         }
         "rocm" {
             Info "baixando PyTorch ROCm NATIVO (gfx120X) - pode levar varios minutos..."
-            & $vpy -m pip install --pre torch torchvision torchaudio --index-url https://rocm.nightlies.amd.com/v2/gfx120X-all/
+            Run "PyTorch ROCm" { & $vpy -m pip install --pre torch torchvision torchaudio --index-url https://rocm.nightlies.amd.com/v2/gfx120X-all/ }
         }
         default {
             Info "baixando PyTorch CPU..."
-            & $vpy -m pip install torch torchvision torchaudio
+            Run "PyTorch CPU" { & $vpy -m pip install torch torchvision torchaudio }
         }
     }
     Ok "PyTorch instalado"
@@ -109,7 +129,7 @@ else {
 
 # 5) Dependencias do ComfyUI -----------------------------------------------
 Step "Dependencias do ComfyUI"
-& $vpy -m pip install -r (Join-Path $ComfyDir "requirements.txt")
+Run "requirements do ComfyUI" { & $vpy -m pip install --quiet -r (Join-Path $ComfyDir "requirements.txt") }
 Ok "requirements instalados"
 
 # 6) Custom node: ComfyUI-GGUF (para o Flux quantizado) ---------------------
@@ -118,7 +138,7 @@ $ggufDir = Join-Path $ComfyDir "custom_nodes\ComfyUI-GGUF"
 if (Test-Path $ggufDir) { Ok "ja instalado" }
 else {
     git clone https://github.com/city96/ComfyUI-GGUF $ggufDir
-    & $vpy -m pip install -r (Join-Path $ggufDir "requirements.txt")
+    Run "requirements do ComfyUI-GGUF" { & $vpy -m pip install --quiet -r (Join-Path $ggufDir "requirements.txt") }
     Ok "instalado"
 }
 
