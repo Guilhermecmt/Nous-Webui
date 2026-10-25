@@ -73,6 +73,19 @@ if ($py) {
             if (-not $ok) { Write-Host $out; Bad "email/testes: testes falharam" }
         } else { Write-Host "  (testes do e-mail pulados: faltam aiohttp/requests no Python)" -ForegroundColor DarkGray }
     }
+
+    # Usar no celular: portao com Open WebUI e servicos de mentira (sem rede, sem Ollama).
+    if (Test-Path (Join-Path $root "celular/testes")) {
+        & $py.Source -c "import aiohttp" 2>$null
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "== Usar no celular (portao de mentira)" -ForegroundColor Cyan
+            $old = $ErrorActionPreference; $ErrorActionPreference = "Continue"
+            $out = & $py.Source -W ignore -m unittest discover -s celular/testes -t celular/testes 2>&1 | Out-String
+            $ok = $LASTEXITCODE -eq 0
+            $ErrorActionPreference = $old
+            if (-not $ok) { Write-Host $out; Bad "celular/testes: testes falharam" }
+        } else { Write-Host "  (testes do celular pulados: falta aiohttp no Python)" -ForegroundColor DarkGray }
+    }
 }
 
 $node = Get-Command node -ErrorAction SilentlyContinue

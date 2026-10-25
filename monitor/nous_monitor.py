@@ -31,6 +31,7 @@ Expoe (em http://127.0.0.1:8990, so' para paginas locais - ver cors_mw):
   GET  /model/check?name=  qualquer modelo do Ollama/Hugging Face: tamanho e se cabe
   GET  /catalog?vram_gb=&ram_gb=&gpu=  simulacao "e se eu tivesse outra maquina"
   GET  /update/status, POST /update/check|apply|config|modelos/atualizar   (nous_update.py)
+  GET  /celular/estado, POST /celular/ligar|desligar|codigo|aparelhos/remover   (celular/controle.py)
 
 GPU: lido dos contadores de desempenho do Windows (funcionam em PT-BR com os
 nomes em ingles) + tamanho real da VRAM via registro (qwMemorySize).
@@ -1760,6 +1761,13 @@ def build_app():
         nous_update.add_routes(app, h_pull, _EXTRA_PULLABLE, _data_dir)
     except Exception as e:
         print(f"[Nous][update] rotas de atualizacao indisponiveis: {e}", file=sys.stderr)
+    # Usar no celular (v2.11): ligar/desligar o portao, QR, aparelhos (celular/controle.py)
+    try:
+        sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "celular"))
+        import controle as celular_controle
+        celular_controle.add_routes(app, _data_dir)
+    except Exception as e:
+        print(f"[Nous][celular] rotas do celular indisponiveis: {e}", file=sys.stderr)
     return app
 
 
