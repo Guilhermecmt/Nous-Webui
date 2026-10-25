@@ -55,13 +55,16 @@ function git(cwd: string, args: string[], entrada?: string, env: Record<string, 
     p.stdin.end(entrada === undefined ? undefined : Buffer.from(entrada, 'utf8'));
   });
 }
-const mesmo = (a: string, b: string) => path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase();
+// Caminho como o disco o conhece: expande nomes curtos do Windows (RUNNER~1), que o
+// Git nunca devolve; sem isso path.relative(topo, origem) sai com ..\..\ e a copia erra a pasta.
+const real = (p: string) => { try { return fs.realpathSync.native(path.resolve(p)); } catch { return path.resolve(p); } };
+const mesmo = (a: string, b: string) => real(a).toLowerCase() === real(b).toLowerCase();
 
 /* ------------------------------------------------------------ criar */
 export async function criar(origem: string, titulo: string): Promise<{ tarefa: Tarefa; avisos: string[] }> {
   const t0 = await git(origem, ['rev-parse', '--show-toplevel']);
   if (!t0.ok) throw new Error('Para trabalhar numa cópia separada o projeto precisa estar no Git. Abra o terminal e rode "git init", depois faça o primeiro commit na aba Git.');
-  const topo = path.resolve(t0.saida.trim());
+  const topo = real(t0.saida.trim());
   const head = await git(topo, ['rev-parse', '--verify', 'HEAD']);
   if (!head.ok) throw new Error('Esse projeto ainda não tem nenhum commit no Git. Faça o primeiro commit (aba Git) para a cópia separada saber de onde partir.');
   const avisos: string[] = [];
@@ -86,7 +89,7 @@ export async function criar(origem: string, titulo: string): Promise<{ tarefa: T
   const ramo = 'nous-tarefa/' + id;
   const w = await git(topo, ['worktree', 'add', '-b', ramo, raiz, base]);
   if (!w.ok) throw new Error('Não consegui criar a cópia separada: ' + (w.erro || w.saida).trim().split('\n').pop());
-  const rel = path.relative(topo, path.resolve(origem));
+  const rel = path.relative(topo, real(origem));
   const t: Tarefa = { id, titulo: titulo.trim().slice(0, 80) || 'Tarefa separada', criado: Date.now(), origem: path.resolve(origem), topo, raiz,
     pasta: rel ? path.join(raiz, rel) : raiz, ramo, base, estado: 'aberta' };
   gravar(t);
@@ -111,8 +114,8 @@ export function abertas(origem?: string): Tarefa[] {
 
 /* A tarefa dona de uma pasta (a pasta da copia ou uma de dentro dela). */
 export function dePasta(pasta: string): Tarefa | null {
-  const p = path.resolve(pasta).toLowerCase();
-  return abertas().find((t) => p === t.raiz.toLowerCase() || p.startsWith(t.raiz.toLowerCase() + path.sep)) || null;
+  const p = real(pasta).toLowerCase();
+  return abertas().find((t) => { const r = real(t.raiz).toLowerCase(); return p === r || p.startsWith(r + path.sep); }) || null;
 }
 
 /* ------------------------------------------------------------ revisar */

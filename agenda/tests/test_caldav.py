@@ -26,9 +26,17 @@ import unittest
 import urllib.parse
 from datetime import datetime, timezone
 
+
+def utc_ics(local):
+    """'2026-11-03T09:00' no fuso desta maquina -> '20261103T120000Z' (em Brasilia)."""
+    return datetime.fromisoformat(local).astimezone(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))
-os.environ["NOUS_TZ"] = "America/Sao_Paulo"
+# O fuso dos compromissos tem que bater com o relogio desta maquina: Brasilia aqui,
+# UTC na CI (sem isso o TZID diria Sao Paulo para horas que a maquina leu em UTC).
+_off = datetime(2026, 11, 3, 9, 0).astimezone().utcoffset().total_seconds()
+os.environ["NOUS_TZ"] = "America/Sao_Paulo" if _off == -3 * 3600 else "UTC"
 
 try:
     import requests  # noqa: E402
@@ -519,7 +527,7 @@ class Base:
         txt = self.other.get(self.CAL, name)
         self.assertIn("SUMMARY:Dentista", txt)
         self.assertIn("LOCATION:Centro\\, sala 3", txt)
-        self.assertIn("DTSTART:20261103T120000Z", txt)
+        self.assertIn("DTSTART:" + utc_ics("2026-11-03T09:00"), txt)
         self.assertIn("TRIGGER:-PT10M", txt)
         # alterado aqui
         db.event_update(self.cx, UID, eid, {"title": "Dentista (remarcado)", "start_at": "2026-11-04T09:00",
@@ -528,7 +536,7 @@ class Base:
         self.sync()
         txt = self.other.get(self.CAL, name)
         self.assertIn("SUMMARY:Dentista (remarcado)", txt)
-        self.assertIn("DTSTART:20261104T120000Z", txt)
+        self.assertIn("DTSTART:" + utc_ics("2026-11-04T09:00"), txt)
         self.assertIn("SEQUENCE:1", txt)
         # apagado aqui
         db.event_delete(self.cx, UID, eid)
@@ -549,7 +557,11 @@ class Base:
         self.sync()
         row = self.dav_ev("Pilates")
         txt = self.other.get(self.CAL, row["href"].rsplit("/", 1)[-1])
-        self.assertIn("DTSTART;TZID=America/Sao_Paulo:20261103T073000", txt)
+        iana = cd.local_tzid()
+        if iana:
+            self.assertIn("DTSTART;TZID=%s:20261103T073000" % iana, txt)
+        else:
+            self.assertIn("DTSTART:" + utc_ics("2026-11-03T07:30"), txt)
         self.assertIn("RRULE:FREQ=WEEKLY;BYDAY=TU", txt)
         # relendo do servidor (forca) nada muda
         self.sync(force=True)
