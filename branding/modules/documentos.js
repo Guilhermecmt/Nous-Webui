@@ -7,8 +7,8 @@
 (function () {
 	'use strict';
 
-	var MON = 'http://127.0.0.1:8990';
-	var MEM = 'http://127.0.0.1:8993';
+	var MON = window.NousUrl(8990);
+	var MEM = window.NousUrl(8993);
 	var UI = window.NousUI || {};
 	var esc = UI.esc || function (s) { return String(s || ''); };
 	var ov = null, pdfB64 = null, pdfName = 'documento', info = null;

@@ -7,7 +7,7 @@
 (function () {
 	'use strict';
 
-	var SK_URL = 'http://127.0.0.1:8997';
+	var SK_URL = window.NousUrl(8997);
 	var UI = window.NousUI || {};
 	var esc = UI.esc || function (s) { return String(s || ''); };
 	var uid = null, ov = null;

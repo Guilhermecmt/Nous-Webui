@@ -162,6 +162,21 @@ $iLiga = Add-Item "Iniciar o Nous" {
     if ($S.rodando) { Start-Oculto "parar-nous.vbs" } else { Start-Oculto "nous-hidden.vbs" }
 }
 $iCode = Add-Item "Abrir o Nous Code" { Start-Oculto "nous-code.vbs" }
+# "Usar no celular": mostra se esta' ligado e deixa desligar (ligar e' no painel Seu Nous,
+# onde aparece o QR). Desligar passa pelo monitor, que tambem tira a regra do firewall.
+$iCel = Add-Item "" $null $false
+$iCelOff = Add-Item "Desligar o celular" {
+    $r = [Windows.Forms.MessageBox]::Show("Desligar o uso do Nous no celular?`n`nOs celulares ja ligados continuam registrados e voltam a abrir quando voce ligar de novo. O Windows pode pedir permissao para fechar a porta.",
+        "Usar no celular", "OKCancel", "Question")
+    if ($r -ne "OK") { return }
+    try {
+        Invoke-RestMethod -Uri "http://127.0.0.1:$PortaMonitor/celular/desligar" -Method Post -ContentType "application/json" -Body "{}" -TimeoutSec 120 | Out-Null
+        $script:ni.ShowBalloonTip(4000, "Nous", "O celular foi desligado.", "Info")
+    } catch {
+        [void][Windows.Forms.MessageBox]::Show("Nao consegui desligar agora. Abra o Nous e use o painel Seu Nous > Celular.", "Nous")
+    }
+}
+$iCelOff.Available = $false
 Add-Sep
 $iAtuApp = Add-Item "" {
     $est = Read-Json $estPath
@@ -224,6 +239,19 @@ $iSair = Add-Item "Sair (o Nous continua como esta)" {
     [Windows.Forms.Application]::Exit()
 }
 
+# "Usar no celular": ligado = o portao (nous_celular.py) esta' vivo (NousData/celular/estado.json)
+function Get-Celular {
+    $r = @{ ligado = $false; aparelhos = 0 }
+    $pasta = Join-Path $DataDir "celular"
+    $e = Read-Json (Join-Path $pasta "estado.json")
+    if ($e -and $e.pid) {
+        $p = Get-Process -Id ([int]$e.pid) -ErrorAction SilentlyContinue
+        if ($p) { $r.ligado = $true }
+    }
+    $r.aparelhos = @(Get-ChildItem -LiteralPath (Join-Path $pasta "aparelhos") -Filter "*.json" -ErrorAction SilentlyContinue).Count
+    return $r
+}
+
 # --- atualiza os textos do menu com o que a coleta achou -----------------------
 function Update-Menu {
     $est = Read-Json $estPath
@@ -260,6 +288,9 @@ function Update-Menu {
     $iBand.Checked = [bool]$cfg.bandeja
     $iWin.Checked = [bool](Get-ItemProperty -Path $ChaveRun -Name "Nous" -ErrorAction SilentlyContinue).Nous
     $iCode.Enabled = $true
+    $cel = Get-Celular
+    $iCel.Text = if ($cel.ligado) { "Celular: ligado ({0})" -f $(if ($cel.aparelhos -eq 1) { "1 aparelho" } else { "$($cel.aparelhos) aparelhos" }) } else { "Celular: desligado" }
+    $iCelOff.Available = [bool]$cel.ligado
     $script:ultimoEst = $est
 }
 

@@ -8,7 +8,7 @@
 (function () {
 	'use strict';
 
-	var MON = 'http://127.0.0.1:8990';
+	var MON = window.NousUrl(8990);
 	var DIA = 24 * 3600 * 1000;
 	var aplicando = false;
 
