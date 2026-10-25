@@ -8,6 +8,8 @@ import os from 'node:os';
 import path from 'node:path';
 import type { AddressInfo } from 'node:net';
 
+// as edicoes aqui nao consultam o language server (isso e' testado em diagnosticos.test.ts)
+process.env.NOUS_CODE_DIAGNOSTICOS = '0';
 let roteiro: string[] = [];
 let pedidos: { messages: { role: string; content: string }[] }[] = [];
 const falso = http.createServer((req, res) => {

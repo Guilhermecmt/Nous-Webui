@@ -699,9 +699,10 @@ async function executar(s: Sessao, c: Chamada, ctx: Ctx, tt: Turno): Promise<Res
         F.gravar(abs, novo);
         s.lidos[rel] = fs.statSync(abs).mtimeMs;
         instrSubpasta(s, abs, tt);
-        const saida = c.nome === 'edit'
+        const diag = await diagnosticosEdicao(s, ctx, abs, rel, atual, novo);
+        const saida = (c.nome === 'edit'
           ? (a.replace_all === true ? `The file ${rel} has been updated. All occurrences were successfully replaced.` : `The file ${rel} has been updated successfully.`)
-          : `<path>${rel}</path>\n<type>file</type>\n<content>\n${atual === null ? 'Created' : 'Updated'} file\n</content>`;
+          : `<path>${rel}</path>\n<type>file</type>\n<content>\n${atual === null ? 'Created' : 'Updated'} file\n</content>`) + diag;
         return { ok: true, resumo: `+${d.mais} -${d.menos}`, saida, diff: d.texto };
       }
       case 'pwsh': {
@@ -935,6 +936,19 @@ async function executar(s: Sessao, c: Chamada, ctx: Ctx, tt: Turno): Promise<Res
 }
 
 function ev(s: Sessao, ctx: Ctx, e: Evento) { s.eventos.push(e); ctx.emitir(e); }
+
+/* Diagnosticos do language server depois de uma edicao: so' os erros que ela
+ * introduziu, em poucas linhas para o modelo corrigir no passo seguinte, e um
+ * evento para o editor marcar o arquivo. Sem servidor (ou sem resposta a tempo)
+ * a edicao segue como sempre. NOUS_CODE_DIAGNOSTICOS=0 desliga. */
+async function diagnosticosEdicao(s: Sessao, ctx: Ctx, abs: string, rel: string, antes: string | null, depois: string): Promise<string> {
+  if (process.env.NOUS_CODE_DIAGNOSTICOS === '0') return '';
+  let d: L.Diag[] | null = null;
+  try { d = await L.diagnosticosNovos(s.pasta, abs, antes, depois); } catch { d = null; }
+  if (!d) return '';
+  ev(s, ctx, { t: 'diagnosticos', arquivo: rel, itens: d.slice(0, 20).map((x) => ({ linha: x.linha, coluna: x.coluna, codigo: x.codigo, msg: x.msg.slice(0, 300) })) });
+  return d.length ? '\n\n' + L.textoDiagnosticos(rel, d) : '';
+}
 
 /* ------------------------------------------------------------ subagente (so' leitura) */
 const FERR_SUB = new Set(['list_files', 'read', 'glob', 'grep', 'lsp']);

@@ -333,3 +333,6 @@ input, textarea, select { font: inherit; color: var(--txt); }
 #nc-modal summary { cursor: pointer; color: var(--txt); padding: 3px 0; }
 #nc-modal summary small { color: var(--mut2); margin-left: 6px; }
 #nc-modal pre { margin: 4px 0 8px; padding: 8px 10px; background: var(--noite); border-radius: 6px; font: 11.5px/1.5 var(--mono); white-space: pre-wrap; word-break: break-word; max-height: 360px; overflow-y: auto; }
+
+.nc-diag b { color: #e5534b; }
+.nc-diag a { color: inherit; text-decoration: underline; cursor: pointer; }

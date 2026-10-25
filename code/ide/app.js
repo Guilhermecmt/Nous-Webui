@@ -49,7 +49,7 @@
   /* ------------------------------------------------------------ estado */
   const st = {
     raiz: null, nomeRaiz: '', abas: [], ativa: null, expandidas: new Set(['']), cacheArvore: new Map(),
-    vista: 'arquivos', git: null, sessao: null, rodandoCtrl: null, vivo: null, modelos: [],
+    vista: 'arquivos', git: null, sessao: null, rodandoCtrl: null, vivo: null, modelos: [], diag: {},
     ws: null, termId: null, term: null, fit: null, monaco: null, editor: null, diffEd: null, selArvore: null,
   };
 
@@ -434,6 +434,7 @@
       if (d.binario || d.grande) return toast(base(caminho) + (d.binario ? ' é um arquivo binário.' : ' é grande demais para abrir aqui.'), true);
       const modelo = st.monaco.editor.createModel(d.conteudo, linguagem(caminho), st.monaco.Uri.parse('file:///' + caminho));
       if (d.crlf) modelo.setEOL(st.monaco.editor.EndOfLineSequence.CRLF);
+      if (st.diag[caminho]) marcarProblemas(modelo, st.diag[caminho]);
       const aba = { tipo: 'arquivo', caminho, modelo, salvo: modelo.getAlternativeVersionId(), sujo: false, vista: null };
       modelo.onDidChangeContent(() => {
         const s = modelo.getAlternativeVersionId() !== aba.salvo;
@@ -535,6 +536,7 @@
     const versao = a.modelo.getAlternativeVersionId();
     api('POST', '/fs/salvar', { raiz: st.raiz, caminho: a.caminho, conteudo: a.modelo.getValue() }).then(() => {
       a.salvo = versao; a.sujo = a.modelo.getAlternativeVersionId() !== versao; a.mudouNoDisco = false;
+      delete st.diag[a.caminho]; marcarProblemas(a.modelo, []);  // quem salva assume o arquivo: as marcas do agente saem
       a.ignorarAte = Date.now() + 1500;  // o aviso do disco desta gravacao nao conta
       desenharAbas(); $('#nc-aviso-disco').classList.add('oculto'); atualizarGitDepois();
     }).catch((e) => toast('Não salvou: ' + e.message, true));
@@ -1281,6 +1283,7 @@
       case 'pede': cartaoPedido(e, historico); break;
       case 'lembretes': if (!historico) { if (st.sessao) st.sessao.lembretes = e.lembretes; pintarLembretes(e.lembretes); } break;  // ao recarregar vale a lista do servidor
       case 'entregas': cartaoEntregas(e); break;
+      case 'diagnosticos': problemasDaEdicao(e); break;
       case 'mcp-pendente': cartaoMcp(e, historico); break;
       case 'aprovado': resolvido(e.id, e.ok, e.sempre, e.texto); break;
       case 'erro': semTexto(); add('<div class="nc-erro">' + esc(e.texto) + '</div>'); semVivo(); break;
@@ -1288,6 +1291,26 @@
       case 'fim': semVivo(); pintarMudancas(e.mudancas); break;
     }
     if (!historico) t.scrollTop = t.scrollHeight;
+  }
+
+  /* Erros que a edição do agente criou (o language server achou): sublinhados no
+   * editor e uma linha na conversa. Lista vazia limpa as marcas do arquivo. */
+  function marcarProblemas(modelo, itens) {
+    if (!st.monaco) return;
+    st.monaco.editor.setModelMarkers(modelo, 'nous-lsp', itens.map((i) => {
+      const w = modelo.getWordAtPosition({ lineNumber: i.linha, column: i.coluna });
+      return { severity: st.monaco.MarkerSeverity.Error, message: i.msg + (i.codigo ? ' (' + i.codigo + ')' : ''), source: 'Nous Code',
+        startLineNumber: i.linha, startColumn: i.coluna, endLineNumber: i.linha, endColumn: w && w.endColumn > i.coluna ? w.endColumn : i.coluna + 1 };
+    }));
+  }
+  function problemasDaEdicao(e) {
+    if (e.itens.length) st.diag[e.arquivo] = e.itens; else delete st.diag[e.arquivo];
+    const aba = st.abas.find((a) => a.tipo === 'arquivo' && a.caminho === e.arquivo);
+    if (aba) marcarProblemas(aba.modelo, e.itens);
+    if (!e.itens.length) return;
+    const el = add('<div class="nc-nota nc-diag"><b>' + e.itens.length + (e.itens.length === 1 ? ' problema' : ' problemas') + ' em ' + esc(e.arquivo) + '</b> depois da edição' +
+      e.itens.slice(0, 3).map((i) => '<br><a href="#" data-pabre="' + esc(e.arquivo) + '" data-linha="' + i.linha + '">linha ' + i.linha + '</a>: ' + esc(i.msg.slice(0, 140))).join('') + '</div>');
+    el.querySelectorAll('a[data-pabre]').forEach((a) => a.addEventListener('click', (ev) => { ev.preventDefault(); abrirArquivo(a.dataset.pabre, Number(a.dataset.linha), 1); }));
   }
 
   function textoLembrete(t) {
