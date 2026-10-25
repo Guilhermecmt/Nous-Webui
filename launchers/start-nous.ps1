@@ -6,14 +6,15 @@
 #>
 $ErrorActionPreference = "SilentlyContinue"
 
-$venv = Join-Path $env:USERPROFILE "open-webui"
+# NOUS_VENV / NOUS_DATA_DIR: so' para testar contra outra pasta; sem elas, o padrao de sempre.
+$venv = if ($env:NOUS_VENV) { $env:NOUS_VENV } else { Join-Path $env:USERPROFILE "open-webui" }
 $exe  = Join-Path $venv "Scripts\open-webui.exe"
 $py   = Join-Path $venv "Scripts\python.exe"
 $url  = "http://localhost:8080"
 
 # --- Configuracao ---
 $env:WEBUI_NAME          = "Nous"
-$env:DATA_DIR            = Join-Path $env:USERPROFILE "NousData"
+$env:DATA_DIR            = if ($env:NOUS_DATA_DIR) { $env:NOUS_DATA_DIR } else { Join-Path $env:USERPROFILE "NousData" }
 $env:OLLAMA_BASE_URL     = "http://127.0.0.1:11434"
 # Modelo fica na VRAM por 5 min apos a ultima mensagem. Era 30s, mas recarregar
 # um modelo de ~8 GB custa ~100s; com 30s, qualquer pausa para ler/digitar fazia
@@ -32,8 +33,6 @@ if (-not [Environment]::GetEnvironmentVariable("OLLAMA_CONTEXT_LENGTH", "User"))
 $env:ENABLE_WEB_SEARCH   = "True"
 $env:WEB_SEARCH_ENGINE   = "duckduckgo"
 $env:WEB_SEARCH_RESULT_COUNT = "5"
-$env:ENABLE_RAG_WEB_SEARCH   = "True"
-$env:RAG_WEB_SEARCH_ENGINE   = "duckduckgo"
 # Injeta os resultados da busca direto no contexto (sem exigir modelo de
 # embedding) - sem isto, o Gemma responde "nao tenho acesso em tempo real".
 $env:BYPASS_WEB_SEARCH_EMBEDDING_AND_RETRIEVAL = "True"
@@ -66,6 +65,10 @@ $env:DEFAULT_LOCALE          = "pt-BR"
 $env:YOUTUBE_LOADER_LANGUAGE = "pt,pt-BR,en"
 $env:ENABLE_CALENDAR         = "False"
 $env:ENABLE_AUTOMATIONS      = "False"
+# Desde a 0.10 o Open WebUI chama busca web e documentos como ferramentas do
+# modelo ("nativo"); modelos pequenos de PC nao chamam e a busca voltava sem
+# fontes. "legacy" e' o modo de sempre: o Open WebUI busca e poe no contexto.
+$env:DEFAULT_MODEL_PARAMS    = '{"function_calling":"legacy"}'
 # Embeddings multilingues (granite pelo Ollama, o mesmo do resto do Nous) so'
 # com banco novo: trocar o modelo com documentos ja' indexados invalidaria a
 # busca neles. Pelo Ollama porque o download do Hugging Face falha no Windows

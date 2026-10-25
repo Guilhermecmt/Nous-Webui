@@ -13,8 +13,12 @@ USO:
 """
 import json
 import os
+import sys
 import argparse
 import sqlite3
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "ajustes"))
+from config_db import obter, definir, tem_config  # noqa: E402
 
 OLLAMA_URL = os.environ.get("OLLAMA_BASE_URL", "http://127.0.0.1:11434").rstrip("/")
 
@@ -61,43 +65,6 @@ def _resolve_db(data_dir):
     return os.path.join(candidates[0], "webui.db") if candidates else None
 
 
-def _read_config(cx):
-    """Lê o dict 'data' da linha mais recente da tabela config (mesmo padrão do register_nvidia)."""
-    row = cx.execute("SELECT data FROM config ORDER BY id DESC LIMIT 1").fetchone()
-    if not row:
-        return {}
-    try:
-        data = json.loads(row[0]) if isinstance(row[0], str) else row[0]
-    except Exception:
-        return {}
-    return data if isinstance(data, dict) else {}
-
-
-def _write_config(cx, data):
-    """Atualiza somente a linha mais recente (UPDATE sem WHERE sobrescreveria todas)."""
-    row = cx.execute("SELECT id FROM config ORDER BY id DESC LIMIT 1").fetchone()
-    payload = json.dumps(data, ensure_ascii=False)
-    if row:
-        cx.execute("UPDATE config SET data=? WHERE id=?", (payload, row[0]))
-    else:
-        # Colunas DATETIME do Open WebUI esperam string ISO, NAO epoch inteiro
-        # (gravar int faz o servidor crashar no boot com fromisoformat).
-        import datetime
-        now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        cx.execute(
-            "INSERT INTO config (data, version, created_at, updated_at) VALUES (?,0,?,?)",
-            (payload, now, now),
-        )
-
-
-def _set_nested(obj, path: str, value):
-    """Escreve value em obj seguindo o caminho dot-separated, criando dicts conforme necessário."""
-    keys = path.split(".")
-    for k in keys[:-1]:
-        obj = obj.setdefault(k, {})
-    obj[keys[-1]] = value
-
-
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--data-dir", default=None)
@@ -115,11 +82,8 @@ def main():
             cx = sqlite3.connect(db, timeout=15)
             try:
                 if cx.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='config'").fetchone():
-                    data = _read_config(cx)
-                    arena = data.get("evaluation", {}).get("arena", {})
-                    if arena.get("enable"):
-                        _set_nested(data, "evaluation.arena.enable", False)
-                        _write_config(cx, data)
+                    if obter(cx, "evaluation.arena.enable"):
+                        definir(cx, {"evaluation.arena.enable": False})
                         cx.commit()
                         print("Arena desativado (< 2 modelos).")
             finally:
@@ -139,8 +103,7 @@ def main():
             print("Tabela 'config' ainda não criada. Tentarei no próximo boot.")
             return
 
-        data = _read_config(cx)
-        if not data:
+        if not tem_config(cx):
             print("Config vazia. Tentarei no próximo boot.")
             return
 
@@ -155,9 +118,8 @@ def main():
             },
         }
 
-        _set_nested(data, "evaluation.arena.enable", True)
-        _set_nested(data, "evaluation.arena.models", [arena_model])
-        _write_config(cx, data)
+        definir(cx, {"evaluation.arena.enable": True,
+                     "evaluation.arena.models": [arena_model]})
         cx.commit()
         print(
             f"Comparar Modelos ativado com modelos: {chat_models[:2]} "

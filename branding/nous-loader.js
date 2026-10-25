@@ -1895,33 +1895,47 @@
 	var _galNavInjected = false;
 	function ensureGalleryNavItem() {
 		if (_galNavInjected) return;
-		/* âncora: o link /notes já renderizado pelo Svelte */
-		var notesLink = document.querySelector('a[href="/notes"]');
+		/* âncora: o item "Notas" já renderizado pelo Svelte (id estável desde a
+		   0.12; o href /notes vale nas versões antigas e em qualquer idioma) */
+		var notesLink = document.getElementById('sidebar-notes-button') || document.querySelector('a[href="/notes"]');
 		if (!notesLink) return;
-		/* parentElement direto = div.flex.items-center.w-full (wrapper do item) */
+		/* parentElement direto = o wrapper do item */
 		var wrapper = notesLink.parentElement;
 		if (!wrapper || !wrapper.parentElement) return;
 		/* evita duplicar */
 		if (wrapper.parentElement.querySelector('#nous-gal-nav')) return;
 		_galNavInjected = true;
 
-		var item = document.createElement('div');
+		/* o item é uma CÓPIA do "Notas": herda o visual de qualquer versão do
+		   Open WebUI; só trocam o ícone, o rótulo e o destino */
+		var item = wrapper.cloneNode(true);
 		item.id = 'nous-gal-nav';
-		item.className = 'flex items-center w-full';
-		item.innerHTML =
-			'<a href="javascript:void(0)" id="nous-gal-nav-link" draggable="false" ' +
-			'class="flex flex-1 rounded-xl py-1.5 px-3 hover:bg-gray-50 dark:hover:bg-gray-800 transition cursor-pointer select-none">' +
-			'<div class="self-center mr-3">' +
-			'<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-5">' +
-			'<path stroke-linecap="round" stroke-linejoin="round" ' +
-			'd="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z"/>' +
-			'</svg></div>' +
-			'<div class="self-center truncate">Galeria</div>' +
-			'</a>';
+		item.removeAttribute('data-id');
+		var link = item.querySelector('a') || item;
+		link.id = 'nous-gal-nav-link';
+		link.setAttribute('href', 'javascript:void(0)');
+		link.setAttribute('aria-label', 'Galeria');
+		var velho = item.querySelector('svg');
+		if (velho) {
+			var icone = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+			icone.setAttribute('viewBox', '0 0 24 24');
+			icone.setAttribute('fill', 'none');
+			icone.setAttribute('stroke', 'currentColor');
+			icone.setAttribute('stroke-width', '1.5');
+			icone.setAttribute('aria-hidden', 'true');
+			icone.setAttribute('class', velho.getAttribute('class') || 'size-4');
+			icone.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" ' +
+				'd="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z"/>';
+			velho.replaceWith(icone);
+		}
+		/* o rótulo é o último elemento sem filhos que tem texto */
+		var folhas = [].filter.call(item.querySelectorAll('*'), function (e) { return !e.children.length && e.textContent.trim(); });
+		if (folhas.length) folhas[folhas.length - 1].textContent = 'Galeria';
+		else link.insertAdjacentText('beforeend', 'Galeria');
 
 		/* insere ANTES do wrapper do /notes */
 		wrapper.parentElement.insertBefore(item, wrapper);
-		item.querySelector('#nous-gal-nav-link').addEventListener('click', openGallery);
+		link.addEventListener('click', function (ev) { ev.preventDefault(); openGallery(ev); });
 	}
 
 	var galEl = null, galLbEl = null, galOpen = false;

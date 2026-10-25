@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-Ajustes do Nous sobre os padroes do Open WebUI 0.9.6, gravados na tabela config.
+Ajustes do Nous sobre os padroes do Open WebUI (0.9.6 a 0.12), gravados na tabela
+config (os dois formatos dela; ver config_db.py).
 
 Cada ajuste roda UMA vez por instalacao (marcador em NousData/.ajustes_nous.json):
 se o admin mudar depois pelo painel, o Nous nao desfaz. Ajuste novo = versao nova
@@ -17,6 +18,11 @@ na lista abaixo.
      modelo invalida os vetores antigos). Pelo Ollama e nao pelo sentence-
      transformers: o download do Hugging Face falha no Windows sem Modo de
      Desenvolvedor (WinError 1314, links simbolicos) e quebrava a busca.
+  2  models.default_params.function_calling = legacy. A partir da 0.10 o Open
+     WebUI usa "nativo" (o modelo decide chamar a busca web, os documentos...
+     como ferramentas); modelos pequenos de PC nao chamam e a busca na web
+     voltava sem fontes. "legacy" e' o comportamento de sempre: o Open WebUI
+     faz a busca e poe o resultado no contexto. So' se o usuario nao escolheu.
 
 Os mesmos valores vao como variavel de ambiente no launcher, para instalacoes
 novas (onde a tabela config ainda nao tem a chave).
@@ -32,18 +38,11 @@ import sqlite3
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "evaluation"))
-from register_arena import _resolve_db, _read_config, _write_config, _set_nested  # noqa: E402
+from register_arena import _resolve_db  # noqa: E402
+from config_db import obter, definir, tem_config  # noqa: E402
 
 NOUS_EMBED = "granite-embedding:278m"
 OLD_EMBED = "sentence-transformers/all-MiniLM-L6-v2"
-
-
-def _get(data, path, default=None):
-    for k in path.split("."):
-        if not isinstance(data, dict) or k not in data:
-            return default
-        data = data[k]
-    return data
 
 
 def _count(cx, table):
@@ -53,28 +52,35 @@ def _count(cx, table):
         return 0
 
 
-def ajuste_1(cx, data, log):
-    if not _get(data, "ui.default_locale"):
-        _set_nested(data, "ui.default_locale", "pt-BR")
+def ajuste_1(cx, log):
+    if not obter(cx, "ui.default_locale"):
+        definir(cx, {"ui.default_locale": "pt-BR"})
         log.append("idioma padrao pt-BR")
-    if _get(data, "rag.youtube_loader_language") in (None, ["en"]):
-        _set_nested(data, "rag.youtube_loader_language", ["pt", "pt-BR", "en"])
+    if obter(cx, "rag.youtube_loader_language") in (None, ["en"]):
+        definir(cx, {"rag.youtube_loader_language": ["pt", "pt-BR", "en"]})
         log.append("legendas do YouTube em portugues")
-    _set_nested(data, "calendar.enable", False)
-    _set_nested(data, "automations.enable", False)
+    definir(cx, {"calendar.enable": False, "automations.enable": False})
     log.append("calendario/automacoes nativos escondidos (o Nous usa a Agenda propria)")
-    engine = _get(data, "rag.embedding_engine", "")
-    model = _get(data, "rag.embedding_model", OLD_EMBED)
+    engine = obter(cx, "rag.embedding_engine", "")
+    model = obter(cx, "rag.embedding_model", OLD_EMBED)
     if engine in ("", None) and model in (OLD_EMBED, None):
         if _count(cx, "file") == 0 and _count(cx, "knowledge") == 0:
-            _set_nested(data, "rag.embedding_engine", "ollama")
-            _set_nested(data, "rag.embedding_model", NOUS_EMBED)
+            definir(cx, {"rag.embedding_engine": "ollama", "rag.embedding_model": NOUS_EMBED})
             log.append("embeddings de documentos multilingues (granite pelo Ollama)")
         else:
             log.append("embeddings mantidos (ja ha documentos indexados)")
 
 
-AJUSTES = [(1, ajuste_1)]
+def ajuste_2(cx, log):
+    params = obter(cx, "models.default_params")
+    params = dict(params) if isinstance(params, dict) else {}
+    if "function_calling" not in params:
+        params["function_calling"] = "legacy"
+        definir(cx, {"models.default_params": params})
+        log.append("busca web e documentos pelo modo de sempre (legacy)")
+
+
+AJUSTES = [(1, ajuste_1), (2, ajuste_2)]
 
 
 def main():
@@ -98,11 +104,12 @@ def main():
         if not cx.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='config'").fetchone():
             print("Tabela 'config' ainda nao criada. Tentarei no proximo boot.")
             return
-        data = _read_config(cx)
+        if not tem_config(cx):
+            print("Config ainda vazia (o servidor ainda nao gravou os padroes). Tentarei no proximo boot.")
+            return
         log = []
         for _v, f in pending:
-            f(cx, data, log)
-        _write_config(cx, data)
+            f(cx, log)
         cx.commit()
     finally:
         cx.close()

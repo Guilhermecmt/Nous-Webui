@@ -25,10 +25,14 @@ USO:
     python monitor/register_model_ctx.py [--data-dir <DATA_DIR>]
 """
 import os
+import sys
 import json
 import time
 import argparse
 import sqlite3
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "ajustes"))
+from config_db import obter, definir, tem_config, caminho_busca_web  # noqa: E402
 
 OLLAMA_URL = os.environ.get("OLLAMA_BASE_URL", "http://127.0.0.1:11434").rstrip("/")
 NUM_CTX = int(os.environ.get("NOUS_NUM_CTX", "16384"))
@@ -145,45 +149,19 @@ def _set_web_search(cx):
     WebUI ler do DB e ignorar as env vars do start-nous.ps1 apos o 1o boot.
     Sem enable/engine gravados, a busca web nao roda de forma confiavel
     (recupera 0 fontes ou cai no RAG de historico)."""
-    if not _table_exists(cx, "config"):
+    if not _table_exists(cx, "config") or not tem_config(cx):
         return False
-    row = cx.execute("SELECT id, data FROM config ORDER BY id DESC LIMIT 1").fetchone()
-    if not row:
-        return False
-    cid, raw = row[0], row[1]
-    try:
-        data = json.loads(raw) if isinstance(raw, str) else raw
-    except Exception:
-        return False
-    if not isinstance(data, dict):
-        return False
-
-    def _getn(d, path):
-        for k in path.split("."):
-            if isinstance(d, dict) and k in d:
-                d = d[k]
-            else:
-                return None
-        return d
-
-    def _setn(d, path, val):
-        keys = path.split(".")
-        for k in keys[:-1]:
-            d = d.setdefault(k, {})
-        d[keys[-1]] = val
-
+    # "web.search" a partir da 0.10, "rag.web.search" antes (config_db.py)
+    base = caminho_busca_web(cx)
     desired = {
-        "rag.web.search.enable": True,
-        "rag.web.search.engine": WEB_ENGINE,
-        "rag.web.search.result_count": WEB_RESULTS,
+        base + ".enable": True,
+        base + ".engine": WEB_ENGINE,
+        base + ".result_count": WEB_RESULTS,
     }
     # so' escreve se algo estiver diferente (idempotente)
-    if all(_getn(data, k) == v for k, v in desired.items()):
+    if all(obter(cx, k) == v for k, v in desired.items()):
         return False
-    for k, v in desired.items():
-        _setn(data, k, v)
-    cx.execute("UPDATE config SET data=? WHERE id=?",
-               (json.dumps(data, ensure_ascii=False), cid))
+    definir(cx, desired)
     return True
 
 
