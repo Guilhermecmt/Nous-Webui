@@ -146,13 +146,12 @@ function Find-PortaLivre {
 # na versao certa. Sempre encerra o que subiu.
 function Test-Boot($esperada) {
     $porta = Find-PortaLivre
-    $keyFile = Join-Path $DataDir ".webui_secret_key"
-    $env:DATA_DIR = $DataDir
-    $env:WEBUI_NAME = "Nous"
-    $env:OLLAMA_BASE_URL = "http://127.0.0.1:11434"
+    # O mesmo ambiente do launcher: desde a 0.10 o Open WebUI grava no banco os
+    # padroes que ve' neste primeiro inicio (acompanhamentos, busca web, idioma...).
+    $env:NOUS_DATA_DIR = $DataDir
+    . (Join-Path $Repo "launchers\nous-env.ps1")
+    Set-NousEnv | Out-Null
     $env:WEBUI_AUTH = "True"
-    $env:ENABLE_VERSION_UPDATE_CHECK = "False"
-    $env:WEBUI_SECRET_KEY = $(if (Test-Path $keyFile) { (Get-Content $keyFile -Raw).Trim() } else { [guid]::NewGuid().ToString("N") + [guid]::NewGuid().ToString("N") })
     $out = Join-Path $env:TEMP "nous-teste-boot.out.log"
     $err = Join-Path $env:TEMP "nous-teste-boot.err.log"
     Remove-Item $out, $err -Force -ErrorAction SilentlyContinue

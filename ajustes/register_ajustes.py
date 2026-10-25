@@ -87,6 +87,27 @@ def ajuste_2(cx, log):
 AJUSTES = [(1, ajuste_1), (2, ajuste_2)]
 
 
+def padrao_modelo(cx, pasta_dados):
+    """Modelo que o Nous abre por padrao (o escolhido na instalacao, se ainda estiver
+    no Ollama). Ate a 0.9 o launcher passava DEFAULT_MODELS em todo inicio; desde a
+    0.10 o Open WebUI grava o padrao no banco e ignora a variavel depois do 1o
+    inicio, e sem isto a tela inicial abria no primeiro modelo da lista. So' se o
+    usuario ainda nao escolheu outro (ui.default_models vazio)."""
+    if not por_chave(cx) or obter(cx, "ui.default_models"):
+        return
+    try:
+        modelo = json.load(open(os.path.join(pasta_dados, "install-manifest.json"), encoding="utf-8-sig")).get("model")
+        if not modelo:
+            return
+        import requests
+        base = os.environ.get("OLLAMA_BASE_URL", "http://127.0.0.1:11434").rstrip("/")
+        tags = [m.get("name") for m in requests.get(base + "/api/tags", timeout=5).json().get("models", [])]
+    except Exception:
+        return
+    if modelo in tags or modelo + ":latest" in tags:
+        definir(cx, {"ui.default_models": modelo})
+
+
 def sem_novidades(cx):
     """O Open WebUI mostra as notas da versao, em ingles, ao administrador toda vez
     que a versao muda (settings.showChangelog, padrao ligado). O Nous e' quem
@@ -128,6 +149,7 @@ def main():
     cx = sqlite3.connect(db, timeout=15)
     try:
         sem_novidades(cx)
+        padrao_modelo(cx, os.path.dirname(db))
         cx.commit()
         if not pending:
             return
