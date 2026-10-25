@@ -422,6 +422,18 @@ function Start-Monitor {
     }
 }
 
+# Icone na bandeja do sistema (bandeja.ps1): ele proprio so' deixa uma copia rodar.
+# Desligavel pelo menu do icone ("bandeja": false em NousData\atualizacao-config.json).
+function Start-Bandeja {
+    $vbs = Join-Path $PSScriptRoot "bandeja.vbs"
+    if (-not (Test-Path $vbs)) { return }
+    $cfg = Join-Path $env:DATA_DIR "atualizacao-config.json"
+    if (Test-Path $cfg) {
+        try { if ((Get-Content $cfg -Raw | ConvertFrom-Json).bandeja -eq $false) { return } } catch {}
+    }
+    Start-Process -FilePath "wscript.exe" -ArgumentList "`"$vbs`"" -WindowStyle Hidden
+}
+
 # Mesma busca do instalador: o Ollama pode estar no PATH ou em Program Files,
 # nao so' em LOCALAPPDATA.
 function Find-OllamaApp {
@@ -467,16 +479,17 @@ if (-not (Test-Path $exe)) {
 }
 
 Start-Monitor
+Start-Bandeja
 
 # Ja esta rodando? Garante funcoes nativas e abre o navegador.
-if (Test-Up) { Register-All; Start-Process $url; return }
+if (Test-Up) { Register-All; if ($env:NOUS_SEM_NAVEGADOR -ne "1") { Start-Process $url }; return }
 
 # O servidor NAO esta no ar: abre JA a tela de carregamento (o usuario ve o logo
 # do Nous e uma barra de progresso na hora). Ela mesma checa o servidor e abre o
 # Nous sozinha quando estiver pronto. Sem isto, o navegador so' abriria 1-2 min
 # depois - tempo em que a pessoa acha que travou e clica varias vezes.
 $loading = Join-Path $PSScriptRoot "loading.html"
-if (Test-Path $loading) { Start-Process $loading }
+if ((Test-Path $loading) -and $env:NOUS_SEM_NAVEGADOR -ne "1") { Start-Process $loading }
 
 # Um clique anterior ja esta subindo o servidor: fica so' a tela de carregamento.
 # Sem esta trava, cada clique subia OUTRO servidor contra o mesmo webui.db.

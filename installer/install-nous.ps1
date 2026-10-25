@@ -407,6 +407,7 @@ if (-not $desktopOk) {
 }
 $startOk = New-NousShortcut ([Environment]::GetFolderPath("Programs"))
 $null = New-NousShortcut ([Environment]::GetFolderPath("Programs")) "Parar Nous" "parar-nous.vbs"
+$null = New-NousShortcut ([Environment]::GetFolderPath("Programs")) "Nous Bandeja" "bandeja.vbs"   # icone perto do relogio
 
 # Nous Code (IDE com agente de IA local): precisa do Node 22.18+. Baixa as pecas
 # do editor (Monaco, terminal) uma vez e cria o atalho "Nous Code". Opcional:

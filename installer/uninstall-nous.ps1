@@ -80,6 +80,11 @@ if (Test-Path $manPath) { try { $man = Get-Content $manPath -Raw | ConvertFrom-J
 #    (o stop-nous.ps1 tambem pega os processos-pai que rodam do venv, que
 #    seguravam arquivos e faziam a remocao do passo 2 falhar pela metade)
 Write-Host "`n[1] Parando o Nous" -ForegroundColor Cyan
+# icone da bandeja (launchers\bandeja.ps1) e o "abrir com o Windows" opcional dele
+Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" |
+    Where-Object { $_.CommandLine -like "*bandeja.ps1*" } |
+    ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+Remove-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" -Name "Nous" -ErrorAction SilentlyContinue
 $stop = Join-Path $PSScriptRoot "..\launchers\stop-nous.ps1"
 if (Test-Path $stop) { & $stop | Out-Null }
 foreach ($p in 8080, 8990, 8991, 8992, 8993, 8994, 8995, 8996, 8997) {
@@ -104,7 +109,7 @@ $lnkDirs = @([Environment]::GetFolderPath("Desktop"),
              [Environment]::GetFolderPath("CommonDesktopDirectory"),
              [Environment]::GetFolderPath("Programs"))
 foreach ($d in $lnkDirs) {
-    foreach ($lnk in "Nous.lnk", "Parar Nous.lnk", "Nous Code.lnk") {
+    foreach ($lnk in "Nous.lnk", "Parar Nous.lnk", "Nous Code.lnk", "Nous Bandeja.lnk") {
         $lp = Join-Path $d $lnk
         if ($d -and (Test-Path $lp)) { Remove-Item $lp -Force; Ok "atalho removido: $lp" }
     }

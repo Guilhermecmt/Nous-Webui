@@ -29,6 +29,7 @@ param(
     [string]$OllamaUrl = "http://127.0.0.1:11434",
     [string]$RegistroUrl = "https://registry.ollama.ai",
     [string]$PortaNous = "8080",
+    [int]$EsperaSubirSeg = 180,      # quanto esperar o Nous responder depois de atualizar, antes de voltar atras
     [switch]$ModoTeste               # aceita URLs locais; nao para/inicia o Nous nem mexe no registro do Windows
 )
 $ErrorActionPreference = "Stop"
@@ -191,7 +192,8 @@ function Invoke-Modelos {
         try {
             $resp = Invoke-WebRequest -Uri (Get-RegistroManifestoUrl $nome) -Method Head -UseBasicParsing -TimeoutSec 15 `
                 -Headers @{ Accept = "application/vnd.docker.distribution.manifest.v2+json"; "User-Agent" = "Nous-Atualizador" }
-            $remoto = "$($resp.Headers['Docker-Content-Digest'])" -replace '^sha256:', ''
+            # o registro do Ollama manda o digest do manifesto no cabecalho (o mesmo que "ollama list" mostra)
+            $remoto = "$($resp.Headers['Ollama-Content-Digest'])$($resp.Headers['Docker-Content-Digest'])" -replace '^sha256:', ''
             $local = "$($m.digest)" -replace '^sha256:', ''
             if ($remoto -and $local -and ($remoto.ToLower() -ne $local.ToLower())) {
                 $novos += @{ nome = $nome; digest_local = $local.Substring(0, 12); digest_novo = $remoto.Substring(0, 12) }
@@ -354,7 +356,7 @@ function Invoke-Aplicar {
     Log "backup em $bkp"
 
     # 6) trocar os arquivos (com o Nous parado)
-    $estavaRodando = (-not $ModoTeste) -and (Test-NousRodando)
+    $estavaRodando = Test-NousRodando
     $bandeja = Get-BandejaPids
     Set-Estado @{ fase = "instalando"; mensagem = "Instalando a versao $($r.versao)..." }
     Stop-Nous
@@ -369,7 +371,7 @@ function Invoke-Aplicar {
         if (-not (Copy-App $bkp $AppDir)) { Log "ERRO ao restaurar o backup; copia completa em $bkp" }
         if ($estavaRodando) { Start-Nous }
         if ($bandeja.Count -gt 0 -and -not $ModoTeste) { Start-Process wscript.exe -ArgumentList ('"{0}"' -f (Join-Path $AppDir "launchers\bandeja.vbs")) -WindowStyle Hidden }
-        Set-Estado @{ fase = "revertida"; resultado = "revertida"; disponivel = $true
+        Set-Estado @{ fase = "revertida"; resultado = "revertida"; disponivel = $true; versao_atual = $atual; versao_nova = $r.versao
                       mensagem = "A atualizacao nao deu certo e o Nous voltou para a versao $atual. $motivo" }
     }
     if (-not (Copy-App $stage $AppDir)) { & $reverter "Nao consegui copiar os arquivos novos."; return 1 }
@@ -399,7 +401,7 @@ function Invoke-Aplicar {
         Set-Estado @{ fase = "reiniciando"; mensagem = "Reiniciando o Nous..." }
         Start-Nous
         $subiu = $false
-        for ($i = 0; $i -lt 90; $i++) { Start-Sleep -Seconds 2; if (Test-NousSaudavel) { $subiu = $true; break } }
+        for ($i = 0; $i -lt ($EsperaSubirSeg / 2); $i++) { Start-Sleep -Seconds 2; if (Test-NousSaudavel) { $subiu = $true; break } }
         if (-not $subiu) { & $reverter "O Nous nao abriu com a versao nova."; return 1 }
     }
 
@@ -432,7 +434,7 @@ if ($Acao -eq "Aplicar") {
         $env:NOUS_ATUALIZAR_COPIA = "1"
         $a = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-WindowStyle", "Hidden", "-File", "`"$copia`"", "-Acao", "Aplicar",
                "-AppDir", "`"$AppDir`"", "-DataDir", "`"$DataDir`"", "-Venv", "`"$Venv`"", "-ApiUrl", "`"$ApiUrl`"",
-               "-OllamaUrl", "`"$OllamaUrl`"", "-RegistroUrl", "`"$RegistroUrl`"", "-PortaNous", $PortaNous)
+               "-OllamaUrl", "`"$OllamaUrl`"", "-RegistroUrl", "`"$RegistroUrl`"", "-PortaNous", $PortaNous, "-EsperaSubirSeg", $EsperaSubirSeg)
         if ($ModoTeste) { $a += "-ModoTeste" }
         $p = Start-Process powershell.exe -ArgumentList $a -WindowStyle Hidden -PassThru -Wait
         Remove-Item -LiteralPath $copia -Force -ErrorAction SilentlyContinue

@@ -35,11 +35,12 @@ Name: "pt"; MessagesFile: "compiler:Languages\BrazilianPortuguese.isl"
 
 [Tasks]
 Name: "desktopicon"; Description: "Criar um atalho na Area de Trabalho"; GroupDescription: "Atalhos:"
+Name: "startup"; Description: "Mostrar o icone do Nous na bandeja ao ligar o Windows"; GroupDescription: "Inicio:"; Flags: unchecked
 
 [Files]
 ; O repositorio inteiro, menos o que e' de desenvolvimento ou gerado.
 Source: "..\*"; DestDir: "{app}"; \
-    Excludes: ".git\*,.github\*,dist\*,bkp\*.zip,mockups\*,docs\screenshots\*,__pycache__\*,*.pyc,*.log,*.exe,*.sqlite,.webui_secret_key,branding\assets\marble*.png"; \
+    Excludes: ".git\*,.github\*,.claude\*,dist\*,node_modules\*,bkp\*.zip,mockups\*,docs\screenshots\*,__pycache__\*,*.pyc,*.log,*.exe,*.sqlite,.webui_secret_key,branding\assets\marble*.png"; \
     Flags: recursesubdirs ignoreversion
 
 [Icons]
@@ -47,7 +48,13 @@ Source: "..\*"; DestDir: "{app}"; \
 ; $PSScriptRoot e impedia os servicos auxiliares de subir).
 Name: "{userprograms}\Nous"; Filename: "{sys}\wscript.exe"; Parameters: """{app}\launchers\nous-hidden.vbs"""; WorkingDir: "{app}\launchers"; IconFilename: "{app}\branding\assets\nous.ico"
 Name: "{userprograms}\Parar Nous"; Filename: "{sys}\wscript.exe"; Parameters: """{app}\launchers\parar-nous.vbs"""; WorkingDir: "{app}\launchers"; IconFilename: "{app}\branding\assets\nous.ico"
+Name: "{userprograms}\Nous Bandeja"; Filename: "{sys}\wscript.exe"; Parameters: """{app}\launchers\bandeja.vbs"""; WorkingDir: "{app}\launchers"; IconFilename: "{app}\branding\assets\nous.ico"
 Name: "{userdesktop}\Nous"; Filename: "{sys}\wscript.exe"; Parameters: """{app}\launchers\nous-hidden.vbs"""; WorkingDir: "{app}\launchers"; IconFilename: "{app}\branding\assets\nous.ico"; Tasks: desktopicon
+
+[Registry]
+; Opcional (tarefa "startup", desligada por padrao): so' o icone da bandeja abre com o
+; Windows, nao o servidor. O proprio icone liga/desliga isso pelo menu (mesmo valor).
+Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "Nous"; ValueData: """{sys}\wscript.exe"" ""{app}\launchers\bandeja.vbs"""; Flags: uninsdeletevalue; Tasks: startup
 
 [Run]
 ; Configura o backend (Ollama, Python, Open WebUI, identidade). Janela visivel
