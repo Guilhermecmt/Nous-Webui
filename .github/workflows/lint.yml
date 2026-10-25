@@ -16,7 +16,10 @@ jobs:
           python-version: "3.11"
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          # O Nous Code roda TypeScript direto, o que pede Node 22.18+
+          node-version: "22"
+      - name: Dependencias do Nous Code (para checar os tipos)
+        run: npm ci --prefix code --ignore-scripts --no-audit --no-fund
       - name: Checagens do Nous
         shell: powershell
         run: .\tools\lint.ps1
