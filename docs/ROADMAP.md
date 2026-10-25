@@ -46,9 +46,8 @@ sem conhecimento tecnico, com tudo acontecendo em segundo plano.
   "diga o que fazer" no editor e comparar 2-4 modelos com placar.
 - Validado com qwen3:4b: agenda, "aprenda isso", e-mail pelo chat, OCR,
   pesquisa, compactacao (o que era pendente da v2.7).
-- Pendente: usar no celular (QR na rede de casa) - exige abrir o servidor
-  para a rede local, decisao do usuario; sincronizacao CalDAV de duas vias;
-  testar com IMAP real e com o ComfyUI instalado.
+- Pendente na epoca (feito na v2.11): usar no celular e CalDAV de duas
+  vias. Ainda pendente: testar com IMAP real.
 
 ### v2.9 — Documentos, memoria portatil e qualquer modelo
 - Documentos com a IA sugerindo mudancas para aceitar/recusar, versoes e
@@ -71,6 +70,22 @@ sem conhecimento tecnico, com tudo acontecendo em segundo plano.
   OpenAI (LM Studio, llama.cpp, vLLM). Proximos passos: diagnosticos do LSP
   depois de editar, worktrees do Git para tarefas isoladas, subagente que
   tambem edita, instalar o Node pelo instalador.
+
+### v2.11 — Celular, agenda de duas vias e atualizacao sozinha
+- Open WebUI 0.12.3, com atualizacao segura de quem ja tem o Nous (backup,
+  migracao conferida, volta atras). Telas ancoradas em ids estaveis. Loja com
+  catalogo novo e ranking explicito. Ollama novo sem nuvem nem boas-vindas
+  quando o Nous o instala.
+- Usar no celular: portao na rede de casa, desligado por padrao, pareamento
+  por QR, firewall so' em rede Privada. HTTP (sem microfone/PWA no celular).
+- Agenda: CalDAV de duas vias (iCloud, Nextcloud, Fastmail...). Google so'
+  leitura (o CalDAV dele exige OAuth).
+- Icone na bandeja; atualizacao automatica do Nous e dos modelos; Nous-Setup.exe
+  e script de assinatura prontos (falta o certificado).
+- Nous Code: diagnosticos do LSP depois de editar, tarefa separada (worktree),
+  subagente que edita, Node portatil pelo instalador.
+- E-mail e motor de imagem testados de ponta a ponta (servidor IMAP/SMTP falso;
+  ComfyUI com ROCm nativo na RX 9070 XT).
 
 ### v2.6 — Correcoes para o primeiro acesso
 - Instalador que nao trava nem mente ("Pronto!" so' quando deu certo), app em
@@ -115,26 +130,22 @@ sem conhecimento tecnico, com tudo acontecendo em segundo plano.
 
 ## Proximo
 
-### Atualizar o Open WebUI (0.9.6 -> 0.11.x)
-- A 0.11 refez a interface: adaptar o `nous-loader.js` (ancorar em ids
-  estaveis, nao em textos traduzidos), revalidar filtros/pipes e subir o pin.
-- Atualizar o catalogo da Loja (qwen3.5/3.6/3.8, gemma4:26b/31b) com um campo
-  de ranking explicito em vez de usar o tamanho como medida de qualidade.
-- Ollama 0.35+: decidir sobre o onboarding proprio do app e o OLLAMA_NO_CLOUD.
-
-### Tour "Primeiros passos" para quem nunca usou IA
-- Boas-vindas em linguagem simples; licoes curtas durante o download do modelo
-  (o que e' um modelo, a IA pode errar, como pedir bem); primeira conversa
-  guiada com cartoes de tarefas do dia a dia; foto/documento; tour da tela;
-  botao "?" para rever. Progresso salvo por usuario.
-
-### Bandeja do sistema (System Tray)
-- Icone na bandeja: Iniciar/Parar, abrir, status (rodando/parado, GPU/CPU),
-  uso de memoria — substitui qualquer necessidade de terminal.
-
 ### Distribuicao
-- Instalador assinado (.exe/MSI) para reduzir alerta do SmartScreen.
-- Auto-update do Nous e do modelo.
+- Certificado de assinatura (Azure Trusted Signing ou OV) para o SmartScreen
+  parar de avisar; o script ja esta pronto (docs/DISTRIBUICAO.md).
+- Publicar a primeira release no GitHub (o atualizador automatico depende dela).
+
+### Celular
+- HTTPS sem assustar leigo (para microfone e instalar como app no celular).
+- Testar num celular de verdade e a regra de firewall real.
+
+### Agenda
+- Google Agenda de duas vias (exige OAuth e um app registrado no Google).
+
+### Testes com contas e aparelhos reais
+- E-mail com Gmail/Outlook de verdade; OCR de imagem anexada.
+- Galeria e motor de imagem vistos dentro do Nous; conversa + imagem com a placa
+  livre.
 
 ---
 ### Principios
