@@ -17,6 +17,11 @@
 //   GET  /mcp?pasta=                  servidores MCP do projeto (e se ja' foram permitidos)
 //   POST /mcp/aprovar {pasta, nome, sim}
 //   POST /lembretes/apagar {id, lembrete}
+//   GET  /tarefas?pasta=              tarefas separadas em andamento (copias do projeto)
+//   POST /tarefas {pasta, titulo}     cria a copia (worktree do Git) e a conversa dela
+//   GET  /tarefa/revisao?id=          arquivos mudados na copia, com + e -, e o diff
+//   POST /tarefa/aplicar {id}         leva as mudancas ao projeto (ou recusa, sem tocar em nada)
+//   POST /tarefa/descartar {id}       apaga a copia
 //
 // Lembretes (schedule_create do agente) vencidos rodam a conversa sozinhos:
 // sem ninguem para aprovar, o que pede aprovacao e' recusado (como no dsh).
@@ -49,6 +54,7 @@ import * as J from './jobs.ts';
 import * as L from './lsp.ts';
 import * as M from './mcp.ts';
 import * as R from './lembretes.ts';
+import * as TA from './tarefas.ts';
 import { skills } from './contexto.ts';
 import * as IDE from './ide.ts';
 
@@ -61,10 +67,21 @@ const ORIGENS = new Set(['http://localhost:8080', 'http://127.0.0.1:8080',
   'http://localhost:' + PORTA, 'http://127.0.0.1:' + PORTA]);  // o Nous e a janela do IDE
 const MODELO_PADRAO = process.env.NOUS_CODE_MODEL || 'qwen2.5-coder:14b';
 fs.mkdirSync(DIR_SESSOES, { recursive: true });
+// Com o Node portatil do Nous (fora do PATH do sistema), os comandos do agente
+// e o terminal tambem precisam achar `node` e `npm`: so' neste processo e nos filhos.
+{
+  const nodeDir = path.dirname(process.execPath);
+  const chave = Object.keys(process.env).find((k) => k.toLowerCase() === 'path') || 'PATH';
+  const dirs = (process.env[chave] || '').split(path.delimiter);
+  if (!dirs.some((d) => d && path.resolve(d).toLowerCase() === nodeDir.toLowerCase())) {
+    process.env[chave] = nodeDir + path.delimiter + (process.env[chave] || '');
+  }
+}
 J.configurar(path.join(DADOS, 'jobs'));
 F.configurar(path.join(DADOS, 'saidas'), [path.join(DADOS, 'jobs')]);
 M.configurar(DADOS);
 R.configurar(DADOS);
+TA.configurar(DADOS);
 
 /* ------------------------------------------------------------ sessoes */
 const abertas = new Map<string, Sessao>();
@@ -98,6 +115,32 @@ function listarSessoes(pasta?: string) {
     } catch { /* arquivo quebrado: ignora */ }
   }
   return out.sort((a, b) => b.atualizado - a.atualizado);
+}
+
+/* ------------------------------------------------------------ tarefas separadas */
+const vistaTarefa = (t: TA.Tarefa | null) => t ? { id: t.id, titulo: t.titulo, origem: t.origem, pasta: t.pasta, criado: t.criado } : null;
+
+function sessoesDaTarefa(t: TA.Tarefa): Sessao[] {
+  const raiz = path.resolve(t.raiz).toLowerCase();
+  const dentro = (p: string) => { const x = path.resolve(p).toLowerCase(); return x === raiz || x.startsWith(raiz + path.sep); };
+  const out: Sessao[] = [];
+  for (const n of fs.readdirSync(DIR_SESSOES)) {
+    if (!n.endsWith('.json')) continue;
+    try { const s = carregar(n.slice(0, -5)); if (dentro(s.pasta)) out.push(s); } catch { /* arquivo quebrado: ignora */ }
+  }
+  return out;
+}
+
+/* A copia acabou (aplicada ou descartada): as conversas dela voltam para o
+ * projeto, como historico, sem o que so' valia dentro da copia. */
+function devolverSessoes(t: TA.Tarefa, nota: string) {
+  for (const s of sessoesDaTarefa(t)) {
+    s.pasta = path.join(t.origem, path.relative(t.pasta, s.pasta));
+    s.isolada = false; s.originais = {}; s.lidos = {}; s.pastasInstr = []; s.ultimoContexto = '';
+    J.encerrarSessao(s.id);
+    s.eventos.push({ t: 'nota', texto: nota });
+    salvar(s);
+  }
 }
 
 /* ------------------------------------------------------------ pastas */
@@ -206,9 +249,40 @@ async function rota(req: http.IncomingMessage, res: http.ServerResponse) {
   if (r === 'POST /sessoes') {
     const b = await corpo(req);
     const pasta = pastaValida(String(b.pasta || ''));
-    const s: Sessao = normalizar({ id: novoId(), pasta, modelo: String(b.modelo || MODELO_PADRAO) });
-    abertas.set(s.id, s); salvar(s); lembrarPasta(pasta);
+    const copia = TA.dePasta(pasta);   // dentro de uma tarefa separada: nao entra nos recentes
+    const s: Sessao = normalizar({ id: novoId(), pasta, modelo: String(b.modelo || MODELO_PADRAO), isolada: !!copia });
+    abertas.set(s.id, s); salvar(s); if (!copia) lembrarPasta(pasta);
     return json(req, res, 200, { id: s.id });
+  }
+
+  /* ---- tarefas separadas: o agente trabalha numa copia; o projeto so' muda ao aplicar ---- */
+  if (r === 'GET /tarefas') return json(req, res, 200, TA.abertas(q('pasta') ? pastaValida(q('pasta')) : undefined).map((t) => vistaTarefa(t)));
+  if (r === 'POST /tarefas') {
+    const b = await corpo(req);
+    const origem = pastaValida(String(b.pasta || ''));
+    if (TA.dePasta(origem)) return json(req, res, 400, { erro: 'esta já é uma cópia separada; crie a tarefa a partir do projeto' });
+    const { tarefa, avisos } = await TA.criar(origem, String(b.titulo || ''));
+    const s: Sessao = normalizar({ id: novoId(), pasta: tarefa.pasta, modelo: String(b.modelo || MODELO_PADRAO), titulo: tarefa.titulo, tituloAuto: false, isolada: true });
+    abertas.set(s.id, s); salvar(s); lembrarPasta(origem);
+    return json(req, res, 200, { id: s.id, pasta: tarefa.pasta, tarefa: vistaTarefa(tarefa), avisos });
+  }
+  if (r === 'GET /tarefa/revisao') {
+    const t = TA.ler(q('id'));
+    if (t.estado !== 'aberta') return json(req, res, 410, { erro: 'essa tarefa já foi encerrada' });
+    return json(req, res, 200, await TA.revisar(t.id));
+  }
+  if (r === 'POST /tarefa/aplicar' || r === 'POST /tarefa/descartar') {
+    const b = await corpo(req);
+    const t = TA.ler(String(b.id));
+    if (sessoesDaTarefa(t).some((s) => rodando.has(s.id))) return json(req, res, 409, { erro: 'o agente ainda está trabalhando nesta tarefa; espere ou pare antes' });
+    if (r === 'POST /tarefa/descartar') {
+      await TA.descartar(t.id);
+      devolverSessoes(t, 'A tarefa separada foi descartada: o projeto não mudou.');
+      return json(req, res, 200, { ok: true, origem: t.origem });
+    }
+    const ap = await TA.aplicar(t.id);
+    if (ap.ok) devolverSessoes(t, 'A tarefa separada foi aplicada ao projeto (' + ap.arquivos.length + (ap.arquivos.length === 1 ? ' arquivo' : ' arquivos') + ').');
+    return json(req, res, 200, { ...ap, origem: t.origem });
   }
   if (r === 'GET /sessao') {
     const s = carregar(q('id'));
@@ -216,7 +290,7 @@ async function rota(req: http.IncomingMessage, res: http.ServerResponse) {
       eventos: s.eventos, mudancas: mudancas(s), rodando: rodando.has(s.id), planejando: s.planejando, tarefas: s.tarefas,
       objetivo: s.objetivo, raciocinio: s.raciocinio, internet: s.internet, tokens: s.tokens, limite: NUM_CTX,
       jobs: J.listar(s.id).map((j) => ({ id: j.id, comando: j.comando, descricao: j.descricao, rodando: !j.fim, codigo: j.codigo })),
-      lembretes: R.listar(s.id) });
+      lembretes: R.listar(s.id), tarefa: vistaTarefa(TA.dePasta(s.pasta)) });
   }
   if (r === 'GET /sessao/contexto') {
     const s = carregar(q('id'));

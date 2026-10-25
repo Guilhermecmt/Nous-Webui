@@ -65,6 +65,7 @@ class Conexao {
   morta: Error | null = null;
   carregando = 0;                 // tarefas de $/progress abertas (o servidor ainda indexa o projeto)
   ultimoProgresso = Date.now();
+  diag = new Map<string, { lista: unknown[]; em: number }>();   // uri -> ultimo publishDiagnostics
   private p: ChildProcess;
 
   constructor(p: ChildProcess) {
@@ -113,6 +114,11 @@ class Conexao {
       if (k === 'begin') this.carregando++;
       else if (k === 'end') this.carregando = Math.max(0, this.carregando - 1);
       this.ultimoProgresso = Date.now();
+      return;
+    }
+    if (msg.method === 'textDocument/publishDiagnostics') {
+      const pr = msg.params as { uri?: string; diagnostics?: unknown[] } | undefined;
+      if (pr?.uri) this.diag.set(chaveUri(pr.uri), { lista: pr.diagnostics || [], em: Date.now() });
       return;
     }
     if ('id' in msg && 'method' in msg) {
@@ -171,6 +177,7 @@ function iniciar(s: Servidor, raiz: string): Instancia {
           synchronization: { dynamicRegistration: false },
           hover: { contentFormat: ['markdown', 'plaintext'] },
           definition: { linkSupport: true }, implementation: { linkSupport: true }, references: {},
+          publishDiagnostics: { relatedInformation: false },
         },
       },
     }, 60_000);
@@ -278,4 +285,84 @@ export async function consultar(raiz: string, abs: string, op: Operacao, linha: 
   const corte = l.slice(0, MAX_RESULTADOS);
   return corte.map((x) => `${x.arquivo}:${x.linha}:${x.coluna}: ${x.trecho}`).join('\n') +
     (l.length > MAX_RESULTADOS ? `\n... (${l.length - MAX_RESULTADOS} more)` : '');
+}
+
+/* ------------------------------------------------------------ diagnosticos depois de editar */
+export type Diag = { linha: number; coluna: number; codigo: string; msg: string; trecho: string };
+const ESPERA_DIAG_MS = 8_000;        // depois de aquecido
+const ESPERA_DIAG_1A_MS = 20_000;    // o 1o arquivo carrega o projeto inteiro
+const QUIETO_MS = 600;               // sem novo publishDiagnostics por este tempo = terminou
+
+/* Os erros (nao avisos) que o language server acha em `texto`, como se fosse o
+ * conteudo de `abs`. `null` quando nao ha servidor ou ele nao respondeu a tempo:
+ * a edicao nunca fica esperando por isso. Abre, espera o publishDiagnostics
+ * assentar e fecha, na mesma fila das consultas. */
+export async function diagnosticar(raiz: string, abs: string, texto: string): Promise<Diag[] | null> {
+  const s = servidorPara(abs);
+  if (!s || !comandoDe(s)) return null;
+  let inst: Instancia;
+  try { inst = iniciar(s, raiz); } catch { return null; }
+  const uri = pathToFileURL(abs).href;
+  const vez = inst.fila.then(async (): Promise<Diag[] | null> => {
+    try { await inst.pronta; } catch { return null; }
+    adiar(inst);
+    inst.con.diag.delete(chaveUri(uri));
+    inst.con.avisar('textDocument/didOpen', { textDocument: { uri, languageId: s.linguagens[path.extname(abs).toLowerCase()], version: 1, text: texto } });
+    try {
+      const ini = Date.now();
+      const ate = ini + (inst.aquecido ? ESPERA_DIAG_MS : ESPERA_DIAG_1A_MS);
+      for (;;) {
+        const d = inst.con.diag.get(chaveUri(uri));
+        if (d && Date.now() - d.em >= QUIETO_MS && inst.con.carregando === 0) break;
+        if (Date.now() > ate || inst.con.morta) return null;
+        await new Promise((ok) => setTimeout(ok, 100));
+      }
+      inst.aquecido = true;
+      const linhas = texto.split(/\r?\n/);
+      return (inst.con.diag.get(chaveUri(uri))!.lista as Record<string, unknown>[])
+        .filter((x) => x.severity === 1 || x.severity === undefined)
+        .map((x) => {
+          const r = (x.range as { start: { line: number; character: number } }).start;
+          return { linha: r.line + 1, coluna: r.character + 1, codigo: x.code === undefined ? '' : String(x.code),
+            msg: String(x.message || '').replace(/\s+/g, ' ').trim(), trecho: (linhas[r.line] || '').trim() };
+        });
+    } finally {
+      inst.con.avisar('textDocument/didClose', { textDocument: { uri } });
+      inst.con.diag.delete(chaveUri(uri));
+    }
+  });
+  inst.fila = vez.catch(() => {});
+  return vez.catch(() => null);
+}
+
+/* Os erros que a edicao introduziu: os de `depois` que `antes` (null = arquivo
+ * novo) ainda nao tinha. A comparacao ignora a posicao (a edicao desloca
+ * linhas): vale mensagem, codigo e o texto da linha. So' consulta o `antes`
+ * quando o `depois` tem erro. */
+export async function diagnosticosNovos(raiz: string, abs: string, antes: string | null, depois: string): Promise<Diag[] | null> {
+  const dep = await diagnosticar(raiz, abs, depois);
+  if (!dep || !dep.length || antes === null) return dep;
+  const ant = await diagnosticar(raiz, abs, antes);
+  if (!ant) return dep;
+  const chave = (d: Diag) => d.codigo + '|' + d.msg + '|' + d.trecho;
+  const resto = new Map<string, number>();
+  for (const d of ant) resto.set(chave(d), (resto.get(chave(d)) || 0) + 1);
+  return dep.filter((d) => {
+    const n = resto.get(chave(d)) || 0;
+    if (n > 0) { resto.set(chave(d), n - 1); return false; }
+    return true;
+  });
+}
+
+/* O texto curto que volta ao modelo (ate 5 erros, mensagem cortada). */
+export function textoDiagnosticos(rel: string, d: Diag[], max = 5): string {
+  const l = d.slice(0, max).map((x) => `${rel}:${x.linha}:${x.coluna} error${x.codigo ? ' ' + x.codigo : ''}: ${x.msg.slice(0, 240)}`);
+  return `LSP diagnostics introduced by this edit (${d.length}); fix them in your next step, or ignore them if they are unrelated:\n` + l.join('\n') +
+    (d.length > max ? `\n... (${d.length - max} more)` : '');
+}
+
+/* O mesmo arquivo chega como file:///c%3A/x (servidor) ou file:///C:/x (Node):
+ * a chave compara o caminho de verdade (sem diferenca de maiusculas no Windows). */
+function chaveUri(uri: string): string {
+  try { const p = path.normalize(fileURLToPath(uri)); return process.platform === 'win32' ? p.toLowerCase() : p; } catch { return uri; }
 }

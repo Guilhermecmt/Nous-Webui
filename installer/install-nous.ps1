@@ -452,21 +452,33 @@ if (-not $desktopOk) {
 $startOk = New-NousShortcut ([Environment]::GetFolderPath("Programs"))
 $null = New-NousShortcut ([Environment]::GetFolderPath("Programs")) "Parar Nous" "parar-nous.vbs"
 
-# Nous Code (IDE com agente de IA local): precisa do Node 22.18+. Baixa as pecas
-# do editor (Monaco, terminal) uma vez e cria o atalho "Nous Code". Opcional:
-# sem Node, o resto do Nous funciona igual.
-$nodeCmd = Get-Command node -ErrorAction SilentlyContinue
-$nodeOk = $false
-if ($nodeCmd) {
-    $nv = ((& $nodeCmd.Source --version) -replace '^v', '').Split('.')
-    $nodeOk = [int]$nv[0] -gt 22 -or ([int]$nv[0] -eq 22 -and [int]$nv[1] -ge 18)
+# Nous Code (IDE com agente de IA local): precisa do Node 22.18+. Sem Node bom no
+# computador, baixa o Node portatil (zip oficial, SHA256 conferido) para
+# <app>\runtime\node, sem mexer no PATH do sistema; os launchers usam esse
+# Node (launchers\node-nous.ps1). Baixa as pecas do editor (Monaco, terminal)
+# uma vez e cria o atalho "Nous Code". Opcional: se nada der certo, o resto do
+# Nous funciona igual.
+$nodeExe = $null
+$nodeLib = Join-Path $REPO "launchers\node-nous.ps1"
+if ((Test-Path $nodeLib) -and (Test-Path (Join-Path $REPO "code\package.json"))) {
+    . $nodeLib
+    $nodeExe = Find-NousNode $REPO
+    if (-not $nodeExe) {
+        Info "Nous Code: baixando o Node.js portatil (~30 MB; fica na pasta do Nous e nao mexe no seu PATH)..."
+        if (Install-PortableNode (Get-PortableNodeDir $REPO)) { Ok "Node.js portatil instalado ($($script:NodePin.Versao))" }
+        else { Info "Nous Code: nao consegui baixar o Node.js ($script:NodeErro)." }
+        $nodeExe = Find-NousNode $REPO
+    }
 }
+$nodeOk = [bool]$nodeExe
 $codeDir = Join-Path $REPO "code"
 if ($nodeOk -and (Test-Path (Join-Path $codeDir "package.json"))) {
     # tambem quando falta o language server (instalacao de antes do lsp)
     if (-not (Test-Path (Join-Path $codeDir "node_modules\monaco-editor")) -or -not (Test-Path (Join-Path $codeDir "node_modules\typescript-language-server"))) {
         Info "Nous Code: baixando as pecas do editor e da navegacao de codigo (~100 MB)..."
         Push-Location $codeDir
+        # o npm vem junto do Node; o PATH muda so' neste processo
+        $env:Path = (Split-Path $nodeExe -Parent) + ";" + $env:Path
         & npm ci --omit=dev --no-audit --no-fund 2>&1 | Out-Null
         $npmOk = $LASTEXITCODE -eq 0
         Pop-Location
@@ -476,7 +488,7 @@ if ($nodeOk -and (Test-Path (Join-Path $codeDir "package.json"))) {
     $null = New-NousShortcut ([Environment]::GetFolderPath("Desktop")) "Nous Code" "nous-code.vbs"
     Ok "atalho 'Nous Code' (editor de codigo com IA local)"
 } else {
-    Info "Nous Code (opcional): instale o Node.js 22.18+ (winget install OpenJS.NodeJS.LTS) e rode o instalador de novo."
+    Info "Nous Code (opcional): faltou o Node.js 22.18+ (precisa de internet para baixar). Rode o instalador de novo com internet."
 }
 if ($desktopOk) { Ok "atalho 'Nous' na area de trabalho" }
 if ($startOk)   { Ok "atalhos 'Nous' e 'Parar Nous' no Menu Iniciar (tecla Windows > digite Nous)" }
