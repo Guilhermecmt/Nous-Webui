@@ -2,7 +2,7 @@
 """
 Nous Agenda API - micro-servico REST local, porta 8996.
 
-Notas e lembretes, calendario e tarefas agendadas. Um relogio interno (a cada
+Notas e lembretes, calendario (com sincronizacao CalDAV) e tarefas agendadas. Um relogio interno (a cada
 20 s) dispara os lembretes e as tarefas MESMO com o navegador fechado: o aviso
 aparece como notificacao do Windows e fica na fila que o painel do Nous mostra.
 
@@ -12,6 +12,10 @@ Rotas (todas com user_id, como a Memory API):
   GET  /notes?user_id=&q=&done=        POST /notes  POST /notes/update  POST /notes/delete
   GET  /events?user_id=&from=&to=      POST /events POST /events/update POST /events/delete
   POST /ics/import {user_id, ics}      GET  /ics/export?user_id=
+  GET  /caldav?user_id=                contas CalDAV (sem a senha), calendarios e estado
+  POST /caldav/connect {server, username, password, name}   testa e guarda a conta
+  POST /caldav/calendars {account_id, enabled:[ids], default_id}  escolhe o que sincronizar
+  POST /caldav/sync {account_id?}      sincroniza agora    POST /caldav/disconnect {account_id}
   GET  /subs?user_id=                  POST /subs   POST /subs/delete   POST /subs/sync
   GET  /tasks?user_id=                 POST /tasks  POST /tasks/update  POST /tasks/delete
   POST /tasks/run {user_id, id}        roda agora
@@ -39,10 +43,12 @@ if _HERE not in sys.path:
 
 import agenda_db as db       # noqa: E402
 import agenda_tasks as tasks  # noqa: E402
+import caldav_sync as dav    # noqa: E402
 
-PORT = 8996
+PORT = 8996  # NOUS_AGENDA_PORT muda (testes)
 TICK_S = 20
 SUB_SYNC_S = 3600
+CALDAV_SYNC_S = 300  # CalDAV: de 5 em 5 min, e ~1 min depois de uma mudanca feita aqui
 _running = set()  # ids de tarefas rodando agora
 
 
@@ -270,6 +276,7 @@ async def clock(app):
             due = await loop.run_in_executor(None, _tick_sync)
             for t in due:
                 loop.run_in_executor(None, _run_task_sync, t)
+            loop.run_in_executor(None, dav.sync_due, CALDAV_SYNC_S)
             if db.now() - last_sub >= SUB_SYNC_S:
                 last_sub = db.now()
                 loop.run_in_executor(None, _subs_sync_all)
@@ -350,7 +357,13 @@ async def h_events(request):
     t1 = int(_q(request, "to") or (t0 + 31 * 86400))
     cx = db.connect()
     try:
-        return _ok({"events": db.events_between(cx, uid, t0, min(t1, t0 + 400 * 86400))})
+        evs = db.events_between(cx, uid, t0, min(t1, t0 + 400 * 86400))
+        names = {"dav:" + r["id"]: r["name"] for r in cx.execute(
+            "SELECT id, name FROM caldav_cals WHERE user_id=?", (uid,))}
+        for e in evs:
+            e["cal"] = names.get(e["source"])
+            e.pop("raw", None)  # o .ics do servidor so' serve para a sincronizacao
+        return _ok({"events": evs})
     finally:
         cx.close()
 
@@ -359,9 +372,16 @@ async def h_event_create(request):
     d = await _body(request)
     cx = db.connect()
     try:
-        eid = db.event_create(cx, _uid(d), d)
+        uid = _uid(d)
+        if d.get("calendar_id"):  # criado direto num calendario CalDAV: sobe na proxima sincronizacao
+            cal = dav.calendar_for_new(cx, uid, d["calendar_id"])
+            eid = db.event_create(cx, uid, d, source="dav:" + cal["id"], dirty=2)
+        else:
+            eid = db.event_create(cx, uid, d)
         cx.commit()
-        return _ok({"event": db.event_get(cx, d["user_id"], eid)})
+        ev = db.event_get(cx, uid, eid)
+        ev.pop("raw", None)
+        return _ok({"event": ev})
     finally:
         cx.close()
 
@@ -370,7 +390,10 @@ async def h_event_update(request):
     d = await _body(request)
     cx = db.connect()
     try:
-        return _ok({"event": db.event_update(cx, _uid(d), d.get("id"), d)})
+        ev = db.event_update(cx, _uid(d), d.get("id"), d)
+        if ev:
+            ev.pop("raw", None)
+        return _ok({"event": ev})
     finally:
         cx.close()
 
@@ -582,6 +605,58 @@ async def h_notifs_seen(request):
         cx.close()
 
 
+# ----------------------------------------------------------------- CalDAV
+def _caldav_run(fn, *a):
+    cx = db.connect()
+    try:
+        return fn(cx, *a)
+    finally:
+        cx.close()
+
+
+async def _in_thread(fn, *a):
+    loop = asyncio.get_event_loop()
+    try:
+        return await loop.run_in_executor(None, _caldav_run, fn, *a)
+    except dav.DavError as e:
+        raise ValueError(str(e))
+
+
+async def h_caldav(request):
+    uid = _uid(request.query)
+    return _ok({"accounts": await _in_thread(dav.accounts_list, uid)})
+
+
+async def h_caldav_connect(request):
+    d = await _body(request)
+    uid = _uid(d)
+    aid = await _in_thread(dav.connect, uid, d.get("server"), d.get("username"), d.get("password"), d.get("name"))
+    return _ok({"id": aid, "accounts": await _in_thread(dav.accounts_list, uid)})
+
+
+async def h_caldav_calendars(request):
+    d = await _body(request)
+    uid = _uid(d)
+    await _in_thread(dav.choose_calendars, uid, d.get("account_id"), d.get("enabled") or [], d.get("default_id"))
+    res = await _in_thread(dav.sync_account, d.get("account_id"), uid, True)  # ja' traz os eventos
+    return _ok({"sync": res, "accounts": await _in_thread(dav.accounts_list, uid)})
+
+
+async def h_caldav_sync(request):
+    d = await _body(request)
+    uid = _uid(d)
+    ids = [d["account_id"]] if d.get("account_id") else [a["id"] for a in await _in_thread(dav.accounts_list, uid)]
+    res = [await _in_thread(dav.sync_account, i, uid, bool(d.get("force"))) for i in ids]
+    return _ok({"sync": res, "accounts": await _in_thread(dav.accounts_list, uid)})
+
+
+async def h_caldav_disconnect(request):
+    d = await _body(request)
+    uid = _uid(d)
+    await _in_thread(dav.disconnect, uid, d.get("account_id"))
+    return _ok({"accounts": await _in_thread(dav.accounts_list, uid)})
+
+
 def build_app():
     app = web.Application(middlewares=[cors_mw], client_max_size=8 * 1024 * 1024)
     app.add_routes([
@@ -601,6 +676,11 @@ def build_app():
         web.post("/subs", h_sub_create),
         web.post("/subs/delete", h_sub_delete),
         web.post("/subs/sync", h_sub_sync),
+        web.get("/caldav", h_caldav),
+        web.post("/caldav/connect", h_caldav_connect),
+        web.post("/caldav/calendars", h_caldav_calendars),
+        web.post("/caldav/sync", h_caldav_sync),
+        web.post("/caldav/disconnect", h_caldav_disconnect),
         web.get("/tasks", h_tasks),
         web.post("/tasks", h_task_create),
         web.post("/tasks/update", h_task_update),
