@@ -87,15 +87,29 @@ class Filter:
     def _ollama(self):
         return (self.valves.OLLAMA_URL or os.environ.get("OLLAMA_BASE_URL", "http://127.0.0.1:11434")).rstrip("/")
 
-    def _model(self, chat_model):
+    def _local_names(self):
+        """Nomes dos modelos que rodam nesta maquina (sem os de nuvem e sem os de embeddings)."""
         try:
-            names = [m.get("name", "") for m in
-                     requests.get(f"{self._ollama()}/api/tags", timeout=5).json().get("models", [])]
+            tags = requests.get(f"{self._ollama()}/api/tags", timeout=5).json().get("models", [])
         except Exception:
+            return None
+        return [m.get("name", "") for m in tags
+                if "/" not in m.get("name", "") and "cloud" not in m.get("name", "").lower()
+                and not (m.get("remote_host") or m.get("remote_model"))
+                and not any(p in m.get("name", "").lower() for p in _EMBED)]
+
+    def _model(self, chat_model):
+        names = self._local_names()
+        if names is None:
             return None
         if chat_model in names or (chat_model + ":latest") in names:
             return chat_model
-        return next((n for n in names if "/" not in n and not any(p in n.lower() for p in _EMBED)), None)
+        return names[0] if names else None
+
+    def _chat_is_local(self, chat_model):
+        """O modelo do chat roda nesta maquina? E-mail so' vai para modelo local."""
+        names = self._local_names()
+        return bool(names) and (chat_model in names or (chat_model + ":latest") in names)
 
     def _api(self, method, path, **kw):
         r = requests.request(method, self.valves.EMAIL_URL + path, timeout=kw.pop("timeout", 20), **kw)
@@ -147,11 +161,16 @@ class Filter:
                 "e o corpo do e-mail, pronto para enviar. Nao diga que enviou: o Nous vai guardar "
                 "como RASCUNHO e o usuario envia depois de revisar.")
 
-    def _inbox_text(self):
+    def _inbox_text(self, chat_model=""):
         st = self._api("GET", "/status")
         if not st.get("connected"):
             return ("[Nous Email] Nenhuma conta de e-mail conectada. Explique que ele pode conectar "
                     "em Recursos > Assistente de Email.")
+        if not self._chat_is_local(chat_model):
+            # privacidade: o conteudo dos e-mails nao vai para um modelo de nuvem
+            return ("[Nous Email] O modelo desta conversa roda fora do computador (nuvem), e por privacidade o "
+                    "Nous nao mostra e-mails a ele. Diga isso ao usuario e peca para trocar para um modelo "
+                    "local e perguntar de novo. Nao invente e-mails.")
         msgs = self._api("GET", "/inbox", timeout=300)
         lines = [f"- [{m.get('category') or '?'}]{' (nao lido)' if m.get('unread') else ''} "
                  f"{m.get('from', '')}: {m.get('subject', '')} - {m.get('summary') or ''}" for m in msgs]
@@ -184,7 +203,7 @@ class Filter:
             if want_send:
                 text = await asyncio.to_thread(self._plan_send, uid, msg, body.get("model") or "")
             else:
-                text = await asyncio.to_thread(self._inbox_text)
+                text = await asyncio.to_thread(self._inbox_text, body.get("model") or "")
         except requests.exceptions.ConnectionError:
             text = ("[Nous Email] O servico de e-mail do Nous nao esta no ar. Avise o usuario e sugira "
                     "abrir o Nous de novo pelo atalho. Nada foi enviado.")

@@ -4,7 +4,8 @@ Rascunhos de e-mail esperando aprovacao (NousData/.email_drafts.json).
 
 Regra do Nous: o chat NUNCA envia e-mail. Ele cria um rascunho aqui; o usuario
 revisa no painel e clica Enviar (ou agenda o envio). Rascunhos agendados sao
-enviados pelo relogio do servico de e-mail.
+enviados pelo relogio do servico de e-mail. Estados: pendente, agendado, enviando,
+enviado, erro; claim() garante que cada rascunho sai uma vez so'.
 """
 import os
 import json
@@ -73,6 +74,37 @@ def update(did, fields):
                 _write(items)
                 return d
     return None
+
+
+def claim(did):
+    """Reserva o rascunho para envio ('enviando'), de forma atomica: devolve o rascunho
+    so' para a primeira chamada. Enviado ou ja' em envio -> None (nunca manda duas vezes)."""
+    with _lock:
+        items = _read()
+        for d in items:
+            if d["id"] == did:
+                if d["status"] in ("enviado", "enviando"):
+                    return None
+                d["status"], d["error"] = "enviando", None
+                _write(items)
+                return dict(d)
+    return None
+
+
+def recover():
+    """Ao subir o servico: o que ficou 'enviando' foi interrompido no meio. Nao reenvia
+    sozinho (pode ter saido); marca erro e o usuario decide."""
+    with _lock:
+        items = _read()
+        n = 0
+        for d in items:
+            if d["status"] == "enviando":
+                d["status"] = "erro"
+                d["error"] = "O envio foi interrompido; confira a caixa de enviados antes de enviar de novo."
+                n += 1
+        if n:
+            _write(items)
+    return n
 
 
 def delete(did):
