@@ -49,6 +49,20 @@ if ($py) {
     $code = "import ast,io,json,sys`nbad=0`nfor p in sys.argv[1:]:`n    try:`n        s=io.open(p,encoding='utf-8').read()`n        json.loads(s) if p.endswith('.json') else ast.parse(s,p)`n    except Exception as e:`n        print('  [FALHA] %s: %s' % (p,e)); bad+=1`nsys.exit(1 if bad else 0)"
     & $py.Source -c $code @pyFiles @jsonFiles
     if ($LASTEXITCODE -ne 0) { $fail++ }
+
+    # Assistente de E-mail: IMAP/SMTP de mentira local (email/testes), sem rede e sem Ollama.
+    # Precisa de aiohttp e requests (o venv do Open WebUI tem); sem eles, so' avisa.
+    if (Test-Path (Join-Path $root "email\testes")) {
+        & $py.Source -c "import aiohttp, requests" 2>$null
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "== Assistente de E-mail (servidor falso)" -ForegroundColor Cyan
+            $old = $ErrorActionPreference; $ErrorActionPreference = "Continue"
+            $out = & $py.Source -W ignore -m unittest discover -s email/testes -t email/testes 2>&1 | Out-String
+            $ok = $LASTEXITCODE -eq 0
+            $ErrorActionPreference = $old
+            if (-not $ok) { Write-Host $out; Bad "email/testes: testes falharam" }
+        } else { Write-Host "  (testes do e-mail pulados: faltam aiohttp/requests no Python)" -ForegroundColor DarkGray }
+    }
 }
 
 $node = Get-Command node -ErrorAction SilentlyContinue
