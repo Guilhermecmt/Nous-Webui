@@ -139,9 +139,11 @@ export const ESQUEMAS = [
   ferr('skill', 'Load the full instructions for a skill. Call it before acting on a task that names or clearly matches a skill in the session skill catalog.', {
     name: S('The exact skill name from the available skills list.'),
   }, ['name']),
-  ferr('subagent', 'Delegate a self-contained, read-only investigation to a subagent (a separate agent that works in its own context) so it does not consume this conversation\'s context. It can read, glob, grep and list files, but not change anything. The subagent returns its result, not its intermediate steps.', {
+  ferr('subagent', 'Delegate a self-contained task to a subagent (a separate agent that works in its own context) so it does not consume this conversation\'s context. By default it is read-only: it can read, glob, grep and list files, but not change anything. With edit=true it may also edit and write files, but only the ones listed in files; it cannot run commands, and it asks for the same approvals as you. The subagent returns its result, not its intermediate steps.', {
     description: S('A short (3-5 word) description of the delegated task, for display.'),
     prompt: S("The complete, self-contained task for the subagent. It does not share this conversation's context, so include everything it needs."),
+    edit: B('Set true to let the subagent change files. Requires files. Default false (read-only).'),
+    files: { type: 'array', description: 'With edit=true: the files and folders (relative to the project folder) the subagent may change. Everything else is refused.', items: { type: 'string' } },
   }, ['description', 'prompt']),
   ferr('lsp', 'Query a language server for precise code navigation. operation is one of goToDefinition, findReferences, goToImplementation, hover. line and character are one-based UTF-16 cursor coordinates. findReferences includes the declaration.', {
     operation: { type: 'string', enum: ['goToDefinition', 'findReferences', 'goToImplementation', 'hover'], description: 'goToDefinition, findReferences, goToImplementation, or hover.' },

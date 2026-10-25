@@ -336,3 +336,10 @@ input, textarea, select { font: inherit; color: var(--txt); }
 
 .nc-diag b { color: #e5534b; }
 .nc-diag a { color: inherit; text-decoration: underline; cursor: pointer; }
+
+/* tarefa separada (copia do projeto) */
+#nc-ag-copia { margin: 8px 10px 0; padding: 8px 10px; border: 1px solid var(--ouro); border-radius: 8px; background: rgba(200, 150, 46, .08); font-size: 12.5px; color: var(--txt); }
+#nc-ag-copia b { display: block; color: var(--ouro2); margin-bottom: 2px; }
+#nc-ag-copia .bt { display: flex; gap: 6px; margin-top: 7px; flex-wrap: wrap; }
+.nc-cp-bt { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+#nc-modal .nc-rec { display: block; width: 100%; text-align: left; margin: 4px 0; }
