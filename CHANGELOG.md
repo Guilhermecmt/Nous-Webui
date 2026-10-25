@@ -2,8 +2,24 @@
 
 ## [2.11.0] - 2026-10-25
 O Nous passa para o Open WebUI 0.12.3, abre no celular, sincroniza a agenda nos
-dois sentidos, se atualiza sozinho e ganha um ícone na bandeja.
+dois sentidos, se atualiza sozinho, ensina quem nunca usou IA e ganha um ícone na
+bandeja.
 ### Novo
+- **Primeiros passos para quem nunca usou IA** (`branding/modules/_progresso.js`,
+  `primeiros.js`, `tour.js` e o assistente do `nous-loader.js`). As boas-vindas
+  explicam em linguagem simples o que é o Nous e o que é um "modelo". Enquanto o
+  primeiro modelo baixa, cinco lições curtas, no ritmo da pessoa, ensinam o que é
+  um modelo, que a IA pode errar e como conferir, como pedir bem, o que fica no
+  computador e como mandar foto e documento; o download não depende delas, e elas
+  não somem se ele terminar no meio nem se a página recarregar. Na tela inicial,
+  cartões de tarefas do dia a dia (escrever uma mensagem, entender uma conta,
+  planejar a semana, tirar uma dúvida) preenchem o pedido sem enviar, e dois avisos
+  explicam o pedido e depois como ler e conferir a resposta. O botão **?** reabre
+  qualquer parte: lições, exemplos, como anexar, passeio pela tela e dicas dos
+  painéis. O passeio da v2.8 ganhou o +, o seletor de modelo e a barra lateral, e
+  agora funciona no celular. O progresso fica nas configurações da conta
+  (`nousTour`), vale em qualquer aparelho, e "Pular dicas" é respeitado. Quem
+  atualiza da v2.10 com conversas ou dicas já vistas não é recebido como novato.
 - **Open WebUI 0.12.3** (antes 0.9.6). Quem já tem o Nous é atualizado pelo
   instalador ou pela atualização automática (`installer/atualizar-openwebui.ps1`):
   encerra o que está aberto, faz um zip da `NousData` em `bkp\`, instala a versão
@@ -90,6 +106,8 @@ dois sentidos, se atualiza sozinho e ganha um ícone na bandeja.
   monitor encerra o ComfyUI parado há 10 minutos (`NOUS_COMFY_IDLE_MIN`). Primeira
   imagem em ~34 s com a placa livre.
 - Fusos (`TZID`) de compromissos importados no Windows sem o pacote tzdata.
+- A Loja dizia "já baixado" e não baixava de novo um modelo apagado depois de
+  baixado na mesma sessão do Nous.
 - As notas de versão em inglês do Open WebUI não aparecem mais num banco novo, e o
   modelo escolhido na instalação segue como padrão.
 ### Segurança

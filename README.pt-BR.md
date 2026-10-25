@@ -82,6 +82,7 @@ Precisa do [Node.js](https://nodejs.org) 22.18 ou mais novo (`winget install Ope
 
 ## Novidades da versão 2.11
 
+- **Primeiros passos.** Para quem nunca usou IA: lições curtas enquanto o modelo baixa, cartões com tarefas do dia a dia para a primeira conversa e o botão **?** para rever tudo.
 - **No celular.** Em casa, pelo mesmo Wi-Fi: ligue em **Seu Nous › Celular** e leia o QR. Vem desligado, e só aparelhos que você parear entram. Veja [docs/CELULAR.md](docs/CELULAR.md).
 - **Agenda nos dois sentidos.** Conecte iCloud, Nextcloud ou Fastmail (CalDAV) e o que você muda aqui aparece lá, e vice-versa. Veja [docs/AGENDA-CALDAV.md](docs/AGENDA-CALDAV.md).
 - **Ícone na bandeja.** Perto do relógio: abrir, iniciar, parar e ver o estado do Nous sem janela nenhuma.
@@ -125,7 +126,8 @@ No fim, o Nous abre sozinho no navegador. Ele fica em `%LOCALAPPDATA%\Programs\N
 
 1. **Abra.** Não há conta nem senha: o Nous abre direto no chat.
 2. **Escolha o modelo.** Sem nenhum modelo instalado, uma tela de boas-vindas mostra o recomendado para o seu computador. **Baixar e começar** cuida do resto, com barra de progresso.
-3. **Converse.** Quando o download terminar, é só escrever.
+3. **Aprenda enquanto baixa.** Cinco lições curtas explicam o que é um modelo, que a IA pode errar e como pedir bem. Pule quando quiser.
+4. **Converse.** Quando o download terminar, escolha um dos cartões da tela inicial ou escreva o que quiser. O botão **?** reabre as lições e o passeio pela tela.
 
 Se várias pessoas dividem o computador, crie uma conta para cada uma em **Painel do Admin › Usuários**. Com duas ou mais contas o login volta, e cada pessoa vê só as próprias conversas.
 

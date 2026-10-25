@@ -72,6 +72,9 @@ sem conhecimento tecnico, com tudo acontecendo em segundo plano.
   tambem edita, instalar o Node pelo instalador.
 
 ### v2.11 — Celular, agenda de duas vias e atualizacao sozinha
+- Primeiros passos para quem nunca usou IA: licoes durante o download do
+  modelo, cartoes de tarefas na primeira conversa, botao "?" e passeio pela tela
+  (tambem no celular), progresso salvo na conta.
 - Open WebUI 0.12.3, com atualizacao segura de quem ja tem o Nous (backup,
   migracao conferida, volta atras). Telas ancoradas em ids estaveis. Loja com
   catalogo novo e ranking explicito. Ollama novo sem nuvem nem boas-vindas

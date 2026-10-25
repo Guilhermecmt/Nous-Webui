@@ -755,8 +755,12 @@ async def h_pull(request):
     if cur and cur["status"] == "baixando":
         return web.json_response({"started": False, "reason": "em andamento"})
     if cur and cur["status"] == "pronto":
-        # Já baixado nesta sessão: não refaz o download nem apaga o estado.
-        return web.json_response({"started": False, "reason": "ja baixado"})
+        # Já baixado nesta sessão: não refaz o download nem apaga o estado,
+        # a não ser que o modelo tenha sido apagado depois.
+        models = await _installed_models()
+        nomes = {m.get("name") for m in (models or [])}
+        if models is None or tag in nomes or (":" not in tag and tag + ":latest" in nomes):
+            return web.json_response({"started": False, "reason": "ja baixado"})
     _pulls[tag] = {"status": "baixando", "pct": 0.0,
                    "completed_gb": 0.0, "total_gb": 0.0, "error": None, "nota": None}
     _pull_tasks[tag] = asyncio.get_event_loop().create_task(_do_pull(tag))

@@ -84,6 +84,7 @@ Requires [Node.js](https://nodejs.org) 22.18 or newer (`winget install OpenJS.No
 
 ## What's new in 2.11
 
+- **First steps.** For people who never used AI: short lessons while the model downloads, everyday task cards for the first chat, and a **?** button to see it all again.
 - **On your phone.** At home, on the same Wi-Fi: turn it on in **Seu Nous › Celular** and scan the QR code. It is off by default, and only devices you pair get in. See [docs/CELULAR.md](docs/CELULAR.md) (in Portuguese).
 - **Two-way calendar.** Connect iCloud, Nextcloud or Fastmail (CalDAV): what you change here shows up there, and the other way around.
 - **Tray icon.** Next to the clock: open, start, stop and check Nous without any window.
@@ -127,7 +128,8 @@ Nous opens in your browser when it finishes. It lives in `%LOCALAPPDATA%\Program
 
 1. **Open it.** There is no account or password: Nous opens straight into the chat.
 2. **Pick a model.** With no model installed, a welcome screen shows the one recommended for your computer. *Baixar e começar* handles the rest, with a progress bar.
-3. **Chat.** When the download finishes, just type.
+3. **Learn while it downloads.** Five short lessons explain what a model is, that AI can be wrong and how to ask well. Skip them whenever you like.
+4. **Chat.** When the download finishes, pick one of the cards on the home screen or type anything. The **?** button brings back the lessons and the screen tour.
 
 If several people share the computer, create one account each in **Admin Panel › Users**. With two or more accounts the login screen returns, and each person sees only their own chats.
 
