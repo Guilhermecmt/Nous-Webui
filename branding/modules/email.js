@@ -7,7 +7,7 @@
 (function () {
 	'use strict';
 
-	var EM = 'http://127.0.0.1:8995';
+	var EM = window.NousUrl(8995);
 	var UI = window.NousUI || {};
 	var esc = UI.esc || function (s) { return String(s || ''); };
 	var ov = null, tab = 'caixa', account = null, accounts = [], current = null;

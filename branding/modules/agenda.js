@@ -9,7 +9,7 @@
 (function () {
 	'use strict';
 
-	var AG_URL = 'http://127.0.0.1:8996';
+	var AG_URL = window.NousUrl(8996);
 	var UI = window.NousUI || {};
 	var esc = UI.esc || function (s) { return String(s || ''); };
 	var uid = null;

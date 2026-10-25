@@ -74,7 +74,7 @@ h1{margin:0 0 4px;font:600 22px Cinzel,Georgia,serif;letter-spacing:.06em;color:
 p{margin:.6em 0}ol{padding-left:1.2em;margin:.6em 0}li{margin:.35em 0}.mut{color:var(--mut);font-size:14px}
 input{width:100%;font:600 22px ui-monospace,Consolas,monospace;letter-spacing:.18em;text-transform:uppercase;text-align:center;
 padding:12px;border-radius:12px;border:1px solid var(--ouro);background:transparent;color:var(--txt)}
-button{width:100%;margin-top:12px;padding:13px;border-radius:12px;border:0;background:var(--ouro);color:#fff;font:600 16px inherit;cursor:pointer}
+button{width:100%;margin-top:12px;padding:13px;border-radius:12px;border:0;background:var(--ouro);color:#fff;font:600 16px system-ui,sans-serif;cursor:pointer}
 button:disabled{opacity:.5}#msg{min-height:1.4em;margin-top:10px;color:var(--erro);font-size:14px}
 </style></head><body><main>
 <h1>Nous</h1>

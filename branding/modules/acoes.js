@@ -13,7 +13,7 @@
 (function () {
 	'use strict';
 
-	var MON = 'http://127.0.0.1:8990';
+	var MON = window.NousUrl(8990);
 	var RE = /⟦(opcao|abrir|tema|acao):([^⟧]{1,300})⟧/g;
 	var seen = {};   /* "msgid|marcador" ja' visto (nao roda de novo) */
 	/* Resposta "nova" = a ultima, vista SEM marcador antes (os filtros poem o

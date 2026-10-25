@@ -11,6 +11,23 @@
         src/lib/components/chat/Settings/General.svelte - para manter 100%
         de compatibilidade e persistencia via localStorage.theme).
    ===================================================================== */
+/* Endereco dos servicos do Nous (monitor 8990, memoria 8993, e-mail 8995, agenda
+ * 8996, habilidades 8997, Nous Code 8998). No computador e' o de sempre
+ * (http://127.0.0.1:PORTA). Pelo celular ("Usar no celular", branding/modules/celular.js
+ * e celular/nous_celular.py) a pagina vem do portao e os servicos ficam na MESMA
+ * origem, em /_nous/PORTA: o celular nao enxerga o 127.0.0.1 do computador.
+ * NousUrl.noCelular e' true la': o que so' faz sentido no computador (Nous Code,
+ * controle do celular) se esconde. */
+(function () {
+	'use strict';
+	var h = location.hostname;
+	var direto = h === 'localhost' || h === '127.0.0.1' || h === '[::1]' || h === '::1';
+	window.NousUrl = function (porta) {
+		return direto ? 'http://127.0.0.1:' + porta : location.origin + '/_nous/' + porta;
+	};
+	window.NousUrl.noCelular = !direto;
+})();
+
 (function () {
 	'use strict';
 
@@ -97,7 +114,7 @@
 	}
 
 	/* ===================== Painel de recursos (Nous Monitor) ===================== */
-	var MON_URL = 'http://127.0.0.1:8990';
+	var MON_URL = window.NousUrl(8990);
 	var monEl = null, monModels = null, monBtn = null, monBars = {};
 	var monCollapsed = false;
 	try { monCollapsed = localStorage.getItem('nous-monitor-collapsed') === '1'; } catch (e) {}
@@ -405,7 +422,7 @@
 	}
 
 	/* ====================== Painel "O que o Nous sabe" ====================== */
-	var MEM_URL    = 'http://127.0.0.1:8993';
+	var MEM_URL    = window.NousUrl(8993);
 	var memBtnEl   = null;
 	var memPanelEl = null;
 	var memOpen    = false;
