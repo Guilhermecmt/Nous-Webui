@@ -30,6 +30,7 @@ Expoe (em http://127.0.0.1:8990, so' para paginas locais - ver cors_mw):
   GET  /research/export?id=&formato=docx|pdf|md     relatorio da Pesquisa em Word/PDF
   GET  /model/check?name=  qualquer modelo do Ollama/Hugging Face: tamanho e se cabe
   GET  /catalog?vram_gb=&ram_gb=&gpu=  simulacao "e se eu tivesse outra maquina"
+  GET  /update/status, POST /update/check|apply|config|modelos/atualizar   (nous_update.py)
 
 GPU: lido dos contadores de desempenho do Windows (funcionam em PT-BR com os
 nomes em ingles) + tamanho real da VRAM via registro (qwMemorySize).
@@ -1753,6 +1754,12 @@ def build_app():
                     web.post("/docs/import", h_docs_import),
                     web.post("/docs/export", h_docs_export),
                     web.get("/research/export", h_research_export)])
+    # Atualizacao do app e dos modelos (v2.11): rotas em nous_update.py
+    try:
+        import nous_update
+        nous_update.add_routes(app, h_pull, _EXTRA_PULLABLE, _data_dir)
+    except Exception as e:
+        print(f"[Nous][update] rotas de atualizacao indisponiveis: {e}", file=sys.stderr)
     return app
 
 
