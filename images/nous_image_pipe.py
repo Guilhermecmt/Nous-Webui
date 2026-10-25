@@ -361,6 +361,11 @@ class Pipe:
                 meta = {"chat_id": metadata.get("chat_id"),
                         "message_id": metadata.get("message_id")}
             _, url = await upload_image(request, data, "image/png", meta, uobj)
+            # 0.9.x devolve o endereco; 0.10+ devolve {"id", "url", "name", ...}
+            if isinstance(url, dict):
+                url = url.get("url") or ""
+            if not url:
+                raise ValueError("upload_image sem endereco")
             return url
         except Exception:
             return "data:image/png;base64," + base64.b64encode(data).decode()

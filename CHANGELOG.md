@@ -106,6 +106,8 @@ bandeja.
   monitor encerra o ComfyUI parado há 10 minutos (`NOUS_COMFY_IDLE_MIN`). Primeira
   imagem em ~34 s com a placa livre.
 - Fusos (`TZID`) de compromissos importados no Windows sem o pacote tzdata.
+- A imagem gerada aparecia como texto cru no Open WebUI 0.10+ (o `upload_image`
+  passou a devolver um dicionário em vez do endereço).
 - A Loja dizia "já baixado" e não baixava de novo um modelo apagado depois de
   baixado na mesma sessão do Nous.
 - As notas de versão em inglês do Open WebUI não aparecem mais num banco novo, e o
