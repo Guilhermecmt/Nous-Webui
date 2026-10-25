@@ -1814,6 +1814,7 @@
 
 		/* O Open WebUI renderiza os modelos em botoes ou opcoes dentro de um dropdown */
 		var candidates = document.querySelectorAll(
+			'[role="option"][data-value], ' +      /* 0.12: linha do modelo no seletor */
 			'[aria-label*="Model"], [aria-label*="model"], ' +
 			'.model-item, [data-model-id], ' +
 			'button[id*="model"], li[id*="model"]'
@@ -1823,6 +1824,7 @@
 
 		candidates.forEach(function(el) {
 			if (el.querySelector('.nous-cap-dot')) return; /* ja tem badge */
+			if (el.id === 'model-selector-model-button') return; /* o botao do seletor, nao uma linha */
 			var name = el.getAttribute('data-model-id') ||
 				el.getAttribute('data-value') ||
 				el.getAttribute('value') ||
@@ -1915,8 +1917,28 @@
 		if (wrapper.parentElement.querySelector('#nous-gal-nav')) return;
 		_galNavInjected = true;
 
-		/* o item é uma CÓPIA do "Notas": herda o visual de qualquer versão do
-		   Open WebUI; só trocam o ícone, o rótulo e o destino */
+		var iconePath = 'M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z';
+		if (notesLink.id !== 'sidebar-notes-button') {
+			/* até a 0.9: markup próprio, no estilo do item "Notas" daquela versão */
+			var antigo = document.createElement('div');
+			antigo.id = 'nous-gal-nav';
+			antigo.className = 'flex items-center w-full';
+			antigo.innerHTML =
+				'<a href="javascript:void(0)" id="nous-gal-nav-link" draggable="false" ' +
+				'class="flex flex-1 rounded-xl py-1.5 px-3 hover:bg-gray-50 dark:hover:bg-gray-800 transition cursor-pointer select-none">' +
+				'<div class="self-center mr-3">' +
+				'<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-5">' +
+				'<path stroke-linecap="round" stroke-linejoin="round" d="' + iconePath + '"/>' +
+				'</svg></div>' +
+				'<div class="self-center truncate">Galeria</div>' +
+				'</a>';
+			wrapper.parentElement.insertBefore(antigo, wrapper);
+			antigo.querySelector('#nous-gal-nav-link').addEventListener('click', openGallery);
+			return;
+		}
+
+		/* 0.12: o item é uma CÓPIA do "Notas": herda o visual da versão; só
+		   trocam o ícone, o rótulo e o destino */
 		var item = wrapper.cloneNode(true);
 		item.id = 'nous-gal-nav';
 		item.removeAttribute('data-id');
@@ -1933,8 +1955,7 @@
 			icone.setAttribute('stroke-width', '1.5');
 			icone.setAttribute('aria-hidden', 'true');
 			icone.setAttribute('class', velho.getAttribute('class') || 'size-4');
-			icone.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" ' +
-				'd="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z"/>';
+			icone.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" d="' + iconePath + '"/>';
 			velho.replaceWith(icone);
 		}
 		/* o rótulo é o último elemento sem filhos que tem texto */

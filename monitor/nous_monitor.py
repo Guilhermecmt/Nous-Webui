@@ -9,7 +9,7 @@ Expoe (em http://127.0.0.1:8990, so' para paginas locais - ver cors_mw):
   GET  /hardware     -> { gpu_name, vram_gb, ram_gb, tier }  (tier: gpu-20/gpu-12/gpu-8/cpu)
   GET  /installed    -> { online, models:[{name,size}], chat:[nomes] }
   GET  /catalog      -> catalogo curado (catalog.json) + installed/fit/pull por modelo,
-                        ordenado: recomendados p/ esta maquina primeiro
+                        ordenado: recomendados p/ esta maquina primeiro, pelo ranking do catalogo
   POST /pull         -> body {"model":"tag"}; inicia download via Ollama /api/pull
                         em background (singleton por modelo)
   GET  /pull/status  -> ?model=tag -> { status: baixando|pronto|erro, pct, ... }
@@ -361,20 +361,38 @@ def _local_chat(name):
 
 
 def _fit(model, hw):
-    """recomendado = aproveita bem ESTA maquina; ok = roda; pesado = nao cabe."""
+    """ok = roda; pesado = nao cabe. O 'recomendado' sai do ranking do catalogo
+    (_marcar_recomendados): tamanho do arquivo nao e' medida de qualidade."""
     if hw["tier"] == "cpu":
         if hw["ram_gb"] <= 0:
             return "ok"  # hardware desconhecido: nao assustar
         # tolerancia: maquinas "de 16 GB" reportam ~15.9 (memoria reservada)
-        if model["min_ram_cpu_gb"] > hw["ram_gb"] + 0.6:
-            return "pesado"
-        # na CPU, menor = mais rapido = melhor experiencia
-        return "recomendado" if model["download_gb"] <= 4.0 else "ok"
-    vram = hw["vram_gb"]
-    if model["min_vram_gb"] > vram:
-        return "pesado"
-    # bem dimensionado p/ a placa (nem subaproveitado, nem no limite)
-    return "recomendado" if model["min_vram_gb"] >= vram / 2.5 else "ok"
+        return "pesado" if model["min_ram_cpu_gb"] > hw["ram_gb"] + 0.6 else "ok"
+    return "pesado" if model["min_vram_gb"] > hw["vram_gb"] else "ok"
+
+
+# Recomendados = os de melhor ranking entre os que rodam BEM nesta maquina, ate
+# esta margem (em pontos) abaixo do melhor. "Rodar bem": inteiro na placa de
+# video; sem placa, pelo menos _TPS_MIN tokens/s so' na CPU.
+_MARGEM_RANKING = 1.0
+_TPS_MIN_CPU = 4.0
+
+
+def _roda_bem(m, hw):
+    s = m.get("speed") or {}
+    if hw["tier"] == "cpu":
+        return (s.get("tps") or 0) >= _TPS_MIN_CPU
+    return s.get("onde") == "gpu"
+
+
+def _marcar_recomendados(models, hw):
+    boas = [m for m in models if m["fit"] == "ok" and m.get("ranking") is not None and _roda_bem(m, hw)]
+    if not boas:
+        return
+    melhor = max(m["ranking"] for m in boas)
+    for m in boas:
+        if m["ranking"] >= melhor - _MARGEM_RANKING:
+            m["fit"] = "recomendado"
 
 
 def _sort_models(models, hw):
@@ -383,8 +401,12 @@ def _sort_models(models, hw):
 
     def key(m):
         dl = m["download_gb"]
-        # GPU: dentro do grupo, melhor qualidade primeiro; CPU: mais leve primeiro
-        return (rank[m["fit"]], dl if (cpu or m["fit"] == "pesado") else -dl)
+        if m["fit"] == "pesado":
+            return (2, dl, 0)   # os que estao mais perto de caber primeiro
+        if cpu and m["fit"] == "ok":
+            return (1, dl, 0)   # sem placa, o mais leve e' o mais rapido
+        # o resto: melhor ranking primeiro (empate: o menor download)
+        return (rank[m["fit"]], -(m.get("ranking") or 0), dl)
 
     return sorted(models, key=key)
 
@@ -576,6 +598,7 @@ async def h_catalog(request):
         if pull:
             e["pull"] = pull
         models.append(e)
+    _marcar_recomendados(models, hw)
     # downloads de fora do catalogo (v2.9: "qualquer modelo"), com o progresso
     tags = {m["tag"] for m in catalog} | _EXTRA_PULLABLE
     outros = [{"tag": t, "pull": p, "download_gb": (_checked.get(t) or {}).get("gb"),

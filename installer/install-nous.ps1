@@ -43,7 +43,35 @@ $ollamaApp = Join-Path $env:LOCALAPPDATA "Programs\Ollama\ollama app.exe"
 # versao nova primeiro e depois suba este pin (a identidade Nous se reaplica
 # sozinha no boot via marcador). Sem o pin, um "pip install" futuro pode trazer
 # uma versao que quebra o patch do nome/tema em maquinas de usuarios leigos.
-$OPENWEBUI_PIN = "0.9.6"
+# Quem ja' tem o Nous numa versao mais antiga e' atualizado no passo 4, com
+# backup e volta atras (installer\atualizar-openwebui.ps1).
+$OPENWEBUI_PIN = "0.12.3"
+
+# O Ollama novo (0.32+) abre uma tela de boas-vindas que convida a entrar numa
+# conta e tem uma nuvem propria (modelos que rodam em ollama.com). O Nous e'
+# privado por padrao: quando ELE instala o Ollama, ja' deixa a boas-vindas como
+# concluida e a nuvem desligada (o usuario liga de novo nas configuracoes do
+# Ollama, se quiser). Nunca mexe num Ollama que ja' existia. Tudo opcional: se
+# a versao do Ollama nao conhece os arquivos, eles so' nao fazem nada.
+function Set-OllamaPrivado {
+    try {
+        $dirs = @((Join-Path $env:USERPROFILE ".ollama"), (Join-Path $env:LOCALAPPDATA "Ollama"))
+        foreach ($d in $dirs) {
+            New-Item -ItemType Directory -Force -Path $d | Out-Null
+            $marca = Join-Path $d "onboarding-v1.completed"
+            if (-not (Test-Path $marca)) { New-Item -ItemType File -Path $marca | Out-Null }
+        }
+        $cfgPath = Join-Path $dirs[0] "server.json"
+        $cfg = [ordered]@{}
+        if (Test-Path $cfgPath) {
+            try { (Get-Content $cfgPath -Raw | ConvertFrom-Json).PSObject.Properties | ForEach-Object { $cfg[$_.Name] = $_.Value } } catch {}
+        }
+        if (-not $cfg.Contains("disable_ollama_cloud")) {
+            $cfg["disable_ollama_cloud"] = $true
+            [IO.File]::WriteAllText($cfgPath, ($cfg | ConvertTo-Json))
+        }
+    } catch {}
+}
 
 function Step($n, $t) { Write-Host "`n[$n] $t" -ForegroundColor Cyan }
 function Ok($t)       { Write-Host "    [ok] $t" -ForegroundColor Green }
@@ -294,6 +322,7 @@ if (($ollamaExe -or (Test-OllamaUp)) -and -not $Force) {
         exit 1
     }
 
+    Set-OllamaPrivado   # antes do instalador: ele ja' pode abrir o app
     Info "instalando o Ollama (silencioso)..."
     Start-Process -FilePath $ollamaSetup -ArgumentList "/VERYSILENT /NORESTART" -Wait -NoNewWindow
     Remove-Item $ollamaSetup -Force -ErrorAction SilentlyContinue
@@ -367,7 +396,22 @@ if (-not (Test-Path $vpy)) {
     & $py311 -m venv $venv
     Assert-Exit "a criacao do ambiente Python"
 }
-if ((Test-Path (Join-Path $venv "Scripts\open-webui.exe")) -and -not $Force) { Ok "Open WebUI ja instalado" }
+# Ja' existe: confere a versao e, se for mais antiga que a testada, atualiza com
+# backup dos dados e volta atras se algo falhar (script a parte, em outro
+# processo: ele encerra o que o Nous deixou rodando e sobe um servidor de teste).
+$temOpenWebUI = Test-Path (Join-Path $venv "Scripts\open-webui.exe")
+$updExit = 0
+if ($temOpenWebUI) {
+    $upd = Join-Path $REPO "installer\atualizar-openwebui.ps1"
+    if (Test-Path $upd) {
+        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $upd -Venv $venv -DataDir $dataDir -Pin $OPENWEBUI_PIN -Repo $REPO
+        $updExit = $LASTEXITCODE
+        $global:LASTEXITCODE = 0
+    }
+    if ($updExit -eq 1) { Write-Host "    [aviso] o Open WebUI nao foi atualizado agora; o Nous segue funcionando na versao que ja' estava." -ForegroundColor Yellow }
+    if ($updExit -eq 2) { Fail "a atualizacao do Open WebUI falhou e nao consegui voltar sozinho. Seus dados estao no ultimo zip da pasta bkp\ do Nous." }
+}
+if ($temOpenWebUI -and -not $Force) { Ok "Open WebUI ja instalado" }
 else {
     Info "instalando o Open WebUI $OPENWEBUI_PIN (varios minutos, baixa varios GB)..."
     & $vpy -m pip install --upgrade pip --quiet

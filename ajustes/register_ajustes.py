@@ -39,7 +39,7 @@ import sqlite3
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "evaluation"))
 from register_arena import _resolve_db  # noqa: E402
-from config_db import obter, definir, tem_config  # noqa: E402
+from config_db import obter, definir, tem_config, por_chave  # noqa: E402
 
 NOUS_EMBED = "granite-embedding:278m"
 OLD_EMBED = "sentence-transformers/all-MiniLM-L6-v2"
@@ -72,6 +72,10 @@ def ajuste_1(cx, log):
 
 
 def ajuste_2(cx, log):
+    # So' vale na tabela nova (0.10+). Antes da atualizacao o servidor guarda a
+    # config inteira de memoria e apagaria a chave; o ajuste espera a atualizacao.
+    if not por_chave(cx):
+        return False
     params = obter(cx, "models.default_params")
     params = dict(params) if isinstance(params, dict) else {}
     if "function_calling" not in params:
@@ -134,14 +138,20 @@ def main():
             print("Config ainda vazia (o servidor ainda nao gravou os padroes). Tentarei no proximo boot.")
             return
         log = []
-        for _v, f in pending:
-            f(cx, log)
+        feito = done
+        for v, f in pending:
+            if f(cx, log) is False:   # ainda nao da' para aplicar: tenta de novo no proximo inicio
+                break
+            feito = v
         cx.commit()
     finally:
         cx.close()
+    if feito == done:
+        return
     with open(marker, "w", encoding="utf-8") as fh:
-        json.dump({"versao": pending[-1][0]}, fh)
-    print("Ajustes do Nous: " + "; ".join(log) + ". Valem a partir do proximo inicio do Nous.")
+        json.dump({"versao": feito}, fh)
+    if log:
+        print("Ajustes do Nous: " + "; ".join(log) + ". Valem a partir do proximo inicio do Nous.")
 
 
 if __name__ == "__main__":
