@@ -49,6 +49,17 @@ if ($py) {
     $code = "import ast,io,json,sys`nbad=0`nfor p in sys.argv[1:]:`n    try:`n        s=io.open(p,encoding='utf-8').read()`n        json.loads(s) if p.endswith('.json') else ast.parse(s,p)`n    except Exception as e:`n        print('  [FALHA] %s: %s' % (p,e)); bad+=1`nsys.exit(1 if bad else 0)"
     & $py.Source -c $code @pyFiles @jsonFiles
     if ($LASTEXITCODE -ne 0) { $fail++ }
+
+    # Agenda: testes da sincronizacao CalDAV (servidor de mentira local; pulam sozinhos
+    # se faltar requests/dateutil, e usam o Radicale se ele estiver instalado)
+    $agTests = Join-Path $root "agenda/tests"
+    if (Test-Path $agTests) {
+        Write-Host "== Agenda (CalDAV)" -ForegroundColor Cyan
+        $ErrorActionPreference = "Continue"   # o unittest escreve no stderr
+        $out = & $py.Source -m unittest discover -s $agTests 2>&1 | Out-String
+        $ErrorActionPreference = "Stop"
+        if ($LASTEXITCODE -ne 0) { Write-Host $out; Bad "agenda/tests: testes falharam" }
+    }
 }
 
 $node = Get-Command node -ErrorAction SilentlyContinue

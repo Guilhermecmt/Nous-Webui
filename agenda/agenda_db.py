@@ -6,6 +6,8 @@ Agenda do Nous - camada de dados (SQLite em <DATA_DIR>/nous_agenda.sqlite3).
   events   compromissos do calendario (locais, importados de .ics ou de uma
            assinatura de calendario, ex.: o endereco iCal secreto do Google)
   subs     assinaturas de calendario (URL .ics, sincronizada de hora em hora)
+  caldav_* contas CalDAV (sincronizacao de duas vias, ver caldav_sync.py): contas,
+           calendarios escolhidos e apagados locais ainda nao avisados ao servidor
   notif    fila de avisos que o painel do Nous mostra (e marca como vistos)
   tasks    tarefas agendadas (ver agenda_tasks.py)
 
@@ -30,6 +32,25 @@ except Exception:  # pragma: no cover
     ZoneInfo = None
 
 LOCAL = tz.tzlocal()
+
+
+def zone(tzid):
+    """Fuso a partir do nome IANA ('America/Sao_Paulo'), ou None se nao conhecer.
+    No Windows o zoneinfo do Python nao traz os fusos (falta o pacote tzdata);
+    o dateutil, que ja vem no venv, tem os seus."""
+    tzid = (tzid or "").strip().strip('"')
+    if not tzid:
+        return None
+    if ZoneInfo is not None:
+        try:
+            return ZoneInfo(tzid)
+        except Exception:
+            pass
+    try:
+        return tz.gettz(tzid)
+    except Exception:
+        return None
+
 DB_NAME = "nous_agenda.sqlite3"
 
 # Repeticoes simples da interface -> RRULE (eventos) / passo (notas)
@@ -86,6 +107,27 @@ CREATE TABLE IF NOT EXISTS subs (
     last_sync INTEGER, last_error TEXT, created_at INTEGER NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS caldav_accounts (
+    id TEXT PRIMARY KEY, user_id TEXT NOT NULL, name TEXT NOT NULL DEFAULT '',
+    url TEXT NOT NULL, home_url TEXT, username TEXT NOT NULL, secret TEXT NOT NULL,
+    created_at INTEGER NOT NULL, last_sync INTEGER, last_ok INTEGER,
+    last_error TEXT, last_summary TEXT
+);
+
+CREATE TABLE IF NOT EXISTS caldav_cals (
+    id TEXT PRIMARY KEY, account_id TEXT NOT NULL, user_id TEXT NOT NULL,
+    url TEXT NOT NULL, name TEXT NOT NULL DEFAULT '', color TEXT,
+    enabled INTEGER NOT NULL DEFAULT 0, is_default INTEGER NOT NULL DEFAULT 0,
+    ctag TEXT, sync_token TEXT, remind_min INTEGER DEFAULT 30,
+    last_sync INTEGER, last_error TEXT
+);
+CREATE INDEX IF NOT EXISTS caldav_cals_acc ON caldav_cals(account_id);
+
+CREATE TABLE IF NOT EXISTS caldav_tomb (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, cal_id TEXT NOT NULL, user_id TEXT NOT NULL,
+    href TEXT NOT NULL, etag TEXT, uid TEXT, title TEXT, created_at INTEGER NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS notif (
     id INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT NOT NULL,
     kind TEXT NOT NULL, title TEXT NOT NULL, body TEXT NOT NULL DEFAULT '',
@@ -115,7 +157,13 @@ def connect():
     cx.row_factory = sqlite3.Row
     cx.execute("PRAGMA journal_mode=WAL")
     cx.executescript(_SCHEMA)
-    for ddl in ("ALTER TABLE tasks ADD COLUMN then_task TEXT",):  # v2.8: tarefas em cadeia
+    for ddl in ("ALTER TABLE tasks ADD COLUMN then_task TEXT",  # v2.8: tarefas em cadeia
+                # v2.11: CalDAV. href/etag = onde o evento mora no servidor; dirty: 0 limpo,
+                # 1 alterado aqui, 2 criado aqui (ainda nao subiu); raw = o .ics do servidor
+                "ALTER TABLE events ADD COLUMN href TEXT",
+                "ALTER TABLE events ADD COLUMN etag TEXT",
+                "ALTER TABLE events ADD COLUMN dirty INTEGER NOT NULL DEFAULT 0",
+                "ALTER TABLE events ADD COLUMN raw TEXT"):
         try:
             cx.execute(ddl)
         except sqlite3.OperationalError:
@@ -322,7 +370,7 @@ def _clean_event(d):
     return out
 
 
-def event_create(cx, user_id, d, source="local", uid=None, exdates=None):
+def event_create(cx, user_id, d, source="local", uid=None, exdates=None, dirty=0):
     f = _clean_event(d)
     if not f.get("title") or not f.get("start_at"):
         raise ValueError("evento precisa de titulo e inicio")
@@ -335,12 +383,12 @@ def event_create(cx, user_id, d, source="local", uid=None, exdates=None):
     eid = new_id()
     cx.execute(
         """INSERT INTO events (id, user_id, title, description, location, start_at, end_at,
-               all_day, rrule, exdates, remind_min, uid, source, created_at, updated_at)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+               all_day, rrule, exdates, remind_min, uid, source, dirty, created_at, updated_at)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
         (eid, user_id, f["title"], f.get("description", ""), f.get("location", ""),
          f["start_at"], f["end_at"], f.get("all_day", 0), f.get("rrule"),
          json.dumps(exdates) if exdates else None, f.get("remind_min"),
-         uid or (eid + "@nous"), source, t, t))
+         uid or (eid + "@nous"), source, dirty, t, t))
     return eid
 
 
@@ -350,16 +398,35 @@ def event_get(cx, user_id, eid):
 
 
 def event_update(cx, user_id, eid, d):
+    """Local e evento de um calendario CalDAV podem ser editados; o CalDAV fica
+    marcado (dirty) para subir na proxima sincronizacao. Assinaturas (so leitura) nao."""
     f = _clean_event(d)
-    if f:
+    cur = event_get(cx, user_id, eid)
+    if f and cur and (cur["source"] == "local" or cur["source"].startswith("dav:")):
+        if f.get("all_day") or (f.get("all_day") is None and cur["all_day"]):
+            if "start_at" in f and f["start_at"]:
+                f["start_at"] = to_ts(local_dt(f["start_at"]).replace(hour=0, minute=0, second=0))
+        st = f.get("start_at", cur["start_at"])
+        if "end_at" in f or "start_at" in f:
+            if not f.get("end_at") or f["end_at"] <= st:
+                f["end_at"] = st + (86400 if f.get("all_day", cur["all_day"]) else 3600)
         sets = ", ".join(f"{k}=?" for k in f)
-        cx.execute(f"UPDATE events SET {sets}, updated_at=? WHERE id=? AND user_id=? AND source='local'",
+        extra = ""
+        if cur["source"].startswith("dav:"):
+            extra = ", dirty=%d" % (2 if cur["dirty"] == 2 or not cur["href"] else 1)
+        cx.execute(f"UPDATE events SET {sets}{extra}, updated_at=? WHERE id=? AND user_id=?",
                    (*f.values(), now(), eid, user_id))
         cx.commit()
     return event_get(cx, user_id, eid)
 
 
 def event_delete(cx, user_id, eid):
+    cur = event_get(cx, user_id, eid)
+    if cur and cur["source"].startswith("dav:") and cur["href"]:
+        # o servidor ainda tem este evento: lembra de apagar la na proxima sincronizacao
+        cx.execute("INSERT INTO caldav_tomb (cal_id, user_id, href, etag, uid, title, created_at)"
+                   " VALUES (?,?,?,?,?,?,?)",
+                   (cur["source"][4:], user_id, cur["href"], cur["etag"], cur["uid"], cur["title"], now()))
     cx.execute("DELETE FROM events WHERE id=? AND user_id=?", (eid, user_id))
     cx.commit()
 
@@ -534,14 +601,8 @@ def _parse_dt(value, params):
         d = datetime.strptime(value[:15], "%Y%m%dT%H%M%S").replace(tzinfo=timezone.utc)
         return int(d.timestamp()), False
     d = datetime.strptime(value[:15], "%Y%m%dT%H%M%S")
-    zone = LOCAL
-    tzid = params.get("TZID")
-    if tzid and ZoneInfo is not None:
-        try:
-            zone = ZoneInfo(tzid.strip('"'))
-        except Exception:
-            zone = LOCAL  # TZIDs do Windows/Outlook: usa o fuso local
-    return int(d.replace(tzinfo=zone).timestamp()), False
+    # TZIDs do Windows/Outlook (nao IANA): usa o fuso local
+    return int(d.replace(tzinfo=zone(params.get("TZID")) or LOCAL).timestamp()), False
 
 
 def parse_ics(text):
