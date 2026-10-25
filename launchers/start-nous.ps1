@@ -328,6 +328,14 @@ function Register-Ajustes {
     }
 }
 
+# Conta criada sem login se chama "User": troca pelo nome do Windows (uma vez).
+function Set-ContaNome {
+    $reg = Join-Path $PSScriptRoot "..\ajustes\acesso_local.py"
+    if ((Test-Path $py) -and (Test-Path $reg)) {
+        & $py "$reg" --nome --data-dir "$env:DATA_DIR" | Out-Null
+    }
+}
+
 # --- Utilidades (v2.7): YouTube e Clima, Filters globais registrados no banco ---
 
 function Register-Utilidades {
@@ -347,6 +355,22 @@ function Start-AgendaAPI {
         try { Invoke-RestMethod "http://127.0.0.1:8996/health" -TimeoutSec 2 | Out-Null }
         catch { Start-Process -FilePath $py -ArgumentList "`"$api`"" -WindowStyle Hidden }
     }
+}
+
+# --- Nous Code (v2.10): agente de programacao do painel Codigo (8998) ---
+# Servico em Node (roda o TypeScript direto, sem build). Sem Node 22.18+ o
+# painel explica como instalar; o resto do Nous segue normal.
+function Start-CodeAPI {
+    $srv = Join-Path $PSScriptRoot "..\code\servidor.ts"
+    if (-not (Test-Path $srv)) { return }
+    try { Invoke-RestMethod "http://127.0.0.1:8998/health" -TimeoutSec 2 | Out-Null; return } catch {}
+    $node = Get-Command node -ErrorAction SilentlyContinue
+    $exe = if ($node) { $node.Source } else { Join-Path $env:ProgramFiles "nodejs\node.exe" }
+    if (-not (Test-Path $exe)) { return }
+    $v = (& $exe --version) -replace '^v', ''
+    $p = $v.Split('.')
+    if ([int]$p[0] -lt 22 -or ([int]$p[0] -eq 22 -and [int]$p[1] -lt 18)) { return }
+    Start-Process -FilePath $exe -ArgumentList "`"$srv`"" -WorkingDirectory (Split-Path $srv) -WindowStyle Hidden
 }
 
 # Filtro 'Nous Agenda' (pedidos de agenda pelo chat), global e ativo.
@@ -422,11 +446,11 @@ function Test-ServerProcess {
 }
 
 function Register-All {
-    Ensure-Branding; Register-Ajustes; Register-Memory; Register-Pipe; Register-Research; Register-Arena
+    Ensure-Branding; Register-Ajustes; Set-ContaNome; Register-Memory; Register-Pipe; Register-Research; Register-Arena
     Register-Cloud; Register-Voice; Start-VoiceServer; Start-ComfyUI; Setup-Files
     Setup-History; Hide-EmbedModels; Set-ModelCtx; Start-MemoryAPI; Start-EmailAPI
     Register-Utilidades; Start-AgendaAPI; Register-Agenda; Start-SkillsAPI; Register-Skills
-    Register-EmailChat
+    Register-EmailChat; Start-CodeAPI
 }
 
 function Show-Error([string]$msg) {
@@ -484,6 +508,17 @@ if ($manifestModel) {
 
 # Garante a identidade ANTES do servidor subir (1a requisicao ja sai com logo)
 Ensure-Branding
+
+# Sem tela de login: o Nous abre direto no chat. O acesso_local.py decide (e
+# converte a conta unica na conta fixa do Open WebUI); 2+ contas ou o arquivo
+# NousData\.exigir_login mantem o login. Na duvida, login LIGADO: desligar com a
+# conta errada trancaria o usuario fora.
+$env:WEBUI_AUTH = "True"
+$acesso = Join-Path $PSScriptRoot "..\ajustes\acesso_local.py"
+if ((Test-Path $py) -and (Test-Path $acesso)) {
+    $modo = & $py "$acesso" --data-dir "$env:DATA_DIR"
+    if ("$modo".Trim() -eq "sem-login") { $env:WEBUI_AUTH = "False" }
+}
 
 # Sobe o servidor OCULTO (sem janela) e desanexa. So' em 127.0.0.1: o Nous e'
 # privado e nao deve aparecer para outros aparelhos da rede (antes: 0.0.0.0).

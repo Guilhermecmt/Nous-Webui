@@ -1,339 +1,335 @@
 <div align="center">
 
-<img src="branding/assets/nous_logo.png" width="120" alt="Logo do Nous">
+<img src="branding/assets/nous_logo.png" width="112" alt="Logo do Nous">
 
 # Nous
 
-**Sua IA particular — bonita, local e sua.**
+**Sua IA particular, rodando no seu computador.**
 
-Chat · Documentos · Agenda · E-mail · Visão · Imagens · Pesquisa — 100% no seu PC.  
-Sem nuvem. Sem mensalidade. Suas conversas nunca saem da sua máquina.
+Chat, documentos, agenda, e-mail, pesquisa e programação com IA local no Windows.<br>
+Sem nuvem, sem mensalidade e sem conta para criar.
 
-[![version](https://img.shields.io/badge/version-2.9.0-c8962e)](CHANGELOG.md)
-[![license](https://img.shields.io/badge/license-MIT-black)](LICENSE)
-[![platform](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6)](#requisitos)
-[![local](https://img.shields.io/badge/100%25-local%20%26%20privado-2ea44f)](#por-que-o-nous)
+[![Versão](https://img.shields.io/badge/vers%C3%A3o-2.10.0-c8962e)](CHANGELOG.md)
+[![Licença MIT](https://img.shields.io/badge/licen%C3%A7a-MIT-1f1b16)](LICENSE)
+[![Windows 10 e 11](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6)](#requisitos)
+[![100% local](https://img.shields.io/badge/IA-100%25%20local-2ea44f)](#privacidade-e-segurança)
+[![Lint](https://github.com/Guilhermecmt/Nous-Webui/actions/workflows/lint.yml/badge.svg)](https://github.com/Guilhermecmt/Nous-Webui/actions)
 
 [English](README.md) · **Português**
 
-<img src="docs/screenshots/hero-github.png" width="860" alt="Interface do Nous">
+[Instalação](#instalação) · [Recursos](#recursos) · [Nous Code](#nous-code) · [Privacidade](#privacidade-e-segurança) · [Desenvolvimento](#para-desenvolvedores)
+
+<img src="docs/screenshots/inicio-escuro.png" width="900" alt="Tela inicial do Nous com o painel Seu Nous">
 
 </div>
 
----
+## Visão geral
 
-## Por que o Nous
+**Nous** (do grego *νοῦς*, "mente") transforma o [Open WebUI](https://github.com/open-webui/open-webui) e o [Ollama](https://ollama.com) num produto pronto para quem não é técnico. Ele instala com dois cliques, escolhe o modelo certo para o seu hardware e roda tudo em segundo plano, sem janelas de terminal.
 
-**Nous** (do grego *νοῦς*, "mente") transforma as melhores ferramentas de IA local em um produto acabado: instala com dois cliques, escolhe o modelo certo para o seu computador e cuida de tudo em segundo plano. Nenhuma etapa exige conhecimento técnico.
+- **Privado por padrão.** O modelo roda na sua máquina, o servidor só aceita conexões do próprio PC e conversas, memórias e arquivos ficam no seu disco.
+- **Pronto para usar.** Não pede conta, chave de API nem configuração. Na primeira vez, um assistente recomenda e baixa o modelo ideal para a sua placa de vídeo.
+- **Mais que um chat.** Ele lembra de você, lê as suas notas, escreve documentos com você, cuida da agenda e do e-mail, pesquisa na web com fontes e programa com um agente de verdade.
+- **Feito para modelos locais.** Cada recurso foi testado com modelos pequenos (4B a 14B) rodando numa GPU doméstica, não só com modelos de nuvem.
 
-O que você ganha em relação a um chat de IA comum:
+## Galeria
 
-- **Privacidade de verdade.** O modelo roda no seu computador. Conversas, arquivos e memórias ficam com você — não há servidor para onde mandar nada.
-- **Ele lembra de você.** O Nous aprende fatos duráveis (nome, trabalho, preferências) ao longo das conversas e os usa nas seguintes. Tudo armazenado localmente.
-- **Ele lê suas anotações.** Aponte para o seu vault do Obsidian ou qualquer pasta de notas e o Nous traz os trechos relevantes para dentro da conversa.
-- **Loja de Modelos integrada.** O Nous analisa seu hardware, recomenda o modelo ideal e baixa tudo com um clique — dentro do próprio site, com barra de progresso.
-- **Visão e imagem.** Solte um print e pergunte sobre ele; peça *"crie uma imagem de…"* e ela aparece na conversa (ComfyUI + Flux, opcional).
-- **Busca na web** opcional via DuckDuckGo, sem chave de API.
-- **Documentos com a IA ao lado.** Escreva uma carta, um currículo ou um trabalho e peça *corrigir*, *mais formal*, *mais curto* ou *tópicos em texto*: cada mudança aparece riscada e você aceita ou recusa. Baixa em Word ou PDF.
-- **Pesquisa Profunda.** Selecione "Pesquisa Profunda (Nous)" no dropdown — o Nous planeja, busca a web em múltiplas etapas, lê as páginas e entrega um relatório markdown com citações numeradas e lista de fontes clicáveis. 100% local.
-- **Comparação cega de modelos.** A mesma pergunta para 2 a 4 modelos, voto antes de ver os nomes e um placar de qual combina mais com você.
-- **Assistente de email (opcional).** Conecte sua caixa de entrada e o Nous faz triagem, resume e rascunha respostas — tudo na sua máquina. Seus emails só chegam ao modelo Ollama local, nunca à nuvem. Envio sempre exige confirmação.
-- **Agenda, lembretes e tarefas.** *"Me lembre de pagar a luz sexta às 9h"* vira um aviso do Windows na hora certa; tarefas como o "bom dia com a agenda e os e-mails" rodam sozinhas no horário.
-- **Ele aprende o seu jeito.** Diga *"aprenda isso"* e o Nous guarda o passo a passo para a próxima vez — inclusive o seu estilo de escrever.
-- **Lê fotos, boletos e PDFs.** Texto de prints e documentos lido na sua máquina, boleto com valor e vencimento conferidos e formulários PDF preenchidos e assinados.
-- **Editor de fotos e Galeria.** Remova o fundo, corte e ajuste — ou só escreva *"tira o fundo e corta quadrado"*.
-- **Painel de recursos.** VRAM em tempo real, modelos carregados, um botão para liberar a placa de vídeo e um **Diagnóstico** que diz o que está funcionando.
-- **Sem janelas de terminal.** Abre por um atalho, roda em segundo plano, fecha pelo "Parar Nous".
+<table>
+<tr>
+<td width="50%"><img src="docs/screenshots/conversa.png" alt="Conversa com respostas que podem ser encurtadas, simplificadas ou levadas para Documentos"><br><sub><b>Chat.</b> Cada resposta tem "Mais curto", "Mais simples" e "Documento". O painel à direita mostra a placa de vídeo, a agenda e o que o Nous sabe de você.</sub></td>
+<td width="50%"><img src="docs/screenshots/documentos.png" alt="Documentos com sugestões da IA riscadas e sublinhadas"><br><sub><b>Documentos.</b> A IA só sugere: cada mudança aparece riscada e sublinhada, e você aceita ou recusa uma a uma.</sub></td>
+</tr>
+<tr>
+<td width="50%"><img src="docs/screenshots/loja.png" alt="Loja de modelos com recomendação para a placa de vídeo"><br><sub><b>Loja de modelos.</b> Recomenda o que roda bem na sua placa, mostra a velocidade estimada e baixa com um clique.</sub></td>
+<td width="50%"><img src="docs/screenshots/inicio-claro.png" alt="Tela inicial no tema claro"><br><sub><b>Tema claro.</b> Branco e dourado, com a mesma tela inicial e o mesmo painel.</sub></td>
+</tr>
+</table>
 
-### Novidades da versão 2.9
+## Nous Code
 
-- **📝 Documentos:** escreva ao lado do chat e peça à IA para corrigir, deixar formal, encurtar, organizar ou continuar. Ela **só sugere** — cada mudança aparece riscada/sublinhada para você aceitar ou recusar. Selecione um trecho para mexer só nele. Salva sozinho, guarda versões e baixa em **Word, PDF ou Markdown**.
-- **Respostas:** botões **✂ Mais curto**, **🙂 Mais simples** e **📝 Documento** (abre a resposta para editar e baixar).
-- **Memória:** **⬆ Importar** fatos de um currículo, de um "sobre mim" ou das memórias do ChatGPT (você escolhe o que guardar) e **⬇ Exportar** tudo em um arquivo.
-- **Loja de Modelos:** baixe **qualquer modelo** do Ollama ou do Hugging Face pelo nome ou link — o Nous confere o tamanho e se cabe na sua máquina antes — e **"E se eu tivesse outra máquina?"** mostra o que rodaria com outra placa.
-- **Pesquisa Profunda:** relatórios baixam em **PDF ou Word**.
+Um IDE com agente de programação que usa só IA local, aberto numa janela própria. Ele junta o editor do VS Code (Monaco), arquivos, busca, Git e um terminal de verdade, com um agente ao lado que lê o seu projeto, propõe um plano, edita e roda os testes. Toda mudança passa pela sua aprovação. A parte do agente adapta o [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness), de código aberto (MIT): as mesmas ferramentas, prompts e políticas, ajustados para um modelo local de 14B.
 
-Versões anteriores no [CHANGELOG](CHANGELOG.md).
+<img src="docs/screenshots/nous-code.png" width="900" alt="Nous Code com o editor, o terminal e um plano proposto pelo agente">
 
----
+| No editor | No agente |
+|---|---|
+| Monaco em português, abas, minimapa, Ctrl+S | Lê, procura (`glob`, `grep`), navega pelo código com language server (`lsp`), edita e roda comandos |
+| Árvore de arquivos com criar, renomear e apagar (vai para a Lixeira) | **Modo plano** (`/plano`): investiga sem mexer em nada e propõe um plano para você aprovar |
+| **Ctrl+P** para abrir arquivo e **Ctrl+Shift+F** para buscar no projeto | **Permissões** em quatro níveis, de "Somente leitura" a "Acesso total" |
+| Git: arquivos mudados, diff lado a lado, commit e descartar | Diff na tela antes de cada mudança e **Desfazer** por arquivo ou tudo |
+| Terminal PowerShell real (ConPTY), com **Ctrl+`** | Lista de tarefas, perguntas com opções e **objetivo** (`/objetivo`) em que ele segue trabalhando, rodada após rodada, até cumprir |
+| Recarrega o arquivo quando o agente o muda no disco | Comandos longos viram jobs em segundo plano, e o agente é avisado quando terminam |
+| **Ctrl+L** pergunta ao agente sobre o trecho selecionado | **Lembretes** ("me lembre amanhã às 9h de rodar os testes") que rodam a conversa sozinhos |
+| | **Servidores MCP** (`.mcp.json`, o formato do Claude Code), internet com permissão e arquivos entregues |
+| | Compactação do contexto, subagente de pesquisa, skills (`SKILL.md`) e `@arquivo` |
+| | Ollama e também **LM Studio**, llama.cpp ou vLLM pela API compatível com a OpenAI |
 
-<div align="center">
-<img src="docs/screenshots/philosophy-banner.png" width="860" alt="Nous — The Intelligence Engine">
-</div>
+<img src="docs/screenshots/nous-code-diff.png" width="900" alt="O agente pede para aplicar uma correção, mostrando o diff">
 
----
+**Feito para modelos pequenos.** O motor compensa os vícios mais comuns dos modelos locais:
+- Lê chamadas de ferramenta escritas como JSON no texto. O `qwen2.5-coder:14b`, por exemplo, nunca usa o canal nativo do Ollama.
+- Só deixa editar um arquivo depois de lê-lo, e recusa a edição se o arquivo mudou desde a leitura.
+- Aceita o trecho copiado com os números de linha ou com o recuo diferente.
+- Avisa quando o modelo repete a mesma chamada (na 3ª, 5ª e 8ª vez) e para depois de dez resultados iguais.
+- Resume a conversa antes de estourar o contexto.
+
+**Como abrir:**
+- pelo atalho **Nous Code**;
+- por **Código** no painel "Seu Nous";
+- escrevendo *"abre o código"* no chat.
+
+Precisa do [Node.js](https://nodejs.org) 22.18 ou mais novo (`winget install OpenJS.NodeJS.LTS`). Com ele presente, o instalador baixa o editor e cria o atalho. Detalhes técnicos em [`code/README.md`](code/README.md).
+
+## Novidades da versão 2.10
+
+- **Sem login.** O Nous abre direto no chat, como qualquer programa. A sua conta e as suas conversas antigas continuam lá. Com duas ou mais contas no mesmo PC, o login volta sozinho.
+- **Painel "Seu Nous".** A coruja num anel mostra o uso da placa de vídeo, e o painel reúne a conversa privada, os próximos lembretes, o que o Nous sabe de você e todas as ferramentas.
+- **Nous Code.** IDE com agente de IA local em janela própria, descrito acima.
+- **Conversa privada.** Não fica no histórico nem vira memória.
+
+O histórico completo está no [CHANGELOG](CHANGELOG.md).
 
 ## Requisitos
 
-| Recurso | Mínimo | Recomendado |
-|---------|--------|-------------|
-| Sistema | Windows 10 / 11 | Windows 11 |
-| RAM     | 8 GB | 16 GB+ |
-| GPU     | nenhuma — roda na CPU | 8 GB+ de VRAM |
-| Disco   | 20 GB livres | 30 GB+ |
+| | Mínimo | Recomendado |
+|---|---|---|
+| Sistema | Windows 10 ou 11 | Windows 11 |
+| Memória RAM | 8 GB | 16 GB ou mais |
+| Placa de vídeo | Nenhuma: roda na CPU | 8 GB de VRAM ou mais |
+| Disco livre | 20 GB | 30 GB ou mais |
+| Nous Code (opcional) | Node.js 22.18 | Node.js LTS atual |
 
-> **Sem placa de vídeo dedicada?** O Nous funciona na CPU — as respostas só demoram mais (1–2 min). A Loja de Modelos detecta isso e recomenda modelos leves automaticamente.
-
----
+Sem placa de vídeo dedicada, o Nous funciona na CPU e as respostas só demoram mais. A Loja de modelos percebe isso e recomenda modelos leves.
 
 ## Instalação
 
-> Duas ações. Nenhuma configuração.
+1. Em **Code → Download ZIP**, no topo desta página, baixe o projeto e descompacte onde quiser.
+2. Dê **clique duplo em `instalar.bat`**. Se o Windows avisar, escolha **Mais informações → Executar assim mesmo**.
 
-1. Clique no botão verde **Code → Download ZIP** no topo desta página e descompacte onde quiser.
-2. Abra a pasta e dê **clique duplo em `instalar.bat`**. Se o Windows mostrar um aviso de segurança, escolha **"Mais informações → Executar assim mesmo"**.
+O instalador:
+- confere o hardware;
+- instala o Ollama, o Python 3.11 e a interface (sem mexer no que já existe na máquina);
+- aplica a identidade do Nous;
+- cria os atalhos na área de trabalho e no Menu Iniciar.
 
-O instalador verifica seu hardware, instala o Ollama, o Python e a interface, aplica a identidade Nous e cria os atalhos — na **área de trabalho** e no **Menu Iniciar**. Ao final, o Nous abre sozinho no navegador.
-
-O Nous fica instalado em `%LOCALAPPDATA%\Programs\Nous`: depois da instalação, a pasta que você baixou pode ser apagada. Se algo falhar no caminho, o instalador mostra o motivo em vermelho em vez de dizer "Pronto!".
-
----
+No fim, o Nous abre sozinho no navegador. Ele fica em `%LOCALAPPDATA%\Programs\Nous`, então a pasta baixada pode ser apagada. Se algum passo falhar, o instalador mostra o motivo em vermelho em vez de dizer "Pronto!".
 
 ## Primeiro uso
 
-**1. Crie sua conta.** Qualquer nome, e-mail e senha — a conta existe só na sua máquina, e a primeira criada é a administradora.
+1. **Abra.** Não há conta nem senha: o Nous abre direto no chat.
+2. **Escolha o modelo.** Sem nenhum modelo instalado, uma tela de boas-vindas mostra o recomendado para o seu computador. **Baixar e começar** cuida do resto, com barra de progresso.
+3. **Converse.** Quando o download terminar, é só escrever.
 
-**2. Deixe o assistente trabalhar.** Na primeira abertura, o Nous percebe que ainda não há um modelo de IA instalado e mostra uma tela de boas-vindas com o **modelo recomendado para o seu computador**. Um clique em **"Baixar e começar"** e ele cuida do download, mostrando o progresso.
-
-**3. Converse.** Quando o download termina, é só começar a digitar.
-
----
-
-## Modelos de IA
-
-A **Loja de Modelos** fica no card *Recursos* (canto inferior esquerdo) → botão **"Baixar modelos"**. Ela lista um catálogo curado com:
-
-- selo **"Recomendado para sua máquina"** nos modelos que aproveitam bem o seu hardware (a análise de GPU/RAM é automática);
-- selo **"Entende imagens"** nos modelos com visão;
-- descrição em português, tamanho do download e instalação em **1 clique** com barra de progresso.
-
-Você pode ter vários modelos instalados e alternar entre eles no seletor do topo do chat. Para referência, alguns destaques do catálogo:
-
-| Sua máquina | Modelo sugerido | Download | Perfil |
-|-------------|-----------------|----------|--------|
-| Sem GPU dedicada | Qwen 3.5 4B | ~3,4 GB | Leve, rápido na CPU, entende imagens |
-| GPU 8–12 GB | Gemma 4 12B | ~7,6 GB | Conversa, escrita e visão — o equilíbrio ideal |
-| GPU 12–16 GB | Qwen 3 14B | ~9,3 GB | Raciocínio melhor, contexto mais longo |
-| GPU 20 GB+ | Qwen 3 32B | ~20 GB | Qualidade comparável aos grandes modelos de nuvem |
-
-Para **qualquer outro modelo**, escreva o nome (`qwen3:8b`) ou cole o link do [ollama.com](https://ollama.com/library) ou de um repositório GGUF do Hugging Face no campo **"Outro modelo"** da Loja e clique **Conferir**: o Nous lê o tamanho no catálogo (sem baixar nada), diz se cabe na sua placa e no disco e só então oferece o **Baixar**.
-
-Pensando em trocar de computador? **"E se eu tivesse outra máquina?"** simula outra placa de vídeo e quantidade de RAM e mostra o que rodaria e a que velocidade.
-
----
+Se várias pessoas dividem o computador, crie uma conta para cada uma em **Painel do Admin › Usuários**. Com duas ou mais contas o login volta, e cada pessoa vê só as próprias conversas.
 
 ## Recursos
 
-### Memória — o Nous lembra de você
+### Painel "Seu Nous"
 
-Conversando normalmente, o Nous identifica fatos duráveis — nome, cidade, trabalho, gostos — e os recupera nas conversas seguintes. O painel **"O que o Nous sabe"** (botão de cérebro, canto inferior direito) permite ver, editar e apagar cada memória, além de criar **personas** com memórias separadas (trabalho, estudos, pessoal). Tudo fica em `NousData`, no seu disco.
+Fica fixo à direita e reúne o que importa:
+- a placa de vídeo, num anel em volta da coruja que fica dourado quando há um modelo carregado, com **Liberar a placa de vídeo**;
+- a **conversa privada**;
+- os próximos lembretes;
+- o que o Nous sabe de você;
+- as **Ferramentas**: Documentos, Código, Agenda, E-mail, Pesquisas, Galeria, Editar fotos, Formulários, Habilidades, Comparar, Modelos, Voz e Diagnóstico.
 
-Fatos de identidade e de saúde (nome, alergias, remédios) ficam **fixados** e entram em toda conversa; dá para fixar outros com o 📌. Quando as memórias passam de 30, o Nous leva só as fixadas, as mais recentes e as que têm a ver com a pergunta. **🧹 Organizar memórias** encontra repetidas e propõe juntá-las — nada muda sem o seu OK.
+Em telas menores ele vira uma gaveta. Fechado, sobra só a coruja no canto.
 
-**⬆ Importar** traz o que você já escreveu sobre si: um currículo, um texto "sobre mim" (.txt, .md, .docx, .pdf) ou a lista de memórias do ChatGPT colada no campo. O Nous propõe os fatos, marca os que já sabia e você escolhe o que guardar. **⬇ Exportar** baixa todas as memórias num arquivo (backup ou outro computador) — que o Importar traz de volta igualzinho, com as fixadas.
+### Modelos de IA
 
-### Arquivos — o Nous lê suas anotações
+Abra a Loja em **Ferramentas › Modelos**. Ela mostra:
+- um catálogo com o selo **Recomendado para sua máquina**;
+- a velocidade estimada na sua placa;
+- quanto da memória de vídeo cada modelo ocupa;
+- o selo **Entende imagens** nos modelos com visão.
 
-No primeiro uso, o Nous cria a pasta `Documentos\Nous`. Qualquer `.md` ou `.txt` colocado ali entra automaticamente na busca que acontece antes de cada resposta. A busca usa o **granite-embedding** (multilíngue, entende português), baixado sozinho; os índices se refazem se o modelo mudar. Para usar seu vault do Obsidian, altere o valve `FOLDER` do filtro **Nous Files** no painel de administração.
+| Sua máquina | Modelo sugerido | Download | Perfil |
+|---|---|---|---|
+| Sem GPU dedicada | Qwen 3.5 4B | ~3,4 GB | Leve, rápido na CPU, entende imagens |
+| GPU de 8 a 12 GB | Gemma 4 12B | ~7,6 GB | Conversa, escrita e visão |
+| GPU de 12 a 16 GB | Qwen 3 14B | ~9,3 GB | Raciocínio melhor e contexto mais longo |
+| GPU de 20 GB ou mais | Qwen 3 32B | ~20 GB | Qualidade próxima dos grandes modelos de nuvem |
 
-### Geração de imagem local (opcional)
+**Outro modelo** aceita qualquer nome do Ollama ou link do Hugging Face (GGUF). O Nous lê o tamanho no catálogo, sem baixar nada, e diz se o modelo cabe na placa e no disco antes de oferecer o download. **E se eu tivesse outra máquina?** simula outra placa e mostra o que rodaria.
 
-```powershell
-powershell -ExecutionPolicy Bypass -File images\install-comfyui.ps1
-```
+### Memória
 
-Instala o ComfyUI, o PyTorch certo para a sua GPU e os modelos Flux.1 Schnell (~12 GB). Depois, selecione **Gerador de Imagem Local** no seletor de modelos e peça: *"crie uma logo dourada de uma coruja"*. A imagem aparece na conversa.
+Conversando normalmente, o Nous guarda fatos duráveis (nome, cidade, trabalho, preferências) e os usa nas conversas seguintes. Em **O que eu sei de você › Ver e editar** você:
+- vê, corrige, fixa e apaga cada memória;
+- cria **personas** com memórias separadas;
+- junta repetidas com **Organizar memórias**;
+- usa **Importar**, que lê um currículo, um texto "sobre mim" ou as memórias do ChatGPT e deixa você escolher o que guardar;
+- usa **Exportar**, que gera um backup.
 
-### Assistente de Email — IA local para sua caixa de entrada (opcional)
+### Documentos
 
-Conecte seu email (Gmail, Outlook, Yahoo) via `conectar-email.bat` ou pelo botão **✉ Assistente de Email** no card Recursos. Dá para ligar **várias contas** e escolher a padrão. O Nous vai:
+Escreva cartas, currículos e trabalhos ao lado do chat, ou abra um `.docx`, `.pdf`, `.txt` ou `.md`.
 
-- **Triar** cada email: Importante / Pode esperar / Promoção / Spam + resumo de 1 linha.
-- **Resumir** a mensagem completa quando você abre — inclusive o conteúdo dos **anexos** (PDF, planilha, imagem).
-- **Rascunhar uma resposta** em PT-BR educado, pronta para editar, ou **agendar** o envio.
-- **Escrever pelo chat:** *"manda um e-mail para a Ana dizendo que atraso 10 minutos"* — o destinatário vem dos **contatos aprendidos** dos seus e-mails (importa/exporta vCard) e o texto vira um rascunho.
-- **Convites** de reunião vão para a Agenda com um clique; a aba **Newsletters** ajuda a sair de listas.
-- **Enviar** somente após você revisar e confirmar — nunca envia automaticamente.
+**Pedidos prontos:**
+- Corrigir português
+- Mais formal
+- Mais simples
+- Mais curto
+- Tópicos em texto
+- Organizar com títulos
+- Continuar escrevendo
 
-> **Privacidade:** seus emails são processados apenas pelo **modelo Ollama local**. Nenhum conteúdo sai da máquina, mesmo com Nuvem NVIDIA ativa. As credenciais ficam em `NousData/.email_accounts.json` (fora do git). Use uma **senha de aplicativo**, não a senha principal — revogável a qualquer momento.
+**Como a revisão funciona:** a IA nunca escreve direto no texto. Cada mudança aparece riscada e sublinhada, com o texto chegando ao vivo, e você aceita ou recusa. **Por quê?** explica cada sugestão, e selecionar um trecho limita a mudança a ele.
 
----
+O documento salva sozinho, guarda versões (dá para comparar antes de voltar) e baixa em **Word, PDF ou Markdown**.
 
-### Pesquisa Profunda — pesquisa multi-etapas com fontes
+### Agenda, lembretes e tarefas
 
-Selecione **"Pesquisa Profunda (Nous)"** no dropdown de modelos e faça qualquer pergunta de pesquisa. O Nous:
+*"Me lembre de pagar a luz sexta às 9h"* vira um aviso do Windows na hora certa, mesmo com o navegador fechado. A agenda tem:
+- notas com listas de verificação;
+- calendário com importação de `.ics` e assinatura do Google Agenda, Outlook ou iCloud;
+- avisos no celular (ntfy) ou por e-mail;
+- **tarefas agendadas**, como *"todo dia às 8h, bom dia com a agenda e os e-mails"*, que rodam sozinhas e podem encadear umas nas outras.
 
-1. Planeja 2–4 sub-perguntas para cobrir o tema completamente.
-2. Busca a web (SearXNG local) para cada sub-pergunta.
-3. Baixa e lê as páginas mais relevantes.
-4. Escreve um relatório em markdown com citações `[n]` e uma seção **Fontes** com URLs clicáveis.
-5. Salva um **relatório visual** (sumário, citações clicáveis, cartões das fontes) na biblioteca **Recursos › Relatórios**, com o link no fim da resposta. Ali cada relatório também baixa em **PDF** ou **Word**.
+Datas e horas são lidas por regra, sem depender do palpite do modelo.
 
-Com modelos pequenos (até ~10B) ela faz menos buscas e responde direto quando a pergunta é simples; pergunta vaga ganha sugestões em botões, e dá para continuar a conversa sobre o último relatório (*"e no Brasil?"*).
+### E-mail (opcional)
 
-Tudo roda na sua máquina. Sem chave de API, sem nuvem. Requer o container SearXNG (sobe automaticamente quando o Docker está disponível).
+Conecte Gmail, Outlook ou Yahoo, uma ou várias contas, com uma senha de aplicativo. O Nous:
+- separa importante, pode esperar, promoção e spam;
+- resume mensagens e anexos;
+- rascunha respostas;
+- aprende os contatos;
+- escreve pelo chat (*"manda um e-mail para a Ana dizendo que atraso 10 minutos"*).
 
-### Comparar Modelos — teste cego e placar
+Ele nunca envia sem a sua confirmação, e os e-mails só passam pelo modelo local.
 
-**Recursos › ⚖ Comparar modelos**: a mesma pergunta para **2 a 4 modelos**, um de cada vez (a placa fica inteira para cada um), com o tempo e os tokens/s de cada resposta. Por padrão é às cegas: você vota na melhor e só então vê os nomes. Os votos formam um **placar** com o aproveitamento e a velocidade média de cada modelo nesta máquina.
+### Pesquisa Profunda
 
-No chat, **"Comparar Modelos (Nous)"** no dropdown continua fazendo o duelo A/B da Arena. Os dois precisam de pelo menos dois modelos de chat instalados.
+Escolha **Pesquisa Profunda (Nous)** no seletor de modelos. O Nous:
+1. planeja sub-perguntas;
+2. busca na web (SearXNG local);
+3. lê as páginas;
+4. entrega um relatório com citações numeradas e a lista de fontes.
 
----
+Os relatórios ficam em **Ferramentas › Pesquisas**, baixam em PDF ou Word e podem continuar no chat.
 
-### Conversa por voz em português (opcional)
+### Mais recursos
 
-O Nous pode ouvir e falar — tudo na sua máquina, sem internet, sem API de nuvem.
+- **Arquivos:** tudo o que você põe em `Documentos\Nous`, ou no seu vault do Obsidian, entra na busca antes de cada resposta, com embeddings multilíngues.
+- **Habilidades:** diga *"aprenda isso"* e o Nous guarda o passo a passo para os próximos pedidos parecidos, inclusive o seu jeito de escrever.
+- **Comparar modelos:** a mesma pergunta para 2 a 4 modelos, voto às cegas e um placar.
+- **Leitura de imagens e boletos:** OCR local mesmo com modelos sem visão. Boletos saem com banco, valor e vencimento conferidos.
+- **Formulários PDF:** preenche e assina.
+- **Editor de fotos e Galeria:** cortar, ajustar, remover o fundo com IA local ou escrever *"tira o fundo e corta quadrado"*.
+- **Geração de imagem (opcional):** ComfyUI com Flux.1 Schnell, por *"crie uma imagem de…"*.
+- **Voz em português (opcional):** Piper e Whisper locais, com modo de conversa sem as mãos.
+- **Utilidades no chat:** resumo de vídeos do YouTube, previsão do tempo e comandos como *"tema escuro"* ou *"libera a placa de vídeo"*.
+- **Nous Nuvem (opcional):** modelos de fronteira pela API gratuita da NVIDIA, sem levar a sua memória pessoal junto.
+- **Diagnóstico:** cada parte do Nous com ✓ ou ✗ e o que fazer. Lá também ficam a privacidade na tela (CPF, cartões e chaves borrados) e as dicas de primeiro uso.
 
-```
-Clique duplo em  ativar-voz.bat
-```
+## Privacidade e segurança
 
-Ou abra o painel **Recursos** → clique em **"🎙 Ativar voz em PT-BR"**. O painel baixa o motor de voz Piper (~30 MB) e o modelo de voz brasileiro (~60 MB). O modelo Whisper de reconhecimento de fala (~150 MB) é baixado automaticamente no primeiro uso.
-
-Depois de ativar: clique no **ícone de telefone** no cabeçalho do chat para entrar no modo voz *hands-free* — fale, o Nous transcreve, responde e lê a resposta em voz alta em PT-BR.
-
-> **100% local.** Áudio e transcrições nunca saem da sua máquina. A voz funciona mesmo usando um modelo de nuvem no chat — só o texto vai para a nuvem, nunca sua voz.
-
----
-
-### Nous Nuvem — modelos de fronteira opcionais
-
-O Nous é local por padrão. Se quiser experimentar modelos de ponta (DeepSeek R1, Llama 3.3 70B, Kimi K2…) sem GPU potente, conecte-o à API gratuita da NVIDIA:
-
-1. Crie uma chave gratuita em [build.nvidia.com/models](https://build.nvidia.com/models) (sem cartão de crédito).
-2. Clique duplo em **`ativar-nuvem.bat`**, cole a chave, confirme.
-3. Reinicie o Nous — os modelos de nuvem aparecem no seletor.
-
-> **Privacidade preservada:** conversas com modelos de nuvem vão para os servidores da NVIDIA, mas a sua **memória pessoal nunca é enviada** — o Nous a retém automaticamente nessas requisições. Para desligar tudo: `desativar-nuvem.bat`.
-
-Também é possível plugar provedores pagos (GPT, Claude via OpenRouter) em Admin Panel → Settings → Connections. Sem chave, nada sai da máquina.
-
-### Agenda — notas, lembretes e calendário
-
-Peça no chat: *"me lembre de pagar a luz sexta às 9h"*, *"marca dentista dia 20 às 14h"*, *"anota: ideia para o projeto…"*, *"o que eu tenho amanhã?"*. O modelo local entende o pedido e grava na agenda; na hora certa o Nous avisa com uma **notificação do Windows** (mesmo com o navegador fechado) e um cartão na tela.
-
-O painel **Recursos › 📅 Agenda** tem quatro abas: **Hoje** (atrasados e próximos 7 dias), **Notas** (busca, fixar, concluir, repetir todo dia/dias úteis/semana/mês/ano), **Calendário** (mês, compromissos com aviso antes, importar/exportar `.ics`) e **Tarefas**. Dá para trazer o Google Agenda, o Outlook ou o iCloud colando o endereço **iCal** da agenda (só leitura, atualiza de hora em hora).
-
-Notas aceitam **listas de verificação** (`- [ ] item`) e o botão **💬 usar no chat**. Em **⚙ Avisos**, os lembretes também chegam no **celular** (app gratuito ntfy, sem cadastro) e/ou no seu **e-mail**. Se o Nous gravou algo errado pelo chat, o botão **↩ Desfazer** na resposta apaga. Datas e horas (*"sexta às 9h"*, *"daqui a 2 horas"*, *"dia 20"*) são lidas por regra, não adivinhadas pelo modelo. O Calendário e as Automações nativos do Open WebUI ficam escondidos para não haver dois de cada.
-
-### Tarefas agendadas — o Nous trabalha sozinho
-
-Em **Agenda › Tarefas**: *"todo dia às 8h, bom dia com a agenda e os e-mails"*, *"toda segunda, pesquise novidades de IA"*, *"às 18h, resuma meus e-mails"*. Rodam no horário mesmo com o navegador fechado; o resultado vira uma nota, um aviso e, se quiser, um e-mail para você. Uma tarefa pode **encadear** outra (o resultado da primeira vira contexto da segunda) e espera alguns minutos se você estiver usando a placa de vídeo.
-
-### Habilidades — o Nous aprende o seu jeito
-
-Depois de acertar algo numa conversa (o formato do relatório, o tom do e-mail de cobrança…), diga **"aprenda isso"**. O Nous resume o passo a passo numa habilidade (um arquivo `.md` legível em `NousData\skills`) e, nos próximos pedidos parecidos, segue sozinho. Em **Recursos › 🧠 Habilidades** você revisa, edita, cria e importa habilidades no formato `SKILL.md` de um link do GitHub. **✍ Ensinar meu jeito de escrever** lê textos seus e guarda o seu estilo, usado sempre que você pede para o Nous escrever algo.
-
-### Documentos — escrever com a IA ao lado
-
-**Recursos › 📝 Documentos** (ou *"abre meus documentos"* no chat). Escreva uma carta, um currículo, um trabalho ou um post — ou abra um arquivo `.docx`, `.pdf`, `.txt` ou `.md`. Embaixo ficam os pedidos prontos: **Corrigir português**, **Mais formal**, **Mais simples**, **Mais curto**, **Tópicos em texto**, **Organizar com títulos** e **Continuar escrevendo**, além do campo para pedir do seu jeito (*"troque você por senhor"*).
-
-Documento vazio? Escolha um **modelo pronto** (carta formal, currículo, e-mail profissional, reclamação, ata) ou **✨ Escrever com a IA**: descreva o que precisa e revise o rascunho.
-
-A IA nunca escreve direto no documento: cada mudança aparece **riscada (antes) e sublinhada (depois)** com ✓ e ✕. A revisão mostra *"sugestão 2 de 7"*; **Enter** aceita, **Delete** recusa e o Nous passa para a próxima sozinho — ou use **Aceitar todas** / **Recusar todas**. Depois de aplicar, o aviso traz **Desfazer**. Enquanto a IA trabalha, você vê o texto chegando **ao vivo**; na revisão, **❓ Por quê?** (ou a tecla **?**) explica a sugestão. Em **🕘 Versões**, clicar numa versão mostra o que muda antes de voltar. Se você **selecionar um trecho** antes de pedir, só ele muda. Antes de cada mudança aceita, o Nous guarda uma **versão** (também a cada 10 min de escrita), e dá para voltar a qualquer uma.
-
-O documento salva sozinho em `NousData\documentos`. **⬇ Baixar** gera **Word (.docx)**, **PDF** ou **Markdown**; **💬 Usar no chat** leva o texto para a conversa. Nas respostas do chat, o botão **📝 Documento** faz o caminho inverso. Tudo roda no modelo local.
-
-### Utilidades no chat
-
-- **YouTube:** cole um link e peça "resuma" ou pergunte sobre o vídeo — o Nous lê a legenda (português, se houver) e responde citando os minutos.
-- **Clima:** *"vai chover amanhã em Curitiba?"* — previsão do Open-Meteo (gratuito, sem chave). Defina uma cidade padrão em Painel Admin › Funções › Nous Clima.
-- **Ler imagens e boletos:** mande a foto de um documento, print ou boleto — o Nous lê o texto na sua máquina (OCR) mesmo com um modelo sem visão. Boletos saem com banco, valor e vencimento, conferidos pelo dígito verificador.
-- **Formulários PDF** (**Recursos › 📄 Formulários**): mostra os campos de um PDF preenchível, sugere o que já sabe de você e assina com a sua assinatura salva.
-- **Conversas longas:** quando a conversa passa do que o modelo aguenta, o Nous resume o começo sozinho e segue lembrando dos detalhes.
-- **Respostas sob medida:** embaixo de cada resposta, **✂ Mais curto** e **🙂 Mais simples** pedem a reescrita, e **📝 Documento** abre a resposta nos Documentos.
-- **Controle pelo chat:** *"abre minha agenda"*, *"tema escuro"*, *"libera a placa de vídeo"*, *"abre a galeria"*. Quando há escolhas, a resposta traz **botões**; e o Nous confere se o que o modelo diz ter feito (*"anotei"*, *"rascunho pronto"*) foi mesmo feito.
-
-### Editor de fotos e Galeria
-
-**Recursos › 🖼 Editor de fotos**, ou o botão **"✎ Editar"** que aparece sobre as imagens do chat. Cortar (livre, 1:1, 4:3, 16:9, 9:16), girar, espelhar, brilho/contraste/saturação/temperatura, filtros, redimensionar, desfazer/refazer, baixar PNG/JPG ou copiar. **Remover fundo** usa um modelo U²-Net de 4,5 MB, baixado no primeiro uso e rodando na sua máquina. Em **Diga o que fazer**, escreva do seu jeito: *"tira o fundo, deixa mais claro e corta quadrado"* (funciona sem modelo de IA).
-
-A **Galeria** reúne as imagens geradas: favoritas ★, álbuns 📁, zoom, lixeira e o ✎ que abre a imagem no Editor.
-
-### Painel de recursos e diagnóstico
-
-O card **Recursos** (canto inferior esquerdo) mostra VRAM em tempo real, os modelos carregados na memória e os botões **"Parar modelos"** (libera a GPU na hora) e **"Baixar modelos"** (abre a Loja, que mostra a **velocidade estimada** de cada modelo na sua placa), além dos atalhos para Agenda, Email, Habilidades, Relatórios, Documentos, Galeria, Editor, Formulários e Comparar modelos.
-
-**🩺 Diagnóstico** responde *"o que está funcionando?"*: cada parte do Nous com ✓/✗ e o que fazer. Ali também ficam a **privacidade na tela** (CPF, cartão, senhas e chaves aparecem borrados nas conversas até você clicar) e **"Ver as dicas de novo"** — cada painel mostra uma dica curta na primeira vez.
-
----
+- **Tudo local.** Os modelos rodam no Ollama da sua máquina. Conversas, memórias, documentos e índices ficam em `%USERPROFILE%\NousData`.
+- **Só o próprio PC.** O servidor do Nous e todos os serviços escutam apenas em `127.0.0.1`, então outros aparelhos da rede não chegam neles. Os serviços recusam páginas de outros sites.
+- **Sem login, com escolha.** Como ninguém de fora acessa o Nous, quem protege os dados é a senha do Windows. Para exigir login mesmo assim, crie um arquivo vazio `NousData\.exigir_login`.
+- **Nada sai sem você pedir.** A busca na web, a Nuvem NVIDIA e o e-mail são opcionais. A memória pessoal nunca vai para modelos de nuvem.
+- **Agente sob controle.** O Nous Code só mexe na pasta do projeto escolhido. Mudanças e comandos pedem aprovação, a internet pede permissão por conversa, e tudo o que ele muda pode ser desfeito.
 
 ## Problemas comuns
 
-**"O Windows protegeu seu computador" / "Editor desconhecido"**  
-Comportamento padrão para software sem assinatura digital. Clique em **"Mais informações" → "Executar assim mesmo"**.
+<details>
+<summary><b>"O Windows protegeu seu computador"</b></summary>
 
-**O atalho não apareceu na área de trabalho**  
-Alguns antivírus bloqueiam a criação de atalhos. Aperte a **tecla Windows** e digite **Nous** — o atalho do Menu Iniciar sempre é criado. Alternativa: clique duplo em `iniciar.bat` em `%LOCALAPPDATA%\Programs\Nous`.
+Aviso padrão para programas sem assinatura digital. Clique em **Mais informações → Executar assim mesmo**.
+</details>
 
-**A tela inicial não mostra a logo do Nous / aparece "Open WebUI"**  
-Abra o Nous pelo atalho e pressione **Ctrl+Shift+R** no navegador. A identidade é verificada e reaplicada automaticamente a cada inicialização.
+<details>
+<summary><b>O atalho não apareceu na área de trabalho</b></summary>
 
-**Abre mas não há modelo para conversar**  
-Card *Recursos* → **"Baixar modelos"** → escolha o recomendado. O assistente de boas-vindas também reaparece enquanto não houver modelo instalado.
+Alguns antivírus bloqueiam atalhos. Aperte a tecla Windows e digite **Nous**: o atalho do Menu Iniciar sempre é criado. Outra opção é dar clique duplo em `iniciar.bat`, em `%LOCALAPPDATA%\Programs\Nous`.
+</details>
 
-**"Ollama não está rodando" ou o chat não responde**  
-Abra o Nous pelo atalho (não pelo endereço direto no navegador) — o atalho inicia todos os serviços. Persistindo, use **"Parar modelos"** no painel e abra de novo.
+<details>
+<summary><b>Aparece "Open WebUI" no lugar do Nous</b></summary>
 
-**A instalação falhou / quero recomeçar**  
-Clique duplo em `desinstalar.bat` → opção **[1] Remoção segura** → rode `instalar.bat` de novo. Suas conversas e notas são preservadas.
+Abra pelo atalho e aperte **Ctrl+Shift+R** no navegador. A identidade é conferida e reaplicada a cada início.
+</details>
 
-**Esqueci minha senha**  
-Em `%LOCALAPPDATA%\Programs\Nous`:
-```powershell
-python tools\reset-password.py --email seuemail@exemplo.com
-```
+<details>
+<summary><b>O chat não responde</b></summary>
 
----
+Abra o Nous pelo atalho, que liga todos os serviços. Se continuar, use **Liberar a placa de vídeo** no painel e tente de novo. **Ferramentas › Diagnóstico** mostra o que está parado.
+</details>
+
+<details>
+<summary><b>O Nous Code não abre</b></summary>
+
+Instale o Node.js (`winget install OpenJS.NodeJS.LTS`) e rode o `instalar.bat` de novo: ele baixa o editor e cria o atalho **Nous Code**.
+</details>
+
+<details>
+<summary><b>Quero a tela de login de volta</b></summary>
+
+Crie um arquivo vazio chamado `.exigir_login` em `%USERPROFILE%\NousData` e abra o Nous de novo. A sua conta volta ao e-mail e à senha de antes. Para tirar o login outra vez, apague o arquivo.
+</details>
 
 ## Desinstalar
 
-Em **Configurações → Aplicativos → Aplicativos instalados**, procure **Nous** e clique em **Desinstalar** (ou dê clique duplo em `desinstalar.bat`, em `%LOCALAPPDATA%\Programs\Nous`):
+Em **Configurações → Aplicativos → Aplicativos instalados**, procure **Nous** e clique em **Desinstalar**:
+- **Remoção segura** (recomendada): remove o app e o ambiente Python e preserva as conversas, as notas, o Ollama e o Python.
+- **Remover tudo**: apaga também os dados e desinstala o Ollama e o Python, só se foi o Nous que os instalou.
 
-- **[1] Remoção segura** *(recomendada)* — remove o app e o ambiente Python. Preserva conversas, notas, Ollama e Python.
-- **[2] Remover tudo** — apaga também as conversas e desinstala Ollama/Python, **somente** se foi o Nous que os instalou. Programas que já existiam não são tocados.
+## Para desenvolvedores
 
----
+### Arquitetura
 
-## Estrutura do projeto
+O Nous é uma camada de produto sobre o Open WebUI 0.9.6 (versão fixada no instalador). Ele junta a identidade visual, injetada por um `loader.js` com os painéis, filtros e pipes registrados no banco e serviços locais pequenos, todos em `127.0.0.1`:
+
+| Porta | Serviço | Pasta |
+|---|---|---|
+| 8080 | Open WebUI com a identidade do Nous | `branding/`, `ajustes/` |
+| 8990 | Monitor: Loja, Diagnóstico, Documentos, Galeria, Editor, Formulários, Comparar, relatórios | `monitor/`, `documentos/` |
+| 8991, 8992 | Indexadores de arquivos e do histórico | `files/`, `history/` |
+| 8993 | Memória e personas | `memory/` |
+| 8994 | Voz (Piper) | `voice/` |
+| 8995 | E-mail | `email/` |
+| 8996 | Agenda, lembretes e tarefas | `agenda/` |
+| 8997 | Habilidades | `skills/` |
+| 8998 | Nous Code (IDE e agente, Node) | `code/` |
+| 8188 | ComfyUI (opcional) | `images/` |
+| 11434 | Ollama | |
+
+O lançador (`launchers/start-nous.ps1`) sobe tudo escondido e registra filtros e ajustes a cada início. As operações são idempotentes: rodar de novo não quebra nada.
+
+### Estrutura
 
 ```
-Nous WebUI/
-├─ branding/    identidade: logo, tema Branco & Ouro, loader.js (painéis), aplicador
-├─ voice/       Voz em PT-BR: servidor Piper TTS + registro STT/TTS
-├─ cloud/       Nous Nuvem: registro opt-in da API NVIDIA NIM
-├─ files/       RAG de arquivos locais: indexador + busca híbrida
-├─ history/     RAG do histórico de conversas
-├─ images/      geração de imagem: instalador ComfyUI, modelos Flux, Pipe do chat
-├─ memory/      memória pessoal: filtro, API do painel, personas
-├─ monitor/     painel de recursos + Loja de Modelos (serviço local, porta 8990)
-├─ launchers/   iniciar/parar em segundo plano + build do .exe
-├─ installer/   instalador de 1 clique + script do Inno Setup
-├─ search/      busca na web + Pipe de Pesquisa Profunda (SearXNG + Ollama)
-├─ evaluation/  Comparar Modelos: registro do Arena (comparação cega A/B)
-├─ email/       Assistente de Email: cliente IMAP/SMTP + API REST (porta 8995)
-├─ agenda/      notas, lembretes, calendário e tarefas agendadas (porta 8996)
-├─ skills/      habilidades: filtro do chat + API do painel (porta 8997)
-├─ utilidades/  filtros do chat: YouTube, clima, OCR/boletos, compactar, comandos, guarda
-├─ documentos/  Documentos (IA com sugestões, versões, Word/PDF) e formulários PDF
-├─ ajustes/     padrões do Open WebUI para o Nous (português, embeddings, nativos escondidos)
-├─ tools/       análise de capacidade, backup, reset de senha, health check
-└─ docs/        roadmap, screenshots
+branding/    identidade, loader.js e módulos dos painéis (branding/modules)
+code/        Nous Code: agente (agente.ts), ferramentas, servidor e o IDE (code/ide)
+monitor/     Loja de modelos, diagnóstico e APIs dos painéis
+memory/      memória pessoal: filtro, API e personas
+documentos/  Documentos (sugestões, versões, Word/PDF) e formulários PDF
+agenda/      notas, lembretes, calendário e tarefas agendadas
+email/       cliente IMAP/SMTP e API
+search/      busca na web e Pesquisa Profunda
+skills/      habilidades
+utilidades/  filtros do chat: YouTube, clima, OCR, compactação, comandos
+files/       busca nos seus arquivos
+history/     busca no histórico de conversas
+images/      ComfyUI, Flux e pipe de imagem
+voice/       voz em português
+cloud/       Nous Nuvem (NVIDIA NIM)
+ajustes/     padrões do Open WebUI e acesso sem login
+evaluation/  comparação de modelos
+installer/   instalador, desinstalador e Inno Setup
+launchers/   iniciar e parar em segundo plano
+tools/       lint, health check, backup, análise de hardware
 ```
 
-## Uso avançado
-
-<details>
-<summary>Opções para desenvolvedores</summary>
-
-### Verificação de hardware
+### Testes e lint
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File tools\check-system.ps1
+tools\lint.ps1            # PowerShell 5.1, Python, JSON, JavaScript e os tipos e testes do Nous Code
+cd code; npm install; npm test
 ```
 
-Imprime **CAPAZ (GPU)**, **CAPAZ (CPU)** ou **INCAPAZ**, com detalhes e recomendações.
+O lint roda no CI a cada push. Os testes do Nous Code usam um Ollama de mentira para verificar as políticas do agente sem depender de modelo.
 
 ### Instalação por linha de comando
 
@@ -341,79 +337,39 @@ Imprime **CAPAZ (GPU)**, **CAPAZ (CPU)** ou **INCAPAZ**, com detalhes e recomend
 powershell -ExecutionPolicy Bypass -File installer\install-nous.ps1 -WithModel -Model qwen3:14b
 ```
 
-Idempotente. `-WithImages` instala também o motor de imagem; `-Force` reinstala. A versão do Open WebUI é **pinada** no script (`$OPENWEBUI_PIN`) — atualize o pin conscientemente após testar.
+`-WithImages` instala também o motor de imagem e `-Force` reinstala. O instalador `.exe` sai de `installer\nous-setup.iss`, com `ISCC.exe`.
 
-### Instalação manual
+As rotas de cada serviço estão documentadas no topo do arquivo correspondente, por exemplo `monitor/nous_monitor.py`, `agenda/nous_agenda_api.py` e `code/servidor.ts`.
 
-```powershell
-# 1) Ollama  →  https://ollama.com
-# 2) Python 3.11 + Open WebUI
-py -3.11 -m venv $env:USERPROFILE\open-webui
-& $env:USERPROFILE\open-webui\Scripts\python.exe -m pip install open-webui
-# 3) Identidade Nous
-& $env:USERPROFILE\open-webui\Scripts\python.exe branding\apply_branding.py
-# 4) Iniciar
-powershell -ExecutionPolicy Bypass -File launchers\start-nous.ps1
-```
+## Roadmap e contribuição
 
-### Ferramentas
-
-```powershell
-tools\backup-data.ps1                                    # backup dos dados, mantém 10
-tools\health-check.ps1                                   # verificação de integridade
-python tools\reset-password.py --email voce@exemplo.com  # redefinir senha
-```
-
-### Serviço da Loja de Modelos (porta 8990)
-
-```
-GET  /stats        VRAM + modelos carregados
-GET  /hardware     GPU, VRAM, RAM e tier da máquina
-GET  /catalog      catálogo curado, ordenado para esta máquina
-POST /pull         {"model":"tag"} — inicia download em background
-GET  /pull/status  ?model=tag — progresso em tempo real
-POST /unload       descarrega modelos da VRAM
-GET  /research     biblioteca de relatórios da Pesquisa Profunda (/research/view?id=)
-POST /image/remove-bg  imagem -> PNG sem fundo (editor de fotos)
-GET  /installed    modelos instalados no Ollama (o painel não fala com o Ollama direto)
-GET  /gallery      imagens geradas (/gallery/image/{id}, /gallery/delete, /gallery/meta)
-GET  /diag         Diagnóstico: cada parte do Nous com ✓/✗
-POST /pdf/fields   formulários PDF (/pdf/fill, /pdf/autofill, /pdf/signature)
-POST /compare/run  Comparar modelos (/compare/vote, /compare/score, /compare/reset)
-```
-
-Agenda (8996) e Habilidades (8997) documentam as rotas no topo de
-`agenda/nous_agenda_api.py` e `skills/nous_skills_api.py`.
-
-### Instalador .exe (Inno Setup)
-
-`installer\nous-setup.iss` gera `dist\Nous-Setup.exe` com `ISCC.exe installer\nous-setup.iss`.
-
-</details>
-
----
-
-<div align="center">
-<img src="docs/screenshots/wallpaper.png" width="860" alt="Nous — Your Personal AI Sovereign">
-</div>
-
----
+Os próximos passos estão no [ROADMAP](docs/ROADMAP.md). Issues e pull requests são bem-vindos: veja o [CONTRIBUTING](CONTRIBUTING.md).
 
 ## Construído sobre
 
-[Open WebUI](https://github.com/open-webui/open-webui) ·
-[Ollama](https://ollama.com) ·
-[ComfyUI](https://github.com/comfyanonymous/ComfyUI) ·
-[Flux.1 Schnell](https://huggingface.co/black-forest-labs/FLUX.1-schnell) (Apache-2.0) ·
-[U²-Net](https://github.com/xuebinqin/U-2-Net) (Apache-2.0, modelo `u2netp` publicado pelo [rembg](https://github.com/danielgatis/rembg)) ·
-[RapidOCR](https://github.com/RapidAI/RapidOCR) (Apache-2.0) ·
-[pypdf](https://github.com/py-pdf/pypdf) (BSD-3) ·
-[Granite Embedding](https://huggingface.co/ibm-granite/granite-embedding-278m-multilingual) (Apache-2.0) ·
-[ntfy](https://ntfy.sh) ·
-[Open-Meteo](https://open-meteo.com).  
-A estimativa de velocidade da Loja foi inspirada na ideia do [llmfit](https://github.com/AlexsJones/llmfit) (MIT).  
-Marcas pertencem aos seus respectivos projetos.
+**Base:**
+- [Open WebUI](https://github.com/open-webui/open-webui)
+- [Ollama](https://ollama.com)
+- [Monaco Editor](https://github.com/microsoft/monaco-editor) (MIT)
+- [xterm.js](https://github.com/xtermjs/xterm.js) (MIT)
+- [node-pty](https://github.com/microsoft/node-pty) (MIT)
+- [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (MIT): o agente do Nous Code adapta o contrato das ferramentas, os prompts e as políticas dele ([detalhes](code/THIRD_PARTY_NOTICES.md))
+- [typescript-language-server](https://github.com/typescript-language-server/typescript-language-server) (Apache-2.0) e [Pyright](https://github.com/microsoft/pyright) (MIT), para a navegação de código
+
+**Modelos e bibliotecas:**
+- [ComfyUI](https://github.com/comfyanonymous/ComfyUI)
+- [Flux.1 Schnell](https://huggingface.co/black-forest-labs/FLUX.1-schnell) (Apache-2.0)
+- [U²-Net](https://github.com/xuebinqin/U-2-Net) (Apache-2.0, modelo publicado pelo [rembg](https://github.com/danielgatis/rembg))
+- [RapidOCR](https://github.com/RapidAI/RapidOCR) (Apache-2.0)
+- [pypdf](https://github.com/py-pdf/pypdf) (BSD-3)
+- [Granite Embedding](https://huggingface.co/ibm-granite/granite-embedding-278m-multilingual) (Apache-2.0)
+
+**Serviços:**
+- [ntfy](https://ntfy.sh)
+- [Open-Meteo](https://open-meteo.com)
+
+A estimativa de velocidade da Loja foi inspirada no [llmfit](https://github.com/AlexsJones/llmfit) (MIT). As marcas pertencem aos seus projetos.
 
 ## Licença
 
-[MIT](LICENSE) © Nous. Contribuições são bem-vindas — abra uma issue ou um PR.
+[MIT](LICENSE)

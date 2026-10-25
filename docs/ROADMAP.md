@@ -57,6 +57,21 @@ sem conhecimento tecnico, com tudo acontecendo em segundo plano.
   Face (tamanho e encaixe conferidos antes) e simulacao de outra maquina;
   relatorios da pesquisa em PDF/Word.
 
+### v2.10 — Sem login
+- Abre direto no chat (a conta unica vira a conta fixa do Open WebUI, mesmo
+  id, conversas preservadas; 2+ contas ou `NousData\.exigir_login` mantem o
+  login e desfazem a conversao). Tela inicial com saudacao, dica e "Conversa
+  privada" (chat temporario que o filtro de memoria ignora).
+- Painel "Seu Nous" a' direita no lugar do card Recursos e dos botoes
+  flutuantes: anel de uso da placa, agenda, memorias e ferramentas.
+- Nous Code: IDE com agente de programacao local (code/), aprovacao com diff,
+  desfazer, feito para modelos pequenos. O harness adapta o DeepSeek Harness
+  (MIT): contrato das ferramentas, modo plano, objetivo com rodadas, jobs,
+  compactacao, skills, LSP, MCP, lembretes e provedores compativeis com
+  OpenAI (LM Studio, llama.cpp, vLLM). Proximos passos: diagnosticos do LSP
+  depois de editar, worktrees do Git para tarefas isoladas, subagente que
+  tambem edita, instalar o Node pelo instalador.
+
 ### v2.6 — Correcoes para o primeiro acesso
 - Instalador que nao trava nem mente ("Pronto!" so' quando deu certo), app em
   `%LOCALAPPDATA%\Programs\Nous`, entrada em Aplicativos instalados.
