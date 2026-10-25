@@ -49,6 +49,43 @@ if ($py) {
     $code = "import ast,io,json,sys`nbad=0`nfor p in sys.argv[1:]:`n    try:`n        s=io.open(p,encoding='utf-8').read()`n        json.loads(s) if p.endswith('.json') else ast.parse(s,p)`n    except Exception as e:`n        print('  [FALHA] %s: %s' % (p,e)); bad+=1`nsys.exit(1 if bad else 0)"
     & $py.Source -c $code @pyFiles @jsonFiles
     if ($LASTEXITCODE -ne 0) { $fail++ }
+
+    # Agenda: testes da sincronizacao CalDAV (servidor de mentira local; pulam sozinhos
+    # se faltar requests/dateutil, e usam o Radicale se ele estiver instalado)
+    $agTests = Join-Path $root "agenda/tests"
+    if (Test-Path $agTests) {
+        Write-Host "== Agenda (CalDAV)" -ForegroundColor Cyan
+        $ErrorActionPreference = "Continue"   # o unittest escreve no stderr
+        $out = & $py.Source -m unittest discover -s $agTests 2>&1 | Out-String
+        $ErrorActionPreference = "Stop"
+        if ($LASTEXITCODE -ne 0) { Write-Host $out; Bad "agenda/tests: testes falharam" }
+    }
+    # Assistente de E-mail: IMAP/SMTP de mentira local (email/testes), sem rede e sem Ollama.
+    # Precisa de aiohttp e requests (o venv do Open WebUI tem); sem eles, so' avisa.
+    if (Test-Path (Join-Path $root "email\testes")) {
+        & $py.Source -c "import aiohttp, requests" 2>$null
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "== Assistente de E-mail (servidor falso)" -ForegroundColor Cyan
+            $old = $ErrorActionPreference; $ErrorActionPreference = "Continue"
+            $out = & $py.Source -W ignore -m unittest discover -s email/testes -t email/testes 2>&1 | Out-String
+            $ok = $LASTEXITCODE -eq 0
+            $ErrorActionPreference = $old
+            if (-not $ok) { Write-Host $out; Bad "email/testes: testes falharam" }
+        } else { Write-Host "  (testes do e-mail pulados: faltam aiohttp/requests no Python)" -ForegroundColor DarkGray }
+    }
+
+    # Usar no celular: portao com Open WebUI e servicos de mentira (sem rede, sem Ollama).
+    if (Test-Path (Join-Path $root "celular/testes")) {
+        & $py.Source -c "import aiohttp" 2>$null
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "== Usar no celular (portao de mentira)" -ForegroundColor Cyan
+            $old = $ErrorActionPreference; $ErrorActionPreference = "Continue"
+            $out = & $py.Source -W ignore -m unittest discover -s celular/testes -t celular/testes 2>&1 | Out-String
+            $ok = $LASTEXITCODE -eq 0
+            $ErrorActionPreference = $old
+            if (-not $ok) { Write-Host $out; Bad "celular/testes: testes falharam" }
+        } else { Write-Host "  (testes do celular pulados: falta aiohttp no Python)" -ForegroundColor DarkGray }
+    }
 }
 
 $node = Get-Command node -ErrorAction SilentlyContinue

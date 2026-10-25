@@ -8,7 +8,7 @@
 (function () {
 	'use strict';
 
-	var API = 'http://127.0.0.1:8998';
+	var API = window.NousUrl(8998);
 	var UI = window.NousUI || {};
 
 	function open(pasta) {
@@ -26,6 +26,7 @@
 	function ensureButton() {
 		var body = document.getElementById('nous-mon-body');
 		if (!body || document.getElementById('nous-code-open')) return;
+		if (window.NousUrl.noCelular) return;   /* pelo celular o Nous Code nao existe: ele roda comandos no computador */
 		var b = document.createElement('button');
 		b.id = 'nous-code-open';
 		b.type = 'button';

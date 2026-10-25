@@ -106,8 +106,11 @@ try {
         -TimeoutSec 20 `
         -ErrorAction Stop
 
+    # a leitura funcionou; se o servidor de envio recusou, a API devolve um aviso
+    $aviso = ""
+    if ($result.aviso) { $aviso = "ATENCAO: $($result.aviso)`n`n" }
     [System.Windows.Forms.MessageBox]::Show(
-        "Email conectado com sucesso!`n`nConta: $($result.user)`n`n" +
+        "Email conectado com sucesso!`n`nConta: $($result.user)`n`n" + $aviso +
         "Abra o painel Email no Nous (ícone de envelope) para ver sua caixa de entrada.`n`n" +
         "LEMBRETE: O conteúdo dos seus emails é processado apenas pelo modelo de IA local — " +
         "nada sai da sua máquina.",
@@ -127,10 +130,10 @@ try {
     }
 
     $friendly = switch -Wildcard ($errMsg) {
-        "*rejeitada*"      { "Credenciais rejeitadas pelo servidor de email.`nVerifique se a senha de app está correta e se o IMAP está habilitado na sua conta." }
-        "*inacessível*"    { "Não foi possível alcançar o servidor.`nVerifique sua conexão com a internet." }
+        "*recusou o e-mail*" { $errMsg + "`nVerifique se o IMAP está habilitado na sua conta." }
+        "*Não consegui conectar*" { $errMsg + "`nVerifique sua conexão com a internet." }
         "*Não reconheço*"  { "Provedor de email não reconhecido automaticamente.`nUse conectar-email.ps1 com servidores manuais (contate suporte)." }
-        default            { "Erro: $errMsg" }
+        default            { $errMsg }
     }
 
     [System.Windows.Forms.MessageBox]::Show(

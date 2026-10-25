@@ -31,6 +31,9 @@ import sqlite3
 import argparse
 from pathlib import Path
 
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "ajustes"))
+from config_db import obter, definir, apagar  # noqa: E402
+
 TTS_SERVER_URL  = "http://127.0.0.1:8994/v1"
 TTS_API_KEY     = "nous-local"
 DEFAULT_VOICE   = "pt_BR-faber-medium"
@@ -110,33 +113,10 @@ def table_exists(cx, name):
     return row is not None
 
 
-def read_config(cx):
-    row = cx.execute(
-        "SELECT data FROM config ORDER BY id DESC LIMIT 1"
-    ).fetchone()
-    if not row:
-        return {}
-    raw = row[0]
-    return json.loads(raw) if isinstance(raw, str) else raw
-
-
-def write_config(cx, data):
-    row = cx.execute("SELECT id FROM config ORDER BY id DESC LIMIT 1").fetchone()
-    # Colunas DATETIME do Open WebUI esperam string ISO, NAO epoch inteiro
-    # (gravar int faz o servidor crashar no boot com fromisoformat).
-    now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    payload = json.dumps(data, ensure_ascii=False)
-    if row:
-        cx.execute(
-            "UPDATE config SET data=?, updated_at=? WHERE id=?",
-            (payload, now, row[0]),
-        )
-    else:
-        cx.execute(
-            "INSERT INTO config (data, version, created_at, updated_at) VALUES (?,0,?,?)",
-            (payload, now, now),
-        )
-    cx.commit()
+# Chaves de voz que o Nous grava (config_db.py cuida dos dois formatos da tabela).
+VOICE_KEYS = ("audio.stt.engine", "audio.stt.whisper_model", "audio.tts.engine",
+              "audio.tts.openai.api_base_url", "audio.tts.openai.api_key",
+              "audio.tts.voice", "audio.tts.model")
 
 
 # --------------------------------------------------------------------------
@@ -144,9 +124,6 @@ def write_config(cx, data):
 # --------------------------------------------------------------------------
 
 def register(cx, voice_name, has_gpu):
-    cfg = read_config(cx)
-    audio = cfg.setdefault("audio", {})
-
     # STT — Whisper local em portugues.
     # Usamos "base" por padrao: o Open WebUI baixa o modelo de forma PREGUICOSA
     # na primeira transcricao. "medium" (~1.5 GB) costuma falhar/demorar nesse
@@ -154,32 +131,29 @@ def register(cx, voice_name, has_gpu):
     # ja vem no cache da maioria das instalacoes e e' suficiente para comandos de
     # voz em PT-BR. Quem quiser mais qualidade pode setar NOUS_WHISPER_MODEL=small
     # (ou medium) — mas precisa aguardar o download na 1a vez.
-    stt = audio.setdefault("stt", {})
-    stt["engine"] = "whisper"
-    stt["whisper_model"] = os.environ.get("NOUS_WHISPER_MODEL", "base")
-    # WHISPER_LANGUAGE nao esta no JSON de config (e' env-only na 0.9.6),
-    # mas guardamos aqui para referencia; o launcher pode setar WHISPER_LANGUAGE=pt
-    stt["language"] = "pt"
-
-    # TTS — servidor Piper local via contrato OpenAI
-    tts = audio.setdefault("tts", {})
-    tts["engine"] = "openai"
-    tts_openai = tts.setdefault("openai", {})
-    tts_openai["api_base_url"] = TTS_SERVER_URL
-    tts_openai["api_key"]      = TTS_API_KEY
-    tts["voice"] = voice_name
-    tts["model"] = "piper"
-
-    cfg["audio"] = audio
-    write_config(cx, cfg)
-    print(f"[NousVoz] STT Whisper {stt['whisper_model']} + TTS Piper {voice_name} registrados.")
+    # O idioma do Whisper (WHISPER_LANGUAGE=pt) e' so' variavel de ambiente, ate
+    # na 0.12: quem a poe e' o launcher.
+    whisper = os.environ.get("NOUS_WHISPER_MODEL", "base")
+    definir(cx, {
+        "audio.stt.engine": "whisper",
+        "audio.stt.whisper_model": whisper,
+        # TTS — servidor Piper local via contrato OpenAI
+        "audio.tts.engine": "openai",
+        "audio.tts.openai.api_base_url": TTS_SERVER_URL,
+        "audio.tts.openai.api_key": TTS_API_KEY,
+        "audio.tts.voice": voice_name,
+        "audio.tts.model": "piper",
+    })
+    cx.commit()
+    print(f"[NousVoz] STT Whisper {whisper} + TTS Piper {voice_name} registrados.")
 
 
 def remove(cx):
-    cfg = read_config(cx)
-    if "audio" in cfg:
-        cfg["audio"] = {}
-        write_config(cx, cfg)
+    # So' desfaz o que o Nous gravou (TTS apontando para o servidor Piper local);
+    # voz que o usuario configurou por conta propria fica como esta'.
+    if obter(cx, "audio.tts.openai.api_base_url") == TTS_SERVER_URL:
+        apagar(cx, VOICE_KEYS)
+        cx.commit()
         print("[NousVoz] Config de voz removida (assets ausentes).")
     else:
         print("[NousVoz] Nenhuma config de voz para remover.")

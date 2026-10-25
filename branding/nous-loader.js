@@ -11,6 +11,23 @@
         src/lib/components/chat/Settings/General.svelte - para manter 100%
         de compatibilidade e persistencia via localStorage.theme).
    ===================================================================== */
+/* Endereco dos servicos do Nous (monitor 8990, memoria 8993, e-mail 8995, agenda
+ * 8996, habilidades 8997, Nous Code 8998). No computador e' o de sempre
+ * (http://127.0.0.1:PORTA). Pelo celular ("Usar no celular", branding/modules/celular.js
+ * e celular/nous_celular.py) a pagina vem do portao e os servicos ficam na MESMA
+ * origem, em /_nous/PORTA: o celular nao enxerga o 127.0.0.1 do computador.
+ * NousUrl.noCelular e' true la': o que so' faz sentido no computador (Nous Code,
+ * controle do celular) se esconde. */
+(function () {
+	'use strict';
+	var h = location.hostname;
+	var direto = h === 'localhost' || h === '127.0.0.1' || h === '[::1]' || h === '::1';
+	window.NousUrl = function (porta) {
+		return direto ? 'http://127.0.0.1:' + porta : location.origin + '/_nous/' + porta;
+	};
+	window.NousUrl.noCelular = !direto;
+})();
+
 (function () {
 	'use strict';
 
@@ -97,7 +114,7 @@
 	}
 
 	/* ===================== Painel de recursos (Nous Monitor) ===================== */
-	var MON_URL = 'http://127.0.0.1:8990';
+	var MON_URL = window.NousUrl(8990);
 	var monEl = null, monModels = null, monBtn = null, monBars = {};
 	var monCollapsed = false;
 	try { monCollapsed = localStorage.getItem('nous-monitor-collapsed') === '1'; } catch (e) {}
@@ -405,7 +422,7 @@
 	}
 
 	/* ====================== Painel "O que o Nous sabe" ====================== */
-	var MEM_URL    = 'http://127.0.0.1:8993';
+	var MEM_URL    = window.NousUrl(8993);
 	var memBtnEl   = null;
 	var memPanelEl = null;
 	var memOpen    = false;
@@ -1564,7 +1581,7 @@
 	 * mostra uma boas-vindas com o modelo recomendado e um botao unico.
 	 * Some sozinho (para sempre) depois do primeiro download.
 	 * ======================================================================= */
-	var wizEl = null, wizShown = false, wizTimer = null;
+	var wizEl = null, wizShown = false, wizTimer = null, wizBg = false, wizPronto = false;
 
 	function wizCheck() {
 		if (wizShown || storeOpen || !onHome() || !document.body) return;
@@ -1582,9 +1599,15 @@
 
 	function _wizSkip() {
 		try { sessionStorage.setItem('nous-wizard-skip', '1'); } catch (e) {}
+		var baixando = !!(wizEl && wizEl.querySelector('#nous-wiz-fill')) && !wizPronto;
 		if (wizEl) wizEl.remove();
 		wizEl = null;
-		if (wizTimer) { clearTimeout(wizTimer); wizTimer = null; }
+		/* o download continua no monitor: segue de olho e avisa quando terminar */
+		if (baixando) {
+			wizBg = true;
+			if (window.NousUI && window.NousUI.toast) window.NousUI.toast('O download continua. Avisamos quando terminar; para acompanhar, abra Modelos no painel Seu Nous.', { tipo: 'info', ms: 6500 });
+		} else if (wizTimer) { clearTimeout(wizTimer); wizTimer = null; }
+		var b = document.getElementById('nous-pp-aj'); if (b) b.focus();
 	}
 
 	function showWizard() {
@@ -1593,20 +1616,24 @@
 			.then(function (r) { return r.json(); })
 			.then(function (data) {
 				var models = (data && data.models) || [];
-				var rec = null;
+				var rec = null, baixando = null;
 				models.forEach(function (m) {
+					if (!baixando && m.pull && m.pull.status === 'baixando') baixando = m;
 					if (!rec && m.fit === 'recomendado' && !m.installed) rec = m;
 				});
+				/* a pagina recarregou no meio do download: volta direto para o progresso */
+				if (baixando) rec = baixando;
 				if (!rec) rec = models.length ? models[0] : null;
-				if (rec) renderWizard(rec);
+				if (rec) renderWizard(rec, !!baixando);
 				else wizShown = false; /* loja offline: tenta de novo no proximo ciclo */
 			})
 			.catch(function () { wizShown = false; });
 	}
 
-	function renderWizard(rec) {
+	function renderWizard(rec, retomar) {
 		injectStoreStyle();
 		if (wizEl) wizEl.remove();
+		wizPronto = false; wizBg = false;
 		wizEl = document.createElement('div');
 		wizEl.id = 'nous-wiz-ov';
 		wizEl.setAttribute('style',
@@ -1614,33 +1641,75 @@
 			'display:flex;align-items:center;justify-content:center;backdrop-filter:blur(5px);' +
 			'font-family:Inter,system-ui,sans-serif;color:#eee');
 		wizEl.innerHTML =
-			'<div style="width:430px;max-width:92vw;background:rgba(18,18,22,.98);' +
-			'border:1px solid rgba(200,150,46,.45);border-radius:18px;padding:28px 26px;' +
+			'<div id="nous-wiz-box" role="dialog" aria-modal="true" aria-labelledby="nous-wiz-tit" style="width:520px;max-width:94vw;max-height:94vh;overflow:auto;' +
+			'background:rgba(18,18,22,.98);border:1px solid rgba(200,150,46,.45);border-radius:18px;padding:26px 24px;' +
 			'box-shadow:0 20px 60px rgba(0,0,0,.6);text-align:center">' +
-			'<img src="/static/favicon.png" alt="" style="width:58px;height:58px;margin-bottom:10px">' +
-			'<div style="font-size:19px;font-weight:700;color:#e7c069;letter-spacing:.04em;margin-bottom:6px">' +
-			'Bem-vindo ao Nous</div>' +
-			'<div style="font-size:13px;opacity:.8;line-height:1.5;margin-bottom:18px">' +
-			'Sua IA particular esta quase pronta. Falta um passo:<br>instalar o modelo de inteligencia — ' +
-			'gratuito, direto na sua maquina.</div>' +
-			'<div class="nous-store-card nous-rec" style="text-align:left;margin-bottom:16px">' +
+			'<img id="nous-wiz-logo" src="/static/favicon.png" alt="" style="display:block;margin:0 auto 10px;width:58px;height:58px">' +
+			'<h2 id="nous-wiz-tit" style="margin:0 0 8px;font-size:19px;font-weight:700;color:#e7c069;letter-spacing:.04em">' +
+			'Bem-vindo ao Nous</h2>' +
+			'<div id="nous-wiz-texto" style="font-size:13.5px;opacity:.88;line-height:1.55;margin-bottom:16px">' +
+			'O Nous é uma IA que mora no seu computador. Você conversa escrevendo, como num aplicativo de mensagens, ' +
+			'e ela ajuda com textos, contas, planos e dúvidas. Nada do que você escreve sai daqui.<br><br>' +
+			'Falta um passo: baixar o "cérebro" dela, que chamamos de <b style="color:#f0d9a0">modelo</b>. ' +
+			'É grátis e leva alguns minutos, conforme a sua internet.</div>' +
+			'<div class="nous-store-card nous-rec" style="text-align:left;margin-bottom:14px">' +
 			'<div class="nous-store-top"><span class="nous-store-name">' + _esc(rec.name) + '</span>' +
-			'<span class="nous-store-badge nous-b-rec">Recomendado para sua maquina</span>' +
+			'<span class="nous-store-badge nous-b-rec">Recomendado para sua máquina</span>' +
 			(rec.vision ? '<span class="nous-store-badge nous-b-vis">Entende imagens</span>' : '') +
 			'</div>' +
 			'<div class="nous-store-desc">' + _esc(rec.desc) + ' (~' + rec.download_gb + ' GB de download)</div>' +
-			'<div id="nous-wiz-zone" class="nous-store-row"></div>' +
+			'<div id="nous-wiz-zone" class="nous-store-row" role="status" aria-live="polite"></div>' +
 			'</div>' +
-			'<div style="display:flex;gap:14px;justify-content:center;font-size:12px">' +
-			'<a id="nous-wiz-more" href="javascript:void(0)" style="color:#c8962e;text-decoration:none">ver outros modelos</a>' +
-			'<a id="nous-wiz-skip" href="javascript:void(0)" style="color:#777;text-decoration:none">agora nao</a>' +
+			'<div id="nous-wiz-lic" style="display:none;text-align:left;margin:0 0 14px;padding:14px 2px 0;border-top:1px solid rgba(200,150,46,.25)"></div>' +
+			'<div style="display:flex;gap:16px;justify-content:center;font-size:12.5px">' +
+			'<a id="nous-wiz-more" href="javascript:void(0)" role="button" style="color:#c8962e;text-decoration:none;padding:4px">ver outros modelos</a>' +
+			'<a id="nous-wiz-skip" href="javascript:void(0)" role="button" style="color:#999;text-decoration:none;padding:4px">agora não</a>' +
 			'</div></div>';
 		document.body.appendChild(wizEl);
 		wizEl.querySelector('#nous-wiz-more').addEventListener('click', function () {
 			_wizSkip(); openStore();
 		});
 		wizEl.querySelector('#nous-wiz-skip').addEventListener('click', _wizSkip);
-		_wizIdle(rec);
+		/* teclado: os dois links respondem a Enter/Espaco e o Esc fecha, como "agora nao" */
+		['#nous-wiz-more', '#nous-wiz-skip'].forEach(function (s) {
+			wizEl.querySelector(s).addEventListener('keydown', function (e) {
+				if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); e.target.click(); }
+			});
+		});
+		wizEl.addEventListener('keydown', function (e) {
+			if (e.key === 'Escape') { e.stopPropagation(); _wizSkip(); return; }
+			if (e.key !== 'Tab') return;
+			var fs = [].filter.call(wizEl.querySelectorAll('button:not(:disabled), a[role=button]'), function (b) { return b.offsetParent !== null; });
+			if (!fs.length) return;
+			var a = document.activeElement, p = fs[0], u = fs[fs.length - 1];
+			if (e.shiftKey && (a === p || !wizEl.contains(a))) { u.focus(); e.preventDefault(); }
+			else if (!e.shiftKey && (a === u || !wizEl.contains(a))) { p.focus(); e.preventDefault(); }
+		});
+		if (retomar) { _wizTextoBaixando(); _wizProgress(rec); _wizLicoes(); }
+		else _wizIdle(rec);
+		var b0 = wizEl.querySelector('#nous-wiz-zone button'); if (b0) b0.focus();
+	}
+
+	/* licoes curtas enquanto baixa (primeiros.js); quem ja' usava o Nous ou tocou em "Pular dicas" nao ve' */
+	function _wizLicoes() {
+		var host = wizEl && wizEl.querySelector('#nous-wiz-lic');
+		if (!host || !window.NousPrimeiros || !window.NousPrimeiros.licoes || !window.NousPrimeiros.deveMostrarLicoes()) return;
+		host.style.display = '';
+		function fim(txt) {
+			host.innerHTML = '<div style="font-size:12.5px;opacity:.8;text-align:center;line-height:1.5">' + txt +
+				' As lições ficam no botão <b style="color:#e7c069">?</b> quando você quiser rever.</div>';
+		}
+		window.NousPrimeiros.licoes(host, { pular: true, aoFim: function () { fim('Lições concluídas.'); },
+			aoPular: function () { fim('Tudo bem, sem lições.'); } });
+	}
+	function _wizTextoBaixando() {
+		var t = wizEl && wizEl.querySelector('#nous-wiz-texto');
+		if (!t) return;
+		var tem = window.NousPrimeiros && window.NousPrimeiros.deveMostrarLicoes && window.NousPrimeiros.deveMostrarLicoes();
+		var lg = wizEl.querySelector('#nous-wiz-logo');
+		if (lg && tem) lg.style.display = 'none';   /* mais espaco para as licoes */
+		t.innerHTML = tem ? 'Enquanto o modelo baixa, leia estas lições curtas, no seu ritmo. O download continua sozinho.'
+			: 'O download continua sozinho. Pode deixar esta janela aberta: avisamos quando terminar.';
 	}
 
 	function _wizIdle(rec) {
@@ -1648,12 +1717,14 @@
 		if (!zone) return;
 		zone.innerHTML =
 			'<button class="nous-store-btn" type="button" style="width:100%;padding:9px;font-size:13px">' +
-			'Baixar e comecar</button>';
+			'Baixar e começar</button>';
 		zone.querySelector('button').addEventListener('click', function () { _wizStart(rec); });
 	}
 
 	function _wizStart(rec) {
+		_wizTextoBaixando();
 		_wizProgress(rec);
+		_wizLicoes();
 		startPull(rec.tag).then(function (ok) {
 			if (!ok) _wizError(rec, 'Não consegui iniciar o download. Confira a internet e tente de novo.');
 		});
@@ -1662,17 +1733,19 @@
 	function _wizProgress(rec) {
 		var zone = wizEl && wizEl.querySelector('#nous-wiz-zone');
 		if (!zone) return;
+		wizPronto = false;
 		zone.innerHTML =
 			'<div class="nous-store-prog">' +
 			'<div class="nous-mon-track"><div class="nous-mon-fill" id="nous-wiz-fill" style="width:0%"></div></div>' +
-			'<span class="nous-store-ptxt" id="nous-wiz-ptxt">Iniciando o download... ' +
-			'Pode deixar esta janela aberta — avisamos quando terminar.</span></div>';
+			'<span class="nous-store-ptxt" id="nous-wiz-ptxt">Iniciando o download...</span></div>';
 		var none = 0;
+		if (wizTimer) { clearTimeout(wizTimer); wizTimer = null; }
 		function poll() {
+			if (!wizEl && !wizBg) return;
 			fetch(MON_URL + '/pull/status?model=' + encodeURIComponent(rec.tag), { cache: 'no-store' })
 				.then(function (r) { return r.json(); })
 				.then(function (st) {
-					if (!wizEl) return;
+					if (!wizEl && !wizBg) return;
 					if (st.status === 'pronto') { _wizDone(rec); return; }
 					if (st.status === 'erro') { _wizError(rec, st.error); return; }
 					/* "nenhum" = o monitor nao conhece este download (o pedido falhou
@@ -1682,12 +1755,11 @@
 						return;
 					}
 					var pct = Math.round((st.pct || 0) * 100);
-					var fill = wizEl.querySelector('#nous-wiz-fill');
-					var txt = wizEl.querySelector('#nous-wiz-ptxt');
+					var fill = wizEl && wizEl.querySelector('#nous-wiz-fill');
+					var txt = wizEl && wizEl.querySelector('#nous-wiz-ptxt');
 					if (fill) fill.style.width = pct + '%';
 					if (txt) txt.textContent = 'Baixando... ' + pct + '%' +
-						(st.total_gb ? ' · ' + st.completed_gb + ' / ' + st.total_gb + ' GB' : '') +
-						' — pode deixar esta janela aberta.';
+						(st.total_gb ? ' · ' + st.completed_gb + ' / ' + st.total_gb + ' GB' : '');
 					wizTimer = setTimeout(poll, 2000);
 				})
 				.catch(function () { wizTimer = setTimeout(poll, 4000); });
@@ -1697,27 +1769,39 @@
 
 	function _wizError(rec, msg) {
 		var zone = wizEl && wizEl.querySelector('#nous-wiz-zone');
-		if (!zone) return;
+		if (!zone) {
+			if (wizBg && window.NousUI && window.NousUI.toast) window.NousUI.toast('O download falhou. Abra Modelos no painel Seu Nous para tentar de novo.', { tipo: 'erro', ms: 8000 });
+			wizBg = false;
+			return;
+		}
 		zone.innerHTML =
 			'<span class="nous-store-err">' + _esc(msg || 'O download falhou.') + '</span>' +
 			'<button class="nous-store-btn" type="button">Tentar de novo</button>';
 		zone.querySelector('button').addEventListener('click', function () { _wizStart(rec); });
 	}
 
+	/* O download terminou, talvez no meio das licoes: so' o quadro do modelo muda; as licoes ficam onde estao. */
 	function _wizDone(rec) {
-		var zone = wizEl && wizEl.querySelector('#nous-wiz-zone');
-		if (!zone) return;
-		zone.innerHTML =
-			'<div style="flex:1;text-align:center">' +
-			'<div style="color:#5fd693;font-weight:600;font-size:13px;margin-bottom:8px">' +
-			'Tudo pronto! Sua IA foi instalada.</div>' +
-			'<button class="nous-store-btn" type="button" style="width:100%;padding:9px;font-size:13px">' +
-			'Comecar a conversar</button></div>';
-		zone.querySelector('button').addEventListener('click', function () {
+		wizPronto = true;
+		function ir() {
 			/* Abre o chat JA com o modelo novo: com reload puro o Open WebUI podia
 			   escolher o primeiro da lista - as vezes o de embeddings, que nao conversa. */
 			location.href = '/?model=' + encodeURIComponent(rec.tag);
-		});
+		}
+		var zone = wizEl && wizEl.querySelector('#nous-wiz-zone');
+		if (!zone) {   /* janela fechada: so' avisa */
+			if (wizBg && window.NousUI && window.NousUI.toast) window.NousUI.toast((rec.name || 'O modelo') + ' está pronto.', { acao: ir, rotulo: 'Começar a conversar', ms: 12000 });
+			wizBg = false;
+			return;
+		}
+		var tem = wizEl.querySelector('#nous-wiz-lic').style.display !== 'none';
+		zone.innerHTML =
+			'<div style="flex:1;text-align:center">' +
+			'<div style="color:#5fd693;font-weight:600;font-size:13px;margin-bottom:8px">' +
+			'Tudo pronto! Sua IA foi instalada.' + (tem ? ' Termine as lições no seu tempo e depois clique abaixo.' : '') + '</div>' +
+			'<button class="nous-store-btn" type="button" style="width:100%;padding:9px;font-size:13px">' +
+			'Começar a conversar</button></div>';
+		zone.querySelector('button').addEventListener('click', ir);
 	}
 
 	/* ====================== Dica de cadastro na tela de login ====================== *
@@ -1814,6 +1898,7 @@
 
 		/* O Open WebUI renderiza os modelos em botoes ou opcoes dentro de um dropdown */
 		var candidates = document.querySelectorAll(
+			'[role="option"][data-value], ' +      /* 0.12: linha do modelo no seletor */
 			'[aria-label*="Model"], [aria-label*="model"], ' +
 			'.model-item, [data-model-id], ' +
 			'button[id*="model"], li[id*="model"]'
@@ -1823,6 +1908,7 @@
 
 		candidates.forEach(function(el) {
 			if (el.querySelector('.nous-cap-dot')) return; /* ja tem badge */
+			if (el.id === 'model-selector-model-button') return; /* o botao do seletor, nao uma linha */
 			var name = el.getAttribute('data-model-id') ||
 				el.getAttribute('data-value') ||
 				el.getAttribute('value') ||
@@ -1857,6 +1943,15 @@
 	var _clPrefDone = false;
 
 	function suppressChangelog() {
+		/* 0.12: o modal "O que ha de novo" e' um dialogo com os links dos commits
+		   do Open WebUI no GitHub; o primeiro botao (o X) fecha. Sem texto. */
+		var dlgs = document.querySelectorAll('[role="dialog"]');
+		for (var d = 0; d < dlgs.length; d++) {
+			if (!dlgs[d].querySelector('a[href*="github.com/open-webui/open-webui/"]')) continue;
+			var x = dlgs[d].querySelector('button');
+			if (x) { x.click(); break; }
+		}
+		/* versoes ate a 0.9: o titulo da versao e' um h3 "vX.Y.Z - AAAA-MM-DD" */
 		var hs = document.querySelectorAll('h3');
 		for (var i = 0; i < hs.length; i++) {
 			if (!CHANGELOG_H3.test((hs[i].textContent || '').trim())) continue;
@@ -1895,33 +1990,66 @@
 	var _galNavInjected = false;
 	function ensureGalleryNavItem() {
 		if (_galNavInjected) return;
-		/* âncora: o link /notes já renderizado pelo Svelte */
-		var notesLink = document.querySelector('a[href="/notes"]');
+		/* âncora: o item "Notas" já renderizado pelo Svelte (id estável desde a
+		   0.12; o href /notes vale nas versões antigas e em qualquer idioma) */
+		var notesLink = document.getElementById('sidebar-notes-button') || document.querySelector('a[href="/notes"]');
 		if (!notesLink) return;
-		/* parentElement direto = div.flex.items-center.w-full (wrapper do item) */
+		/* parentElement direto = o wrapper do item */
 		var wrapper = notesLink.parentElement;
 		if (!wrapper || !wrapper.parentElement) return;
 		/* evita duplicar */
 		if (wrapper.parentElement.querySelector('#nous-gal-nav')) return;
 		_galNavInjected = true;
 
-		var item = document.createElement('div');
+		var iconePath = 'M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z';
+		if (notesLink.id !== 'sidebar-notes-button') {
+			/* até a 0.9: markup próprio, no estilo do item "Notas" daquela versão */
+			var antigo = document.createElement('div');
+			antigo.id = 'nous-gal-nav';
+			antigo.className = 'flex items-center w-full';
+			antigo.innerHTML =
+				'<a href="javascript:void(0)" id="nous-gal-nav-link" draggable="false" ' +
+				'class="flex flex-1 rounded-xl py-1.5 px-3 hover:bg-gray-50 dark:hover:bg-gray-800 transition cursor-pointer select-none">' +
+				'<div class="self-center mr-3">' +
+				'<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-5">' +
+				'<path stroke-linecap="round" stroke-linejoin="round" d="' + iconePath + '"/>' +
+				'</svg></div>' +
+				'<div class="self-center truncate">Galeria</div>' +
+				'</a>';
+			wrapper.parentElement.insertBefore(antigo, wrapper);
+			antigo.querySelector('#nous-gal-nav-link').addEventListener('click', openGallery);
+			return;
+		}
+
+		/* 0.12: o item é uma CÓPIA do "Notas": herda o visual da versão; só
+		   trocam o ícone, o rótulo e o destino */
+		var item = wrapper.cloneNode(true);
 		item.id = 'nous-gal-nav';
-		item.className = 'flex items-center w-full';
-		item.innerHTML =
-			'<a href="javascript:void(0)" id="nous-gal-nav-link" draggable="false" ' +
-			'class="flex flex-1 rounded-xl py-1.5 px-3 hover:bg-gray-50 dark:hover:bg-gray-800 transition cursor-pointer select-none">' +
-			'<div class="self-center mr-3">' +
-			'<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-5">' +
-			'<path stroke-linecap="round" stroke-linejoin="round" ' +
-			'd="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z"/>' +
-			'</svg></div>' +
-			'<div class="self-center truncate">Galeria</div>' +
-			'</a>';
+		item.removeAttribute('data-id');
+		var link = item.querySelector('a') || item;
+		link.id = 'nous-gal-nav-link';
+		link.setAttribute('href', 'javascript:void(0)');
+		link.setAttribute('aria-label', 'Galeria');
+		var velho = item.querySelector('svg');
+		if (velho) {
+			var icone = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+			icone.setAttribute('viewBox', '0 0 24 24');
+			icone.setAttribute('fill', 'none');
+			icone.setAttribute('stroke', 'currentColor');
+			icone.setAttribute('stroke-width', '1.5');
+			icone.setAttribute('aria-hidden', 'true');
+			icone.setAttribute('class', velho.getAttribute('class') || 'size-4');
+			icone.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" d="' + iconePath + '"/>';
+			velho.replaceWith(icone);
+		}
+		/* o rótulo é o último elemento sem filhos que tem texto */
+		var folhas = [].filter.call(item.querySelectorAll('*'), function (e) { return !e.children.length && e.textContent.trim(); });
+		if (folhas.length) folhas[folhas.length - 1].textContent = 'Galeria';
+		else link.insertAdjacentText('beforeend', 'Galeria');
 
 		/* insere ANTES do wrapper do /notes */
 		wrapper.parentElement.insertBefore(item, wrapper);
-		item.querySelector('#nous-gal-nav-link').addEventListener('click', openGallery);
+		link.addEventListener('click', function (ev) { ev.preventDefault(); openGallery(ev); });
 	}
 
 	var galEl = null, galLbEl = null, galOpen = false;

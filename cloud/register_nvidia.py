@@ -24,6 +24,9 @@ import datetime
 import sqlite3
 import argparse
 
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "ajustes"))
+from config_db import obter, definir  # noqa: E402
+
 NVIDIA_URL  = "https://integrate.api.nvidia.com/v1"
 KEY_FILE    = ".nvidia_api_key"
 
@@ -87,38 +90,24 @@ def table_exists(cx, name):
 
 # --------------------------------------------------- config read/write
 
+# So' o trecho "openai" da config interessa; config_db.py cuida dos dois
+# formatos da tabela (blob unico ate a 0.9, uma linha por chave a partir da 0.10).
+OPENAI_KEYS = ("enable", "api_base_urls", "api_keys", "api_configs")
+
+
 def read_config(cx):
-    """Devolve o dict 'data' da linha mais recente da tabela config."""
-    row = cx.execute(
-        "SELECT data FROM config ORDER BY id DESC LIMIT 1"
-    ).fetchone()
-    if not row:
-        return {}
-    raw = row[0]
-    try:
-        data = json.loads(raw) if isinstance(raw, str) else raw
-    except Exception:
-        return {}
-    return data if isinstance(data, dict) else {}
+    """Devolve {'openai': {enable, api_base_urls, api_keys, api_configs}}."""
+    cfg = {}
+    for k in OPENAI_KEYS:
+        v = obter(cx, "openai." + k)
+        if v is not None:
+            cfg.setdefault("openai", {})[k] = v
+    return cfg
 
 
 def write_config(cx, data):
-    row = cx.execute("SELECT id FROM config ORDER BY id DESC LIMIT 1").fetchone()
-    # A tabela 'config' do Open WebUI usa colunas DATETIME (string ISO), NAO
-    # epoch inteiro. Gravar int aqui faz o servidor crashar no boot com
-    # "fromisoformat: argument must be str". Por isso usamos datetime string.
-    now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    payload = json.dumps(data, ensure_ascii=False)
-    if row:
-        cx.execute(
-            "UPDATE config SET data=?, updated_at=? WHERE id=?",
-            (payload, now, row[0]),
-        )
-    else:
-        cx.execute(
-            "INSERT INTO config (data, version, created_at, updated_at) VALUES (?,0,?,?)",
-            (payload, now, now),
-        )
+    openai_cfg = data.get("openai") or {}
+    definir(cx, {"openai." + k: openai_cfg[k] for k in OPENAI_KEYS if k in openai_cfg})
     cx.commit()
 
 

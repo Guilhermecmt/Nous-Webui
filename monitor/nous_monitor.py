@@ -9,7 +9,7 @@ Expoe (em http://127.0.0.1:8990, so' para paginas locais - ver cors_mw):
   GET  /hardware     -> { gpu_name, vram_gb, ram_gb, tier }  (tier: gpu-20/gpu-12/gpu-8/cpu)
   GET  /installed    -> { online, models:[{name,size}], chat:[nomes] }
   GET  /catalog      -> catalogo curado (catalog.json) + installed/fit/pull por modelo,
-                        ordenado: recomendados p/ esta maquina primeiro
+                        ordenado: recomendados p/ esta maquina primeiro, pelo ranking do catalogo
   POST /pull         -> body {"model":"tag"}; inicia download via Ollama /api/pull
                         em background (singleton por modelo)
   GET  /pull/status  -> ?model=tag -> { status: baixando|pronto|erro, pct, ... }
@@ -30,6 +30,8 @@ Expoe (em http://127.0.0.1:8990, so' para paginas locais - ver cors_mw):
   GET  /research/export?id=&formato=docx|pdf|md     relatorio da Pesquisa em Word/PDF
   GET  /model/check?name=  qualquer modelo do Ollama/Hugging Face: tamanho e se cabe
   GET  /catalog?vram_gb=&ram_gb=&gpu=  simulacao "e se eu tivesse outra maquina"
+  GET  /update/status, POST /update/check|apply|config|modelos/atualizar   (nous_update.py)
+  GET  /celular/estado, POST /celular/ligar|desligar|codigo|aparelhos/remover   (celular/controle.py)
 
 GPU: lido dos contadores de desempenho do Windows (funcionam em PT-BR com os
 nomes em ingles) + tamanho real da VRAM via registro (qwMemorySize).
@@ -52,8 +54,8 @@ from pathlib import Path
 import aiohttp
 from aiohttp import web
 
-OLLAMA = "http://127.0.0.1:11434"
-PORT = 8990
+OLLAMA = os.environ.get("NOUS_OLLAMA_URL") or "http://127.0.0.1:11434"   # NOUS_OLLAMA_URL: so' para testes (Ollama de mentira)
+PORT = int(os.environ.get("NOUS_MONITOR_PORT") or 8990)
 GB = 1073741824
 CATALOG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "catalog.json")
 
@@ -217,6 +219,45 @@ async def h_comfyui_start(request):
     return web.json_response({"ok": ok})
 
 
+# Motor de imagem ocioso: depois de N minutos sem fila nem geracao, o ComfyUI e'
+# encerrado (libera RAM e a VRAM que o Windows reserva ao processo). O Pipe o
+# sobe de novo no proximo pedido de imagem. NOUS_COMFY_IDLE_MIN=0 desliga.
+_COMFY_IDLE_MIN = float(os.environ.get("NOUS_COMFY_IDLE_MIN") or 10)
+
+
+async def _comfy_busy():
+    """True/False se o ComfyUI responde; None se esta fora do ar."""
+    try:
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=4)) as s:
+            async with s.get("http://127.0.0.1:8188/queue") as r:
+                q = await r.json()
+        return bool(q.get("queue_running") or q.get("queue_pending"))
+    except Exception:
+        return None
+
+
+async def _comfy_idle_loop():
+    last_busy = None
+    while True:
+        await asyncio.sleep(30)
+        if _COMFY_IDLE_MIN <= 0:
+            continue
+        busy = await _comfy_busy()
+        now = asyncio.get_event_loop().time()
+        if busy is None:
+            last_busy = None
+        elif busy or last_busy is None:
+            last_busy = now
+        elif now - last_busy >= _COMFY_IDLE_MIN * 60:
+            print("[Nous][imagens] ComfyUI ocioso: encerrando", file=sys.stderr)
+            await _stop_comfyui()
+            last_busy = None
+
+
+async def _start_background(app):
+    app["comfy_idle"] = asyncio.get_event_loop().create_task(_comfy_idle_loop())
+
+
 async def _stop_comfyui():
     """Encerra o processo Python do ComfyUI (porta 8188) liberando a VRAM."""
     try:
@@ -361,20 +402,38 @@ def _local_chat(name):
 
 
 def _fit(model, hw):
-    """recomendado = aproveita bem ESTA maquina; ok = roda; pesado = nao cabe."""
+    """ok = roda; pesado = nao cabe. O 'recomendado' sai do ranking do catalogo
+    (_marcar_recomendados): tamanho do arquivo nao e' medida de qualidade."""
     if hw["tier"] == "cpu":
         if hw["ram_gb"] <= 0:
             return "ok"  # hardware desconhecido: nao assustar
         # tolerancia: maquinas "de 16 GB" reportam ~15.9 (memoria reservada)
-        if model["min_ram_cpu_gb"] > hw["ram_gb"] + 0.6:
-            return "pesado"
-        # na CPU, menor = mais rapido = melhor experiencia
-        return "recomendado" if model["download_gb"] <= 4.0 else "ok"
-    vram = hw["vram_gb"]
-    if model["min_vram_gb"] > vram:
-        return "pesado"
-    # bem dimensionado p/ a placa (nem subaproveitado, nem no limite)
-    return "recomendado" if model["min_vram_gb"] >= vram / 2.5 else "ok"
+        return "pesado" if model["min_ram_cpu_gb"] > hw["ram_gb"] + 0.6 else "ok"
+    return "pesado" if model["min_vram_gb"] > hw["vram_gb"] else "ok"
+
+
+# Recomendados = os de melhor ranking entre os que rodam BEM nesta maquina, ate
+# esta margem (em pontos) abaixo do melhor. "Rodar bem": inteiro na placa de
+# video; sem placa, pelo menos _TPS_MIN tokens/s so' na CPU.
+_MARGEM_RANKING = 1.0
+_TPS_MIN_CPU = 4.0
+
+
+def _roda_bem(m, hw):
+    s = m.get("speed") or {}
+    if hw["tier"] == "cpu":
+        return (s.get("tps") or 0) >= _TPS_MIN_CPU
+    return s.get("onde") == "gpu"
+
+
+def _marcar_recomendados(models, hw):
+    boas = [m for m in models if m["fit"] == "ok" and m.get("ranking") is not None and _roda_bem(m, hw)]
+    if not boas:
+        return
+    melhor = max(m["ranking"] for m in boas)
+    for m in boas:
+        if m["ranking"] >= melhor - _MARGEM_RANKING:
+            m["fit"] = "recomendado"
 
 
 def _sort_models(models, hw):
@@ -383,8 +442,12 @@ def _sort_models(models, hw):
 
     def key(m):
         dl = m["download_gb"]
-        # GPU: dentro do grupo, melhor qualidade primeiro; CPU: mais leve primeiro
-        return (rank[m["fit"]], dl if (cpu or m["fit"] == "pesado") else -dl)
+        if m["fit"] == "pesado":
+            return (2, dl, 0)   # os que estao mais perto de caber primeiro
+        if cpu and m["fit"] == "ok":
+            return (1, dl, 0)   # sem placa, o mais leve e' o mais rapido
+        # o resto: melhor ranking primeiro (empate: o menor download)
+        return (rank[m["fit"]], -(m.get("ranking") or 0), dl)
 
     return sorted(models, key=key)
 
@@ -576,6 +639,7 @@ async def h_catalog(request):
         if pull:
             e["pull"] = pull
         models.append(e)
+    _marcar_recomendados(models, hw)
     # downloads de fora do catalogo (v2.9: "qualquer modelo"), com o progresso
     tags = {m["tag"] for m in catalog} | _EXTRA_PULLABLE
     outros = [{"tag": t, "pull": p, "download_gb": (_checked.get(t) or {}).get("gb"),
@@ -691,8 +755,12 @@ async def h_pull(request):
     if cur and cur["status"] == "baixando":
         return web.json_response({"started": False, "reason": "em andamento"})
     if cur and cur["status"] == "pronto":
-        # Já baixado nesta sessão: não refaz o download nem apaga o estado.
-        return web.json_response({"started": False, "reason": "ja baixado"})
+        # Já baixado nesta sessão: não refaz o download nem apaga o estado,
+        # a não ser que o modelo tenha sido apagado depois.
+        models = await _installed_models()
+        nomes = {m.get("name") for m in (models or [])}
+        if models is None or tag in nomes or (":" not in tag and tag + ":latest" in nomes):
+            return web.json_response({"started": False, "reason": "ja baixado"})
     _pulls[tag] = {"status": "baixando", "pct": 0.0,
                    "completed_gb": 0.0, "total_gb": 0.0, "error": None, "nota": None}
     _pull_tasks[tag] = asyncio.get_event_loop().create_task(_do_pull(tag))
@@ -1688,6 +1756,7 @@ async def h_research_export(request):
 
 def build_app():
     app = web.Application(middlewares=[cors_mw], client_max_size=_MAX_IMG + 1024)
+    app.on_startup.append(_start_background)
     app.add_routes([web.get("/stats", h_stats),
                     web.post("/unload", h_unload),
                     web.get("/health", h_health),
@@ -1730,6 +1799,19 @@ def build_app():
                     web.post("/docs/import", h_docs_import),
                     web.post("/docs/export", h_docs_export),
                     web.get("/research/export", h_research_export)])
+    # Atualizacao do app e dos modelos (v2.11): rotas em nous_update.py
+    try:
+        import nous_update
+        nous_update.add_routes(app, h_pull, _EXTRA_PULLABLE, _data_dir)
+    except Exception as e:
+        print(f"[Nous][update] rotas de atualizacao indisponiveis: {e}", file=sys.stderr)
+    # Usar no celular (v2.11): ligar/desligar o portao, QR, aparelhos (celular/controle.py)
+    try:
+        sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "celular"))
+        import controle as celular_controle
+        celular_controle.add_routes(app, _data_dir)
+    except Exception as e:
+        print(f"[Nous][celular] rotas do celular indisponiveis: {e}", file=sys.stderr)
     return app
 
 

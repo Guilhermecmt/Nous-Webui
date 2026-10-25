@@ -9,7 +9,7 @@
 Chat, documents, calendar, email, research and coding with local AI on Windows.<br>
 No cloud, no subscription, no account to create.
 
-[![Version](https://img.shields.io/badge/version-2.10.0-c8962e)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-2.11.0-c8962e)](CHANGELOG.md)
 [![MIT License](https://img.shields.io/badge/license-MIT-1f1b16)](LICENSE)
 [![Windows 10 and 11](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6)](#requirements)
 [![100% local](https://img.shields.io/badge/AI-100%25%20local-2ea44f)](#privacy-and-security)
@@ -82,6 +82,15 @@ An IDE with a coding agent that uses only local AI, in its own window. It brings
 
 Requires [Node.js](https://nodejs.org) 22.18 or newer (`winget install OpenJS.NodeJS.LTS`). When Node is present, the installer downloads the editor and creates the shortcut. Technical details are in [`code/README.md`](code/README.md).
 
+## What's new in 2.11
+
+- **First steps.** For people who never used AI: short lessons while the model downloads, everyday task cards for the first chat, and a **?** button to see it all again.
+- **On your phone.** At home, on the same Wi-Fi: turn it on in **Seu Nous › Celular** and scan the QR code. It is off by default, and only devices you pair get in. See [docs/CELULAR.md](docs/CELULAR.md) (in Portuguese).
+- **Two-way calendar.** Connect iCloud, Nextcloud or Fastmail (CalDAV): what you change here shows up there, and the other way around.
+- **Tray icon.** Next to the clock: open, start, stop and check Nous without any window.
+- **Updates itself.** Nous tells you when there is a new version of itself or of a model and updates in one click, rolling back if anything goes wrong.
+- **Under the hood.** Open WebUI 0.12.3, new models in the Store, email and image engine tested end to end, and Nous Code fixing its own errors.
+
 ## What's new in 2.10
 
 - **No login.** Nous opens straight into the chat, like any other program. Your account and past conversations are kept. With two or more accounts on the same PC, the login screen comes back on its own.
@@ -99,7 +108,6 @@ The full history is in the [CHANGELOG](CHANGELOG.md) (in Portuguese).
 | RAM | 8 GB | 16 GB or more |
 | Graphics card | None: runs on the CPU | 8 GB of VRAM or more |
 | Free disk | 20 GB | 30 GB or more |
-| Nous Code (optional) | Node.js 22.18 | Current Node.js LTS |
 
 Without a dedicated GPU, Nous runs on the CPU and answers simply take longer. The model store detects this and recommends light models.
 
@@ -110,7 +118,7 @@ Without a dedicated GPU, Nous runs on the CPU and answers simply take longer. Th
 
 The installer:
 - checks your hardware;
-- installs Ollama, Python 3.11 and the interface, without touching what is already on the machine;
+- installs Ollama, Python 3.11, the interface and a portable Node.js for Nous Code, without touching what is already on the machine;
 - applies the Nous identity;
 - creates shortcuts on the desktop and in the Start menu.
 
@@ -120,7 +128,8 @@ Nous opens in your browser when it finishes. It lives in `%LOCALAPPDATA%\Program
 
 1. **Open it.** There is no account or password: Nous opens straight into the chat.
 2. **Pick a model.** With no model installed, a welcome screen shows the one recommended for your computer. *Baixar e começar* handles the rest, with a progress bar.
-3. **Chat.** When the download finishes, just type.
+3. **Learn while it downloads.** Five short lessons explain what a model is, that AI can be wrong and how to ask well. Skip them whenever you like.
+4. **Chat.** When the download finishes, pick one of the cards on the home screen or type anything. The **?** button brings back the lessons and the screen tour.
 
 If several people share the computer, create one account each in **Admin Panel › Users**. With two or more accounts the login screen returns, and each person sees only their own chats.
 
@@ -228,7 +237,9 @@ Reports are kept in the panel, download as PDF or Word, and the conversation can
 ## Privacy and security
 
 - **Everything local.** Models run on your machine's Ollama. Chats, memories, documents and indexes live in `%USERPROFILE%\NousData`.
-- **This PC only.** The Nous server and every service listen only on `127.0.0.1`, so other devices on the network cannot reach them. The services reject pages from other websites.
+- **This PC only.** The Nous server and every service listen only on `127.0.0.1`, so other devices on the network cannot reach them. The server and the services reject pages from other websites.
+- **Phone only if you turn it on.** The phone gateway exists only while it is on, answers only the home network (a Private network in Windows) and only devices paired by QR code. Whoever gets in uses all of Nous, since there is no login. Nous Code never goes through it.
+- **Updates with notice.** Checking for a new version is a trip to the internet, at most once a day, and can be turned off from the tray icon. Nothing is downloaded without your click.
 - **No login, by choice.** Since nobody outside can reach Nous, your Windows password is what protects the data. To require a login anyway, create an empty file `NousData\.exigir_login`.
 - **Nothing leaves unless you ask.** Web search, NVIDIA cloud and email are optional, and your personal memory is never sent to cloud models.
 - **An agent under control.** Nous Code only touches the chosen project folder. Changes and commands ask for approval, internet access asks once per conversation, and everything it changes can be undone.
@@ -262,7 +273,7 @@ Open Nous from the shortcut, which starts every service. If it persists, free th
 <details>
 <summary><b>Nous Code does not open</b></summary>
 
-Install Node.js (`winget install OpenJS.NodeJS.LTS`) and run `instalar.bat` again: it downloads the editor and creates the **Nous Code** shortcut.
+Run `instalar.bat` again: it downloads a portable Node.js (if the computer lacks Node 22.18 or newer), downloads the editor and creates the **Nous Code** shortcut.
 </details>
 
 <details>
@@ -281,7 +292,7 @@ In **Settings → Apps → Installed apps**, find **Nous** and click **Uninstall
 
 ### Architecture
 
-Nous is a product layer over Open WebUI 0.9.6 (pinned in the installer). It combines three parts:
+Nous is a product layer over Open WebUI 0.12.3 (pinned in the installer). It combines three parts:
 - a visual identity injected by a `loader.js` with the panels;
 - filters and pipes registered in the database;
 - small local services, all on `127.0.0.1`.
@@ -297,6 +308,7 @@ Nous is a product layer over Open WebUI 0.9.6 (pinned in the installer). It comb
 | 8996 | Calendar, reminders and tasks | `agenda/` |
 | 8997 | Skills | `skills/` |
 | 8998 | Nous Code (IDE and agent, Node) | `code/` |
+| 8999 | Phone gateway (only while on; home network) | `celular/` |
 | 8188 | ComfyUI (optional) | `images/` |
 | 11434 | Ollama | |
 
@@ -330,11 +342,11 @@ tools/       lint, health check, backup, hardware check
 ### Tests and lint
 
 ```powershell
-tools\lint.ps1            # PowerShell 5.1, Python, JSON, JavaScript, plus Nous Code types and tests
+tools\lint.ps1            # PowerShell 5.1, Python, JSON, JavaScript, Nous Code, plus the calendar (CalDAV), email and phone tests
 cd code; npm install; npm test
 ```
 
-Lint runs in CI on every push. The Nous Code tests use a fake Ollama server to check the agent policies without a real model.
+Lint runs in CI on every push. No test needs the network or a model: Nous Code uses a fake Ollama, email a fake IMAP/SMTP server, the calendar a fake CalDAV server (plus Radicale when installed) and the phone gateway a fake Open WebUI.
 
 ### Command-line install
 

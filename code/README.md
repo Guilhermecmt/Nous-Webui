@@ -16,6 +16,8 @@ Um IDE com agente de IA local, aberto numa janela própria. O agente roda no Oll
 | Lembretes | "Me lembre amanhã às 9h de rodar os testes": o agente cria o lembrete (`schedule_create`). Na hora marcada, a conversa roda sozinha; o que precisa de aprovação é recusado, porque não há ninguém na tela. |
 | MCP | Servidores MCP no formato do `.mcp.json` do Claude Code. As ferramentas entram como `mcp__servidor__ferramenta`. |
 | Conversa | Lista de tarefas (`todo_write`), perguntas com opções (`ask_user_question`), arquivos entregues (`present`), comandos `/` com autocompletar, `@arquivo`, renomear, duplicar a partir de um pedido, exportar em Markdown, buscar nas conversas e ver o que o modelo está vendo. |
+| Problemas do código | Depois de cada edição o agente consulta o language server (TypeScript, JavaScript e Python) e recebe só os erros que a edição criou, no máximo 5, para corrigir no passo seguinte. O editor sublinha os mesmos erros e a conversa mostra uma linha com atalho para a linha. `NOUS_CODE_DIAGNOSTICOS=0` desliga. |
+| Tarefa separada | **Nova tarefa separada** (menu ⋯ da conversa): o agente trabalha numa cópia do projeto (uma worktree do Git, em `NousData/code/tarefas/copias`), que parte do projeto como está agora, inclusive o que ainda não foi commitado. No fim, **Revisar e aplicar** mostra os arquivos mudados com o diff; **Aplicar** leva as mudanças ao projeto sem commitar, ou recusa sem tocar em nada se o projeto mudou nos mesmos trechos. **Descartar** apaga a cópia. Não vão para a cópia os arquivos novos ainda fora do Git e as pastas ignoradas (como `node_modules`). |
 | Contexto | Medidor de tokens e compactação em duas etapas: primeiro encurta os resultados antigos; depois o modelo escreve um checkpoint com 8 seções. `/compactar` faz isso na hora. Se o contexto estourar, compacta e repete o passo. |
 
 **Para abrir:**
@@ -36,7 +38,7 @@ Os nomes, parâmetros e textos seguem o DeepSeek Harness. Os nomes antigos do No
 | `web_search`, `web_fetch` | Busca até 4 consultas de uma vez e lê páginas, sempre marcando o conteúdo como externo e não confiável. Pede permissão uma vez por conversa. |
 | `todo_write`, `ask_user_question`, `exit_plan_mode` | Lista de tarefas, perguntas com opções (uma ou várias) e o plano para aprovar. |
 | `create_goal`, `get_goal`, `update_goal` | Objetivo com rodadas automáticas. "Bloqueado" só é aceito depois de 3 rodadas. |
-| `subagent` | Um subagente só de leitura investiga com contexto próprio e devolve um relatório. |
+| `subagent` | Um subagente investiga com contexto próprio e devolve um relatório. Só lê, a menos que receba `edit=true` e `files` (os arquivos ou pastas que pode mudar): aí também edita, não roda comandos, e passa pelas mesmas permissões e pela mesma aprovação com diff; o que está fora de `files` volta como `POLICY_DENIED`. |
 | `skill` | Carrega uma `SKILL.md` de `.nous`, `.agents`, `.claude` ou `.dsh` (projeto), ou de `~/.nous` e `~/.agents`. `/nome-da-skill` no pedido injeta as instruções. |
 | `present` | Entrega arquivos (relatório, planilha), com os botões "Abrir no editor" e "Abrir no Windows". |
 | `schedule_*` | Lembretes: daqui a N segundos, numa data, a cada N segundos, diário, semanal ou cron, sempre com fuso horário. |
@@ -96,6 +98,7 @@ O serviço `servidor.ts` roda em `127.0.0.1:8998` e serve também a página do I
 | `contexto.ts` | Instruções em cadeia e catálogo de skills. |
 | `lsp.ts` | Cliente LSP: um language server por projeto, iniciado sob demanda. |
 | `mcp.ts` | Cliente MCP (stdio e HTTP) e a permissão dos servidores de projeto. |
+| `tarefas.ts` | Tarefas separadas: a cópia do projeto em worktree do Git, a revisão, o aplicar e o descartar. |
 | `lembretes.ts` | Lembretes com fuso horário e cron, sem biblioteca. |
 | `modelo.ts` | O `/api/chat` do Ollama, o `chat/completions` dos compatíveis com OpenAI e a leitura das chamadas de ferramenta. |
 | `ide.ts` | Arquivos, busca, Git, a janela (modo app do Edge) e o WebSocket do terminal e dos avisos. |
@@ -107,6 +110,8 @@ As conversas, os lembretes e as saídas completas ficam em `NousData/code/`.
 - `monaco-editor`, `@xterm/xterm` e `@xterm/addon-fit`, para a tela;
 - `@lydell/node-pty`, o ConPTY com binário pronto, sem compilar;
 - `ws`, para o WebSocket;
+- o **Node** em si: se o computador não tem o 22.18+, o instalador baixa o Node portátil (zip oficial, SHA256 fixado) para `runtime
+ode` na pasta do Nous, sem mexer no PATH (`launchers/node-nous.ps1`; teste isolado em `tools/testar-node-portatil.ps1`);
 - opcionais: `typescript-language-server`, `typescript` e `pyright`, para o `lsp`.
 
 ## Desenvolvimento

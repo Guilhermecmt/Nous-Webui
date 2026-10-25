@@ -43,7 +43,35 @@ $ollamaApp = Join-Path $env:LOCALAPPDATA "Programs\Ollama\ollama app.exe"
 # versao nova primeiro e depois suba este pin (a identidade Nous se reaplica
 # sozinha no boot via marcador). Sem o pin, um "pip install" futuro pode trazer
 # uma versao que quebra o patch do nome/tema em maquinas de usuarios leigos.
-$OPENWEBUI_PIN = "0.9.6"
+# Quem ja' tem o Nous numa versao mais antiga e' atualizado no passo 4, com
+# backup e volta atras (installer\atualizar-openwebui.ps1).
+$OPENWEBUI_PIN = "0.12.3"
+
+# O Ollama novo (0.32+) abre uma tela de boas-vindas que convida a entrar numa
+# conta e tem uma nuvem propria (modelos que rodam em ollama.com). O Nous e'
+# privado por padrao: quando ELE instala o Ollama, ja' deixa a boas-vindas como
+# concluida e a nuvem desligada (o usuario liga de novo nas configuracoes do
+# Ollama, se quiser). Nunca mexe num Ollama que ja' existia. Tudo opcional: se
+# a versao do Ollama nao conhece os arquivos, eles so' nao fazem nada.
+function Set-OllamaPrivado {
+    try {
+        $dirs = @((Join-Path $env:USERPROFILE ".ollama"), (Join-Path $env:LOCALAPPDATA "Ollama"))
+        foreach ($d in $dirs) {
+            New-Item -ItemType Directory -Force -Path $d | Out-Null
+            $marca = Join-Path $d "onboarding-v1.completed"
+            if (-not (Test-Path $marca)) { New-Item -ItemType File -Path $marca | Out-Null }
+        }
+        $cfgPath = Join-Path $dirs[0] "server.json"
+        $cfg = [ordered]@{}
+        if (Test-Path $cfgPath) {
+            try { (Get-Content $cfgPath -Raw | ConvertFrom-Json).PSObject.Properties | ForEach-Object { $cfg[$_.Name] = $_.Value } } catch {}
+        }
+        if (-not $cfg.Contains("disable_ollama_cloud")) {
+            $cfg["disable_ollama_cloud"] = $true
+            [IO.File]::WriteAllText($cfgPath, ($cfg | ConvertTo-Json))
+        }
+    } catch {}
+}
 
 function Step($n, $t) { Write-Host "`n[$n] $t" -ForegroundColor Cyan }
 function Ok($t)       { Write-Host "    [ok] $t" -ForegroundColor Green }
@@ -294,6 +322,7 @@ if (($ollamaExe -or (Test-OllamaUp)) -and -not $Force) {
         exit 1
     }
 
+    Set-OllamaPrivado   # antes do instalador: ele ja' pode abrir o app
     Info "instalando o Ollama (silencioso)..."
     Start-Process -FilePath $ollamaSetup -ArgumentList "/VERYSILENT /NORESTART" -Wait -NoNewWindow
     Remove-Item $ollamaSetup -Force -ErrorAction SilentlyContinue
@@ -367,7 +396,22 @@ if (-not (Test-Path $vpy)) {
     & $py311 -m venv $venv
     Assert-Exit "a criacao do ambiente Python"
 }
-if ((Test-Path (Join-Path $venv "Scripts\open-webui.exe")) -and -not $Force) { Ok "Open WebUI ja instalado" }
+# Ja' existe: confere a versao e, se for mais antiga que a testada, atualiza com
+# backup dos dados e volta atras se algo falhar (script a parte, em outro
+# processo: ele encerra o que o Nous deixou rodando e sobe um servidor de teste).
+$temOpenWebUI = Test-Path (Join-Path $venv "Scripts\open-webui.exe")
+$updExit = 0
+if ($temOpenWebUI) {
+    $upd = Join-Path $REPO "installer\atualizar-openwebui.ps1"
+    if (Test-Path $upd) {
+        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $upd -Venv $venv -DataDir $dataDir -Pin $OPENWEBUI_PIN -Repo $REPO
+        $updExit = $LASTEXITCODE
+        $global:LASTEXITCODE = 0
+    }
+    if ($updExit -eq 1) { Write-Host "    [aviso] o Open WebUI nao foi atualizado agora; o Nous segue funcionando na versao que ja' estava." -ForegroundColor Yellow }
+    if ($updExit -eq 2) { Fail "a atualizacao do Open WebUI falhou e nao consegui voltar sozinho. Seus dados estao no ultimo zip da pasta bkp\ do Nous." }
+}
+if ($temOpenWebUI -and -not $Force) { Ok "Open WebUI ja instalado" }
 else {
     Info "instalando o Open WebUI $OPENWEBUI_PIN (varios minutos, baixa varios GB)..."
     & $vpy -m pip install --upgrade pip --quiet
@@ -407,22 +451,35 @@ if (-not $desktopOk) {
 }
 $startOk = New-NousShortcut ([Environment]::GetFolderPath("Programs"))
 $null = New-NousShortcut ([Environment]::GetFolderPath("Programs")) "Parar Nous" "parar-nous.vbs"
+$null = New-NousShortcut ([Environment]::GetFolderPath("Programs")) "Nous Bandeja" "bandeja.vbs"   # icone perto do relogio
 
-# Nous Code (IDE com agente de IA local): precisa do Node 22.18+. Baixa as pecas
-# do editor (Monaco, terminal) uma vez e cria o atalho "Nous Code". Opcional:
-# sem Node, o resto do Nous funciona igual.
-$nodeCmd = Get-Command node -ErrorAction SilentlyContinue
-$nodeOk = $false
-if ($nodeCmd) {
-    $nv = ((& $nodeCmd.Source --version) -replace '^v', '').Split('.')
-    $nodeOk = [int]$nv[0] -gt 22 -or ([int]$nv[0] -eq 22 -and [int]$nv[1] -ge 18)
+# Nous Code (IDE com agente de IA local): precisa do Node 22.18+. Sem Node bom no
+# computador, baixa o Node portatil (zip oficial, SHA256 conferido) para
+# <app>\runtime\node, sem mexer no PATH do sistema; os launchers usam esse
+# Node (launchers\node-nous.ps1). Baixa as pecas do editor (Monaco, terminal)
+# uma vez e cria o atalho "Nous Code". Opcional: se nada der certo, o resto do
+# Nous funciona igual.
+$nodeExe = $null
+$nodeLib = Join-Path $REPO "launchers\node-nous.ps1"
+if ((Test-Path $nodeLib) -and (Test-Path (Join-Path $REPO "code\package.json"))) {
+    . $nodeLib
+    $nodeExe = Find-NousNode $REPO
+    if (-not $nodeExe) {
+        Info "Nous Code: baixando o Node.js portatil (~30 MB; fica na pasta do Nous e nao mexe no seu PATH)..."
+        if (Install-PortableNode (Get-PortableNodeDir $REPO)) { Ok "Node.js portatil instalado ($($script:NodePin.Versao))" }
+        else { Info "Nous Code: nao consegui baixar o Node.js ($script:NodeErro)." }
+        $nodeExe = Find-NousNode $REPO
+    }
 }
+$nodeOk = [bool]$nodeExe
 $codeDir = Join-Path $REPO "code"
 if ($nodeOk -and (Test-Path (Join-Path $codeDir "package.json"))) {
     # tambem quando falta o language server (instalacao de antes do lsp)
     if (-not (Test-Path (Join-Path $codeDir "node_modules\monaco-editor")) -or -not (Test-Path (Join-Path $codeDir "node_modules\typescript-language-server"))) {
         Info "Nous Code: baixando as pecas do editor e da navegacao de codigo (~100 MB)..."
         Push-Location $codeDir
+        # o npm vem junto do Node; o PATH muda so' neste processo
+        $env:Path = (Split-Path $nodeExe -Parent) + ";" + $env:Path
         & npm ci --omit=dev --no-audit --no-fund 2>&1 | Out-Null
         $npmOk = $LASTEXITCODE -eq 0
         Pop-Location
@@ -432,7 +489,7 @@ if ($nodeOk -and (Test-Path (Join-Path $codeDir "package.json"))) {
     $null = New-NousShortcut ([Environment]::GetFolderPath("Desktop")) "Nous Code" "nous-code.vbs"
     Ok "atalho 'Nous Code' (editor de codigo com IA local)"
 } else {
-    Info "Nous Code (opcional): instale o Node.js 22.18+ (winget install OpenJS.NodeJS.LTS) e rode o instalador de novo."
+    Info "Nous Code (opcional): faltou o Node.js 22.18+ (precisa de internet para baixar). Rode o instalador de novo com internet."
 }
 if ($desktopOk) { Ok "atalho 'Nous' na area de trabalho" }
 if ($startOk)   { Ok "atalhos 'Nous' e 'Parar Nous' no Menu Iniciar (tecla Windows > digite Nous)" }

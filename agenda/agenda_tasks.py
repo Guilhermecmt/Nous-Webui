@@ -177,7 +177,8 @@ def local_model():
         r = requests.get(f"{OLLAMA_URL}/api/tags", timeout=5)
         for m in r.json().get("models", []):
             name = m.get("name", "")
-            if "/" not in name and not any(p in name.lower() for p in _EMBED):
+            nuvem = "/" in name or "cloud" in name.lower() or m.get("remote_host") or m.get("remote_model")
+            if not nuvem and not any(p in name.lower() for p in _EMBED):
                 return name
     except Exception:
         pass
@@ -269,8 +270,9 @@ def send_email_to_self(subject, text):
     st = requests.get(f"{EMAIL_URL}/status", timeout=5).json()
     if not st.get("connected"):
         return False
+    # confirmado: quem pediu "mandar por e-mail" foi o usuario, ao criar a tarefa; e so' para ele mesmo
     r = requests.post(f"{EMAIL_URL}/send", json={"to": st["user"], "subject": subject,
-                                                 "body": text}, timeout=60)
+                                                 "body": text, "confirmado": True}, timeout=60)
     return r.status_code == 200
 
 

@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-Ajustes do Nous sobre os padroes do Open WebUI 0.9.6, gravados na tabela config.
+Ajustes do Nous sobre os padroes do Open WebUI (0.9.6 a 0.12), gravados na tabela
+config (os dois formatos dela; ver config_db.py).
 
 Cada ajuste roda UMA vez por instalacao (marcador em NousData/.ajustes_nous.json):
 se o admin mudar depois pelo painel, o Nous nao desfaz. Ajuste novo = versao nova
@@ -17,6 +18,11 @@ na lista abaixo.
      modelo invalida os vetores antigos). Pelo Ollama e nao pelo sentence-
      transformers: o download do Hugging Face falha no Windows sem Modo de
      Desenvolvedor (WinError 1314, links simbolicos) e quebrava a busca.
+  2  models.default_params.function_calling = legacy. A partir da 0.10 o Open
+     WebUI usa "nativo" (o modelo decide chamar a busca web, os documentos...
+     como ferramentas); modelos pequenos de PC nao chamam e a busca na web
+     voltava sem fontes. "legacy" e' o comportamento de sempre: o Open WebUI
+     faz a busca e poe o resultado no contexto. So' se o usuario nao escolheu.
 
 Os mesmos valores vao como variavel de ambiente no launcher, para instalacoes
 novas (onde a tabela config ainda nao tem a chave).
@@ -32,18 +38,11 @@ import sqlite3
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "evaluation"))
-from register_arena import _resolve_db, _read_config, _write_config, _set_nested  # noqa: E402
+from register_arena import _resolve_db  # noqa: E402
+from config_db import obter, definir, tem_config, por_chave  # noqa: E402
 
 NOUS_EMBED = "granite-embedding:278m"
 OLD_EMBED = "sentence-transformers/all-MiniLM-L6-v2"
-
-
-def _get(data, path, default=None):
-    for k in path.split("."):
-        if not isinstance(data, dict) or k not in data:
-            return default
-        data = data[k]
-    return data
 
 
 def _count(cx, table):
@@ -53,28 +52,84 @@ def _count(cx, table):
         return 0
 
 
-def ajuste_1(cx, data, log):
-    if not _get(data, "ui.default_locale"):
-        _set_nested(data, "ui.default_locale", "pt-BR")
+def ajuste_1(cx, log):
+    if not obter(cx, "ui.default_locale"):
+        definir(cx, {"ui.default_locale": "pt-BR"})
         log.append("idioma padrao pt-BR")
-    if _get(data, "rag.youtube_loader_language") in (None, ["en"]):
-        _set_nested(data, "rag.youtube_loader_language", ["pt", "pt-BR", "en"])
+    if obter(cx, "rag.youtube_loader_language") in (None, ["en"]):
+        definir(cx, {"rag.youtube_loader_language": ["pt", "pt-BR", "en"]})
         log.append("legendas do YouTube em portugues")
-    _set_nested(data, "calendar.enable", False)
-    _set_nested(data, "automations.enable", False)
+    definir(cx, {"calendar.enable": False, "automations.enable": False})
     log.append("calendario/automacoes nativos escondidos (o Nous usa a Agenda propria)")
-    engine = _get(data, "rag.embedding_engine", "")
-    model = _get(data, "rag.embedding_model", OLD_EMBED)
+    engine = obter(cx, "rag.embedding_engine", "")
+    model = obter(cx, "rag.embedding_model", OLD_EMBED)
     if engine in ("", None) and model in (OLD_EMBED, None):
         if _count(cx, "file") == 0 and _count(cx, "knowledge") == 0:
-            _set_nested(data, "rag.embedding_engine", "ollama")
-            _set_nested(data, "rag.embedding_model", NOUS_EMBED)
+            definir(cx, {"rag.embedding_engine": "ollama", "rag.embedding_model": NOUS_EMBED})
             log.append("embeddings de documentos multilingues (granite pelo Ollama)")
         else:
             log.append("embeddings mantidos (ja ha documentos indexados)")
 
 
-AJUSTES = [(1, ajuste_1)]
+def ajuste_2(cx, log):
+    # So' vale na tabela nova (0.10+). Antes da atualizacao o servidor guarda a
+    # config inteira de memoria e apagaria a chave; o ajuste espera a atualizacao.
+    if not por_chave(cx):
+        return False
+    params = obter(cx, "models.default_params")
+    params = dict(params) if isinstance(params, dict) else {}
+    if "function_calling" not in params:
+        params["function_calling"] = "legacy"
+        definir(cx, {"models.default_params": params})
+        log.append("busca web e documentos pelo modo de sempre (legacy)")
+
+
+AJUSTES = [(1, ajuste_1), (2, ajuste_2)]
+
+
+def padrao_modelo(cx, pasta_dados):
+    """Modelo que o Nous abre por padrao (o escolhido na instalacao, se ainda estiver
+    no Ollama). Ate a 0.9 o launcher passava DEFAULT_MODELS em todo inicio; desde a
+    0.10 o Open WebUI grava o padrao no banco e ignora a variavel depois do 1o
+    inicio, e sem isto a tela inicial abria no primeiro modelo da lista. So' se o
+    usuario ainda nao escolheu outro (ui.default_models vazio)."""
+    if not por_chave(cx) or obter(cx, "ui.default_models"):
+        return
+    try:
+        modelo = json.load(open(os.path.join(pasta_dados, "install-manifest.json"), encoding="utf-8-sig")).get("model")
+        if not modelo:
+            return
+        import requests
+        base = os.environ.get("OLLAMA_BASE_URL", "http://127.0.0.1:11434").rstrip("/")
+        tags = [m.get("name") for m in requests.get(base + "/api/tags", timeout=5).json().get("models", [])]
+    except Exception:
+        return
+    if modelo in tags or modelo + ":latest" in tags:
+        definir(cx, {"ui.default_models": modelo})
+
+
+def sem_novidades(cx):
+    """O Open WebUI mostra as notas da versao, em ingles, ao administrador toda vez
+    que a versao muda (settings.showChangelog, padrao ligado). O Nous e' quem
+    atualiza e conta as novidades: grava showChangelog=false nas contas que ainda
+    nao escolheram. Roda a cada inicio (conta nova tambem entra aqui)."""
+    try:
+        contas = cx.execute("SELECT id, settings FROM user").fetchall()
+    except Exception:
+        return
+    for uid, raw in contas:
+        try:
+            s = json.loads(raw) if isinstance(raw, str) and raw else (raw or {})
+        except Exception:
+            continue
+        if not isinstance(s, dict):
+            s = {}
+        ui = s.get("ui") if isinstance(s.get("ui"), dict) else {}
+        if "showChangelog" in ui:
+            continue
+        ui["showChangelog"] = False
+        s["ui"] = ui
+        cx.execute("UPDATE user SET settings = ? WHERE id = ?", (json.dumps(s, ensure_ascii=False), uid))
 
 
 def main():
@@ -91,24 +146,34 @@ def main():
     except Exception:
         done = 0
     pending = [(v, f) for v, f in AJUSTES if v > done]
-    if not pending:
-        return
     cx = sqlite3.connect(db, timeout=15)
     try:
+        sem_novidades(cx)
+        padrao_modelo(cx, os.path.dirname(db))
+        cx.commit()
+        if not pending:
+            return
         if not cx.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='config'").fetchone():
             print("Tabela 'config' ainda nao criada. Tentarei no proximo boot.")
             return
-        data = _read_config(cx)
+        if not tem_config(cx):
+            print("Config ainda vazia (o servidor ainda nao gravou os padroes). Tentarei no proximo boot.")
+            return
         log = []
-        for _v, f in pending:
-            f(cx, data, log)
-        _write_config(cx, data)
+        feito = done
+        for v, f in pending:
+            if f(cx, log) is False:   # ainda nao da' para aplicar: tenta de novo no proximo inicio
+                break
+            feito = v
         cx.commit()
     finally:
         cx.close()
+    if feito == done:
+        return
     with open(marker, "w", encoding="utf-8") as fh:
-        json.dump({"versao": pending[-1][0]}, fh)
-    print("Ajustes do Nous: " + "; ".join(log) + ". Valem a partir do proximo inicio do Nous.")
+        json.dump({"versao": feito}, fh)
+    if log:
+        print("Ajustes do Nous: " + "; ".join(log) + ". Valem a partir do proximo inicio do Nous.")
 
 
 if __name__ == "__main__":

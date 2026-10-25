@@ -14,6 +14,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+      - name: Dependencias dos testes do e-mail (servidor IMAP/SMTP falso)
+        run: python -m pip install aiohttp requests beautifulsoup4 pypdf python-dateutil
       - uses: actions/setup-node@v4
         with:
           # O Nous Code roda TypeScript direto, o que pede Node 22.18+

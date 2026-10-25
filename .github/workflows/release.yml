@@ -1,0 +1,60 @@
+name: release
+
+# Gera o pacote da release (zip + SHA256) e o Nous-Setup.exe. Ao empurrar uma tag
+# vX.Y.Z cria um RASCUNHO de release com esses arquivos: nada vai ao publico ate
+# alguem abrir o rascunho no GitHub e clicar em "Publish". Sem a tag (execucao
+# manual), so' guarda os arquivos como artefato do workflow.
+# (O mesmo pacote sai no computador com tools\empacotar-release.ps1 e
+# tools\compilar-instalador.ps1 - util enquanto o GitHub Actions estiver sem minutos.)
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write   # so' para criar o rascunho da release
+
+jobs:
+  pacote:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: A tag bate com o arquivo VERSION
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: powershell
+        run: |
+          $v = (Get-Content VERSION -Raw).Trim()
+          if ("${{ github.ref_name }}" -ne "v$v") { throw "tag ${{ github.ref_name }} diferente de VERSION ($v)" }
+      - name: Checagens do Nous
+        shell: powershell
+        run: .\tools\lint.ps1
+      - name: Inno Setup
+        shell: powershell
+        run: |
+          if (-not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) { choco install innosetup -y --no-progress }
+      - name: Instalador (sem assinatura)
+        shell: powershell
+        run: .\tools\compilar-instalador.ps1
+      - name: Pacote da atualizacao (zip + SHA256)
+        shell: powershell
+        run: .\tools\empacotar-release.ps1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nous-release
+          path: |
+            dist/Nous-*.zip
+            dist/Nous-*.zip.sha256
+            dist/Nous-Setup.exe
+            dist/Nous-Setup.exe.sha256
+      - name: Rascunho da release
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: powershell
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $v = (Get-Content VERSION -Raw).Trim()
+          gh release create "v$v" "dist/Nous-$v.zip" "dist/Nous-$v.zip.sha256" "dist/Nous-Setup.exe" "dist/Nous-Setup.exe.sha256" `
+            --draft --title "Nous $v" --notes "Rascunho: confira os arquivos e o CHANGELOG antes de publicar."

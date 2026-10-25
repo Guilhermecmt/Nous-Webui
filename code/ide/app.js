@@ -49,7 +49,7 @@
   /* ------------------------------------------------------------ estado */
   const st = {
     raiz: null, nomeRaiz: '', abas: [], ativa: null, expandidas: new Set(['']), cacheArvore: new Map(),
-    vista: 'arquivos', git: null, sessao: null, rodandoCtrl: null, vivo: null, modelos: [],
+    vista: 'arquivos', git: null, sessao: null, rodandoCtrl: null, vivo: null, modelos: [], diag: {},
     ws: null, termId: null, term: null, fit: null, monaco: null, editor: null, diffEd: null, selArvore: null,
   };
 
@@ -113,6 +113,14 @@
     const vai = () => { if (cam.value.trim()) abrirProjeto(cam.value.trim()); };
     $('#nc-in-abrir').addEventListener('click', vai);
     cam.addEventListener('keydown', (e) => { if (e.key === 'Enter') vai(); });
+    api('GET', '/tarefas').then((l) => {
+      if (!l.length) return;
+      const box = document.createElement('div');
+      box.innerHTML = '<p style="margin:12px 0 8px;font-size:12.5px">Tarefas separadas em andamento</p>' + l.map((t) =>
+        '<button class="nc-rec" type="button" data-tp="' + esc(t.pasta) + '"><b>' + esc(t.titulo) + '</b><small>cópia de ' + esc(t.origem) + '</small></button>').join('');
+      $('#nc-in-rec').after(box);
+      $$('[data-tp]', box).forEach((b) => b.addEventListener('click', () => abrirProjeto(b.dataset.tp)));
+    }).catch(() => {});
     api('GET', '/pastas').then((l) => {
       if (!l.length) return;
       $('#nc-in-rec').innerHTML = '<p style="margin:0 0 8px;font-size:12.5px">Recentes</p>' + l.map((p) =>
@@ -129,7 +137,8 @@
       return pega.then((s) => api('GET', '/sessao?id=' + s.id));
     }).then((s) => {
       st.raiz = s.pasta;
-      st.nomeRaiz = s.pasta.split(/[\\/]/).filter(Boolean).pop();
+      st.nomeRaiz = s.tarefa ? s.tarefa.titulo + ' (cópia)' : s.pasta.split(/[\\/]/).filter(Boolean).pop();
+      st.diag = {};
       history.replaceState(null, '', '/?' + qs({ pasta: st.raiz }));
       document.title = st.nomeRaiz + ' - Nous Code';
       $('#nc-inicio')?.classList.add('oculto');
@@ -188,7 +197,7 @@
       '<select id="nc-ag-rac" aria-label="Raciocínio" class="oculto"></select>' +
       '<button class="nc-bt borda" id="nc-ag-plano" type="button" aria-pressed="false">Planejar</button></div>' +
       '<div id="nc-ag-ctx"><div class="barra"><i></i></div><span></span><button type="button" id="nc-ag-compactar" title="Resumir a conversa para liberar contexto">compactar</button></div>' +
-      '<div id="nc-ag-obj" class="oculto"></div><div id="nc-ag-tarefas" class="oculto"></div>' +
+      '<div id="nc-ag-copia" class="oculto"></div><div id="nc-ag-obj" class="oculto"></div><div id="nc-ag-tarefas" class="oculto"></div>' +
       '<div id="nc-trilha" aria-live="polite"></div><div id="nc-ag-jobs" class="oculto"></div><div id="nc-ag-lem" class="oculto"></div><div id="nc-ag-mud" class="oculto"></div>' +
       '<div id="nc-ag-caixa"><div class="caixa"><textarea id="nc-ag-txt" rows="1" placeholder="Peça ao agente: corrija os testes, explique este arquivo…" aria-label="Pedido ao agente"></textarea>' +
       '<button id="nc-ag-env" type="button">Enviar</button></div><div id="nc-ag-dica">Enter envia, / para comandos, @ para anexar arquivo</div></div></aside>' +
@@ -434,6 +443,7 @@
       if (d.binario || d.grande) return toast(base(caminho) + (d.binario ? ' é um arquivo binário.' : ' é grande demais para abrir aqui.'), true);
       const modelo = st.monaco.editor.createModel(d.conteudo, linguagem(caminho), st.monaco.Uri.parse('file:///' + caminho));
       if (d.crlf) modelo.setEOL(st.monaco.editor.EndOfLineSequence.CRLF);
+      if (st.diag[caminho]) marcarProblemas(modelo, st.diag[caminho]);
       const aba = { tipo: 'arquivo', caminho, modelo, salvo: modelo.getAlternativeVersionId(), sujo: false, vista: null };
       modelo.onDidChangeContent(() => {
         const s = modelo.getAlternativeVersionId() !== aba.salvo;
@@ -535,6 +545,7 @@
     const versao = a.modelo.getAlternativeVersionId();
     api('POST', '/fs/salvar', { raiz: st.raiz, caminho: a.caminho, conteudo: a.modelo.getValue() }).then(() => {
       a.salvo = versao; a.sujo = a.modelo.getAlternativeVersionId() !== versao; a.mudouNoDisco = false;
+      delete st.diag[a.caminho]; marcarProblemas(a.modelo, []);  // quem salva assume o arquivo: as marcas do agente saem
       a.ignorarAte = Date.now() + 1500;  // o aviso do disco desta gravacao nao conta
       desenharAbas(); $('#nc-aviso-disco').classList.add('oculto'); atualizarGitDepois();
     }).catch((e) => toast('Não salvou: ' + e.message, true));
@@ -944,6 +955,7 @@
     st.sessao = s;
     st.vivo = null; pensamento = null;
     pintarOpcoes();
+    pintarCopia(s.tarefa);
     listarConversas();
     const tr = $('#nc-trilha');
     tr.innerHTML = '';
@@ -965,10 +977,81 @@
 
   function menuConversa(btn) {
     const r = btn.getBoundingClientRect();
+    const copia = st.sessao && st.sessao.tarefa;
     menu(r.left - 150, r.bottom + 4, [
       ['Renomear', renomearConversa], ['Duplicar a conversa', () => duplicar()], ['Exportar em Markdown', exportarConversa],
       ['Ver o que o modelo está vendo', inspetor], ['Buscar nas conversas', buscarConversas], ['Compactar agora', compactarAgora], '-',
+      ...(copia ? [['Revisar e aplicar a tarefa separada', revisarCopia], ['Voltar ao projeto', () => voltarAoProjeto(copia.origem)], '-']
+        : [['Nova tarefa separada…', novaCopia], ['Tarefas separadas em andamento…', listaCopias], '-']),
       ['Apagar a conversa', apagarConversa]]);
+  }
+
+  /* ---- tarefa separada: o agente trabalha numa cópia do projeto ---- */
+  function pintarCopia(t) {
+    const b = $('#nc-ag-copia');
+    if (!b) return;
+    b.classList.toggle('oculto', !t);
+    if (!t) { b.innerHTML = ''; return; }
+    b.innerHTML = '<div><b>Tarefa separada</b>O agente trabalha numa cópia. Seu projeto só muda se você aplicar o resultado.</div>' +
+      '<div class="bt"><button class="nc-bt ouro" type="button" data-c="rev">Revisar e aplicar</button>' +
+      '<button class="nc-bt borda" type="button" data-c="voltar">Voltar ao projeto</button></div>';
+    $('[data-c=rev]', b).addEventListener('click', revisarCopia);
+    $('[data-c=voltar]', b).addEventListener('click', () => voltarAoProjeto(t.origem));
+  }
+  function irParaPasta(pasta) {
+    if (st.abas.some((a) => a.sujo)) return toast('Salve ou feche os arquivos com mudanças antes de trocar.', true);
+    if (st.rodandoCtrl) return toast('Espere o agente terminar (ou pare) antes de trocar.', true);
+    fecharTudo(); abrirProjeto(pasta);
+  }
+  const voltarAoProjeto = irParaPasta;
+  async function novaCopia() {
+    const t = await dialogo('O agente vai trabalhar numa cópia do projeto, e o seu projeto só muda quando você aceitar o resultado. Do que se trata a tarefa? (um nome curto)', '');
+    if (!t) return;
+    toast('Preparando a cópia…');
+    api('POST', '/tarefas', { pasta: st.raiz, titulo: t }).then((d) => {
+      irParaPasta(d.pasta);
+      setTimeout(() => modal('Cópia pronta', '<p>Pode pedir o que quiser ao agente: ele mexe só na cópia.</p><ul>' + d.avisos.map((a) => '<li>' + esc(a) + '</li>').join('') + '</ul>'), 600);
+    }).catch((e) => toast(e.message, true));
+  }
+  function listaCopias() {
+    api('GET', '/tarefas?' + qs({ pasta: st.raiz })).then((l) => {
+      if (!l.length) return toast('Nenhuma tarefa separada em andamento neste projeto.');
+      const d = modal('Tarefas separadas em andamento', l.map((x) => '<button class="nc-rec" type="button" data-t="' + esc(x.pasta) + '"><b>' + esc(x.titulo) +
+        '</b><small>' + new Date(x.criado).toLocaleString('pt-BR') + '</small></button>').join(''));
+      $$('[data-t]', d).forEach((b) => b.addEventListener('click', () => { d.remove(); irParaPasta(b.dataset.t); }));
+    }).catch((e) => toast(e.message, true));
+  }
+  function revisarCopia() {
+    const t = st.sessao && st.sessao.tarefa;
+    if (!t) return;
+    if (st.rodandoCtrl) return toast('Espere o agente terminar (ou pare) antes de revisar.', true);
+    api('GET', '/tarefa/revisao?' + qs({ id: t.id })).then((r) => {
+      const partes = {};
+      r.diff.split(/^(?=diff --git )/m).forEach((p) => { const m = /^diff --git a\/(.+?) b\//.exec(p); if (m) partes[m[1]] = p; });
+      const rot = { novo: 'novo', mudou: 'mudou', apagado: 'apagado' };
+      const corpo = r.arquivos.length ? '<p>O agente mudou ' + r.arquivos.length + (r.arquivos.length === 1 ? ' arquivo' : ' arquivos') + ' na cópia. Seu projeto continua como estava até você aplicar.</p>' +
+        r.arquivos.map((a) => '<details><summary><b>' + esc(a.arquivo) + '</b> <small>' + rot[a.estado] + ' · <span style="color:var(--verde)">+' + a.mais +
+          '</span> <span style="color:var(--vermelho)">−' + a.menos + '</span></small></summary><pre>' + esc(partes[a.arquivo] || '(sem texto para mostrar)') + '</pre></details>').join('') +
+        (r.cortado ? '<p class="nc-nota">A lista de mudanças é grande: só o começo aparece aqui.</p>' : '')
+        : '<p>A cópia ainda está igual ao projeto: o agente não mudou nada.</p>';
+      const d = modal('Revisar a tarefa "' + t.titulo + '"', corpo + '<div id="nc-cp-erro" class="nc-alerta oculto"></div>' +
+        '<div class="nc-cp-bt"><button class="nc-bt ouro" type="button" data-x="aplicar">' + (r.arquivos.length ? 'Aplicar no projeto' : 'Encerrar a tarefa') + '</button>' +
+        '<button class="nc-bt borda" type="button" data-x="seguir">Continuar trabalhando</button>' +
+        '<button class="nc-bt borda" type="button" data-x="descartar">Descartar tudo</button></div>');
+      $('[data-x=seguir]', d).addEventListener('click', () => d.remove());
+      $('[data-x=aplicar]', d).addEventListener('click', () => {
+        api('POST', '/tarefa/aplicar', { id: t.id }).then((ap) => {
+          if (!ap.ok) { const e = $('#nc-cp-erro', d); e.textContent = ap.motivo; e.classList.remove('oculto'); return; }
+          d.remove(); irParaPasta(ap.origem);
+          setTimeout(() => toast(ap.arquivos.length ? 'Pronto: ' + ap.arquivos.length + (ap.arquivos.length === 1 ? ' arquivo mudou' : ' arquivos mudaram') + ' no projeto. Veja na aba Git.' : 'Tarefa encerrada.'), 600);
+        }).catch((e) => toast(e.message, true));
+      });
+      $('[data-x=descartar]', d).addEventListener('click', async () => {
+        if (!(await dialogo('Descartar a cópia e tudo o que o agente fez nela? O seu projeto não muda.', null, 'Descartar'))) return;
+        api('POST', '/tarefa/descartar', { id: t.id }).then((x) => { d.remove(); irParaPasta(x.origem); setTimeout(() => toast('Cópia descartada.'), 600); })
+          .catch((e) => toast(e.message, true));
+      });
+    }).catch((e) => toast(e.message, true));
   }
   async function renomearConversa(titulo) {
     const t = typeof titulo === 'string' && titulo ? titulo : await dialogo('Nome da conversa', st.sessao.titulo);
@@ -1281,6 +1364,7 @@
       case 'pede': cartaoPedido(e, historico); break;
       case 'lembretes': if (!historico) { if (st.sessao) st.sessao.lembretes = e.lembretes; pintarLembretes(e.lembretes); } break;  // ao recarregar vale a lista do servidor
       case 'entregas': cartaoEntregas(e); break;
+      case 'diagnosticos': problemasDaEdicao(e); break;
       case 'mcp-pendente': cartaoMcp(e, historico); break;
       case 'aprovado': resolvido(e.id, e.ok, e.sempre, e.texto); break;
       case 'erro': semTexto(); add('<div class="nc-erro">' + esc(e.texto) + '</div>'); semVivo(); break;
@@ -1288,6 +1372,26 @@
       case 'fim': semVivo(); pintarMudancas(e.mudancas); break;
     }
     if (!historico) t.scrollTop = t.scrollHeight;
+  }
+
+  /* Erros que a edição do agente criou (o language server achou): sublinhados no
+   * editor e uma linha na conversa. Lista vazia limpa as marcas do arquivo. */
+  function marcarProblemas(modelo, itens) {
+    if (!st.monaco) return;
+    st.monaco.editor.setModelMarkers(modelo, 'nous-lsp', itens.map((i) => {
+      const w = modelo.getWordAtPosition({ lineNumber: i.linha, column: i.coluna });
+      return { severity: st.monaco.MarkerSeverity.Error, message: i.msg + (i.codigo ? ' (' + i.codigo + ')' : ''), source: 'Nous Code',
+        startLineNumber: i.linha, startColumn: i.coluna, endLineNumber: i.linha, endColumn: w && w.endColumn > i.coluna ? w.endColumn : i.coluna + 1 };
+    }));
+  }
+  function problemasDaEdicao(e) {
+    if (e.itens.length) st.diag[e.arquivo] = e.itens; else delete st.diag[e.arquivo];
+    const aba = st.abas.find((a) => a.tipo === 'arquivo' && a.caminho === e.arquivo);
+    if (aba) marcarProblemas(aba.modelo, e.itens);
+    if (!e.itens.length) return;
+    const el = add('<div class="nc-nota nc-diag"><b>' + e.itens.length + (e.itens.length === 1 ? ' problema' : ' problemas') + ' em ' + esc(e.arquivo) + '</b> depois da edição' +
+      e.itens.slice(0, 3).map((i) => '<br><a href="#" data-pabre="' + esc(e.arquivo) + '" data-linha="' + i.linha + '">linha ' + i.linha + '</a>: ' + esc(i.msg.slice(0, 140))).join('') + '</div>');
+    el.querySelectorAll('a[data-pabre]').forEach((a) => a.addEventListener('click', (ev) => { ev.preventDefault(); abrirArquivo(a.dataset.pabre, Number(a.dataset.linha), 1); }));
   }
 
   function textoLembrete(t) {

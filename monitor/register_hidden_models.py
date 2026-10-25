@@ -16,6 +16,12 @@ semântica continua funcionando normalmente.
 Idempotente: pode rodar a cada boot. Só age sobre modelos de embedding
 realmente instalados; se um for removido do Ollama, a linha oculta é limpa.
 
+Modelos de NUVEM do Ollama (ollama.com: "gpt-oss:120b-cloud", "gemma4:cloud"...)
+aparecem na lista do Ollama quando o usuario entra numa conta dele. Rodam fora
+do computador, entao ficam escondidos do seletor por padrao (o Nous e' privado
+por padrao). So' na primeira vez que o Nous os ve': se o usuario os ativar em
+Admin > Modelos, a escolha dele vale e o Nous nao esconde de novo.
+
 USO:
     python monitor/register_hidden_models.py [--data-dir <DATA_DIR>]
 """
@@ -42,6 +48,23 @@ def _embedding_models():
         for m in r.json().get("models", []):
             name = m.get("name", "")
             if name and any(p in name.lower() for p in _EMBED_PATTERNS):
+                out.append(name)
+        return out
+    except Exception:
+        return []
+
+
+def _cloud_models():
+    """Modelos da nuvem do Ollama que aparecem em /api/tags (sufixo -cloud/:cloud
+    ou com remote_host: rodam em ollama.com)."""
+    try:
+        import requests
+        r = requests.get(f"{OLLAMA_URL}/api/tags", timeout=5)
+        r.raise_for_status()
+        out = []
+        for m in r.json().get("models", []):
+            name = m.get("name", "")
+            if name and (name.lower().endswith(("-cloud", ":cloud")) or m.get("remote_host") or m.get("remote_model")):
                 out.append(name)
         return out
     except Exception:
@@ -105,12 +128,29 @@ def _hide_model(cx, model_id, owner, now):
         )
 
 
+def _hide_cloud_once(cx, model_id, owner, now):
+    """Esconde um modelo de nuvem so' se ainda nao ha' linha dele (escolha do usuario vale)."""
+    if cx.execute("SELECT 1 FROM model WHERE id=?", (model_id,)).fetchone():
+        return False
+    meta = json.dumps({"hidden": True,
+                       "description": "Roda na nuvem do Ollama, fora do seu computador. Escondido por padrao: "
+                                      "ative em Admin > Modelos se quiser usar."})
+    cx.execute(
+        """INSERT INTO model
+           (id, user_id, base_model_id, name, params, meta, is_active, updated_at, created_at)
+           VALUES (?,?,?,?,?,?,?,?,?)""",
+        (model_id, owner, None, model_id, json.dumps({}), meta, 0, now, now),
+    )
+    return True
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--data-dir", default=None)
     a = ap.parse_args()
 
     embeds = _embedding_models()
+    nuvem = _cloud_models()
     db = _resolve_db(a.data_dir)
     if not db:
         print("[Nous] webui.db ainda não existe. Tentarei no próximo boot.")
@@ -132,6 +172,10 @@ def main():
             print(f"[Nous] Modelos de embedding ocultados do seletor: {embeds}")
         else:
             print("[Nous] Nenhum modelo de embedding instalado — nada a ocultar.")
+        novos = [mid for mid in nuvem if _hide_cloud_once(cx, mid, owner, now)]
+        if novos:
+            cx.commit()
+            print(f"[Nous] Modelos de nuvem do Ollama escondidos do seletor: {novos}")
     finally:
         cx.close()
 

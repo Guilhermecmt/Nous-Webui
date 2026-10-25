@@ -147,11 +147,23 @@
 		for (var j = 0; j < avisos.length; j++) {
 			if (/agora est[aá] logado|now logged in/i.test(avisos[j].textContent)) avisos[j].style.display = 'none';
 		}
+		/* menu da conta (0.12: [role=menu] com Espaço de Trabalho/Notas): "Sair"
+		   e' o ultimo botao, em qualquer idioma */
+		var alvos = [];
+		var menus = document.querySelectorAll('[role="menu"]');
+		for (var m = 0; m < menus.length; m++) {
+			if (!menus[m].querySelector('a[href="/workspace"], a[href="/notes"]')) continue;
+			var bs = menus[m].querySelectorAll('button');
+			if (bs.length) alvos.push(bs[bs.length - 1]);
+		}
+		/* versoes antigas: botao com o texto do rotulo */
 		var itens = document.querySelectorAll('button[type="button"] > div.truncate');
 		for (var i = 0; i < itens.length; i++) {
 			var t = itens[i].textContent.trim();
-			if (t !== 'Sair' && t !== 'Sign Out') continue;
-			var b = itens[i].parentElement;
+			if (t === 'Sair' || t === 'Sign Out') alvos.push(itens[i].parentElement);
+		}
+		for (var k = 0; k < alvos.length; k++) {
+			var b = alvos[k];
 			b.style.display = 'none';
 			var hr = b.previousElementSibling;
 			if (hr && hr.tagName === 'HR') hr.style.display = 'none';

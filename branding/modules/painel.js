@@ -22,9 +22,9 @@
 	 * Roda antes do app ler a chave (o loader e' anterior ao Svelte). */
 	try { if (localStorage.getItem('showControls') === 'true') localStorage.setItem('showControls', 'false'); } catch (e) {}
 
-	var MON = 'http://127.0.0.1:8990';
-	var MEM = 'http://127.0.0.1:8993';
-	var AG = 'http://127.0.0.1:8996';
+	var MON = window.NousUrl(8990);
+	var MEM = window.NousUrl(8993);
+	var AG = window.NousUrl(8996);
 	var LARGO = 1280;
 	var UI = window.NousUI || {};
 	var esc = UI.esc || function (s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
@@ -44,6 +44,7 @@
 		['nous-cmp-open', 'Comparar', 'scale'],
 		['nous-store-open', 'Modelos', 'store'],
 		['nous-voice-open', 'Voz', 'mic'],
+		['nous-cel-open', 'Celular', 'phone'],
 		['nous-diag-open', 'Diagnóstico', 'pulse']
 	];
 	var ICON = {
@@ -59,6 +60,7 @@
 		store: '<path d="M3 9 5 4h14l2 5M4 9v11h16V9M3 9h18M9 20v-6h6v6"/>',
 		mic: '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>',
 		pulse: '<path d="M3 12h4l3-8 4 16 3-8h4"/>',
+		phone: '<rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/>',
 		code: '<path d="m8 8-5 4 5 4M16 8l5 4-5 4M14 5l-4 14"/>',
 		sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
 		moon: '<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>',
@@ -510,6 +512,10 @@
 	/* Nome inteiro cortado na barra lateral vira o primeiro nome */
 	function primeiroNome() {
 		var b = document.querySelector('#sidebar button[aria-label="Menu do usuário"], #sidebar button[aria-label="User Menu"]');
+		if (!b) {   /* outro idioma: o botao da conta e' o que tem a foto do usuario */
+			var fotos = document.querySelectorAll('#sidebar button img[src*="/users/"]');
+			b = fotos.length ? fotos[fotos.length - 1].closest('button') : null;
+		}
 		var n = b && b.querySelector('div.truncate');
 		if (!n) return;
 		var t = n.textContent.trim();
