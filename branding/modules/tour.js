@@ -10,7 +10,7 @@
 	var TOURS = {
 		home: { when: function () { return !!document.getElementById('chat-input') && visible('nous-pn') && document.body.classList.contains('nous-pn-fixo') && !anyPanel(); },
 			steps: [
-				['#chat-input', 'Converse aqui, em portugues. Alem de perguntas, voce pode pedir: "me lembre de pagar a luz sexta as 9h", "manda um e-mail pra Maria..." ou colar a foto de um boleto.'],
+				['#message-input-container, #chat-input', 'Converse aqui, em portugues. Alem de perguntas, voce pode pedir: "me lembre de pagar a luz sexta as 9h", "manda um e-mail pra Maria..." ou colar a foto de um boleto.'],
 				['#nous-pn-head', 'Este e\' o seu Nous. O anel em volta da coruja mostra quanto da placa de video esta em uso; fica dourado quando um modelo esta pronto para responder.'],
 				['#nous-pn-mem', 'Aqui fica o que o Nous sabe sobre voce. Veja, corrija ou apague quando quiser.'],
 				['#nous-pn-ferr', 'Agenda, Documentos, E-mail, Editor de fotos e o resto: tudo a um clique.']] },
@@ -36,7 +36,7 @@
 		galeria: { when: function () { return visible('nous-gal-ov'); },
 			steps: [['#nous-gal-filter', 'Marque as favoritas com ★ e organize em albuns com 📁. O ✎ abre a imagem no Editor.']] }
 	};
-	var active = null;
+	var active = null, atual = null;   /* atual = {k, i}: o passo na tela, para o destaque acompanhar o layout */
 
 	function visible(id) { var e = document.getElementById(id); return !!e && !e.classList.contains('nous-hidden'); }
 	/* algum painel do Nous (ou o assistente de primeiro uso) aberto? */
@@ -79,6 +79,7 @@
 		var el = null;
 		while (i < steps.length && !(el = document.querySelector(steps[i][0]))) i++;
 		if (!el) { end(k); return; }
+		atual = { k: k, i: i };
 		var r = el.getBoundingClientRect();
 		var halo = document.getElementById('nous-tour-halo') || document.body.appendChild(Object.assign(document.createElement('div'), { id: 'nous-tour-halo' }));
 		halo.style.left = (r.left - 6) + 'px'; halo.style.top = (r.top - 6) + 'px';
@@ -94,6 +95,20 @@
 		card.style.left = Math.min(window.innerWidth - cw - 12, Math.max(12, r.left)) + 'px';
 		card.querySelector('[data-x="next"]').onclick = function () { if (last) end(k); else show(k, i + 1); };
 		card.querySelector('[data-x="off"]').onclick = function () { try { localStorage.setItem('nous-tour-off', '1'); } catch (e) {} end(k); };
+	}
+
+	/* a barra lateral e o painel abrem e fecham com animacao: o destaque segue o elemento */
+	function acompanhar() {
+		if (!active || !atual) return;
+		var el = document.querySelector(TOURS[atual.k].steps[atual.i][0]);
+		var halo = document.getElementById('nous-tour-halo'), card = document.getElementById('nous-tour-card');
+		if (!el || !halo || !card) return;
+		var r = el.getBoundingClientRect();
+		halo.style.left = (r.left - 6) + 'px'; halo.style.top = (r.top - 6) + 'px';
+		halo.style.width = (r.width + 12) + 'px'; halo.style.height = (r.height + 12) + 'px';
+		var ch = card.offsetHeight || 120;
+		card.style.top = (r.bottom + 14 + ch < window.innerHeight ? r.bottom + 14 : Math.max(10, r.top - ch - 14)) + 'px';
+		card.style.left = Math.min(window.innerWidth - 300 - 12, Math.max(12, r.left)) + 'px';
 	}
 
 	function tick() {
@@ -117,6 +132,7 @@
 	function start() {
 		injectStyle();
 		setInterval(tick, 1500);
+		setInterval(acompanhar, 300);
 	}
 
 	if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);

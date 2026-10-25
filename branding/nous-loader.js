@@ -1857,6 +1857,15 @@
 	var _clPrefDone = false;
 
 	function suppressChangelog() {
+		/* 0.12: o modal "O que ha de novo" e' um dialogo com os links dos commits
+		   do Open WebUI no GitHub; o primeiro botao (o X) fecha. Sem texto. */
+		var dlgs = document.querySelectorAll('[role="dialog"]');
+		for (var d = 0; d < dlgs.length; d++) {
+			if (!dlgs[d].querySelector('a[href*="github.com/open-webui/open-webui/"]')) continue;
+			var x = dlgs[d].querySelector('button');
+			if (x) { x.click(); break; }
+		}
+		/* versoes ate a 0.9: o titulo da versao e' um h3 "vX.Y.Z - AAAA-MM-DD" */
 		var hs = document.querySelectorAll('h3');
 		for (var i = 0; i < hs.length; i++) {
 			if (!CHANGELOG_H3.test((hs[i].textContent || '').trim())) continue;

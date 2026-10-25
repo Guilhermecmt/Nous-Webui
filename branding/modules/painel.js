@@ -510,6 +510,10 @@
 	/* Nome inteiro cortado na barra lateral vira o primeiro nome */
 	function primeiroNome() {
 		var b = document.querySelector('#sidebar button[aria-label="Menu do usuário"], #sidebar button[aria-label="User Menu"]');
+		if (!b) {   /* outro idioma: o botao da conta e' o que tem a foto do usuario */
+			var fotos = document.querySelectorAll('#sidebar button img[src*="/users/"]');
+			b = fotos.length ? fotos[fotos.length - 1].closest('button') : null;
+		}
 		var n = b && b.querySelector('div.truncate');
 		if (!n) return;
 		var t = n.textContent.trim();

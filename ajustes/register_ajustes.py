@@ -83,6 +83,30 @@ def ajuste_2(cx, log):
 AJUSTES = [(1, ajuste_1), (2, ajuste_2)]
 
 
+def sem_novidades(cx):
+    """O Open WebUI mostra as notas da versao, em ingles, ao administrador toda vez
+    que a versao muda (settings.showChangelog, padrao ligado). O Nous e' quem
+    atualiza e conta as novidades: grava showChangelog=false nas contas que ainda
+    nao escolheram. Roda a cada inicio (conta nova tambem entra aqui)."""
+    try:
+        contas = cx.execute("SELECT id, settings FROM user").fetchall()
+    except Exception:
+        return
+    for uid, raw in contas:
+        try:
+            s = json.loads(raw) if isinstance(raw, str) and raw else (raw or {})
+        except Exception:
+            continue
+        if not isinstance(s, dict):
+            s = {}
+        ui = s.get("ui") if isinstance(s.get("ui"), dict) else {}
+        if "showChangelog" in ui:
+            continue
+        ui["showChangelog"] = False
+        s["ui"] = ui
+        cx.execute("UPDATE user SET settings = ? WHERE id = ?", (json.dumps(s, ensure_ascii=False), uid))
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--data-dir", default=None)
@@ -97,10 +121,12 @@ def main():
     except Exception:
         done = 0
     pending = [(v, f) for v, f in AJUSTES if v > done]
-    if not pending:
-        return
     cx = sqlite3.connect(db, timeout=15)
     try:
+        sem_novidades(cx)
+        cx.commit()
+        if not pending:
+            return
         if not cx.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='config'").fetchone():
             print("Tabela 'config' ainda nao criada. Tentarei no proximo boot.")
             return
