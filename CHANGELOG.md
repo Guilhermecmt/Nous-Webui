@@ -1,5 +1,15 @@
 # Changelog
 
+## [Não lançado]
+### Mudado
+- **Conversa mais limpa.** As respostas não mostram mais o nome do modelo nem o
+  avatar em cima do texto, como no ChatGPT e no Claude; o modelo em uso segue no
+  seletor da caixa de texto (`branding/nous-gold.css`).
+- Os avisos "Nous lembrou de N detalhe(s) sobre você" e "Nous encontrou contexto
+  em N conversa(s)" aparecem só na primeira mensagem da conversa e somem cerca de
+  2 segundos depois, sem ficar em cima da resposta (`memory/nous_memory.py`,
+  `history/nous_history.py`).
+
 ## [2.11.0] - 2026-10-25
 O Nous passa para o Open WebUI 0.12.3, abre no celular, sincroniza a agenda nos
 dois sentidos, se atualiza sozinho, ensina quem nunca usou IA e ganha um ícone na

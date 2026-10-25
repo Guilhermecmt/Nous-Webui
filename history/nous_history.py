@@ -18,6 +18,7 @@ description: >
 import os
 import re
 import json
+import asyncio
 import sqlite3
 import datetime
 from typing import Optional
@@ -35,6 +36,28 @@ except Exception:
     requests = None
 
 DB_NAME = "nous_history.sqlite3"
+
+_avisos_pendentes: set = set()
+
+
+async def _aviso_rapido(emit, texto: str, segundos: float = 2.0) -> None:
+    """Mostra o aviso enquanto o pedido sai e some logo depois: nao fica em
+    cima da resposta. O status "hidden" esconde o bloco no Open WebUI 0.12."""
+    try:
+        await emit({"type": "status", "data": {"description": texto, "done": False}})
+    except Exception:
+        return
+
+    async def _some():
+        await asyncio.sleep(segundos)
+        try:
+            await emit({"type": "status", "data": {"description": texto, "done": True, "hidden": True}})
+        except Exception:
+            pass
+
+    t = asyncio.create_task(_some())
+    _avisos_pendentes.add(t)  # sem referencia o asyncio pode descartar a tarefa
+    t.add_done_callback(_avisos_pendentes.discard)
 
 _CACHE = {
     "key":        None,   # (mtime, user_id)
@@ -354,18 +377,10 @@ class Filter:
         dates = [label for label, _ in chunks]
         self._pending_dates[uid] = dates
 
-        if __event_emitter__:
-            n_chats = len(set(srcs))
-            try:
-                await __event_emitter__({
-                    "type": "status",
-                    "data": {
-                        "description": f"Nous encontrou contexto em {n_chats} conversa(s) anterior(es).",
-                        "done": True,
-                    },
-                })
-            except Exception:
-                pass
+        # So' na primeira mensagem da conversa: repetir a cada pergunta cansa.
+        if __event_emitter__ and sum(1 for m in messages if m.get("role") == "user") == 1:
+            await _aviso_rapido(__event_emitter__,
+                                f"Nous encontrou contexto em {len(set(srcs))} conversa(s) anterior(es).")
         return body
 
     async def outlet(self, body: dict, __user__: Optional[dict] = None) -> dict:
