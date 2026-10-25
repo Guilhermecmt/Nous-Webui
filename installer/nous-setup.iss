@@ -7,7 +7,7 @@
 ; ============================================================
 
 #define MyAppName "Nous"
-#define MyAppVersion "2.10.0"
+#define MyAppVersion "2.11.0"
 #define MyAppPublisher "Nous"
 #define MyAppURL "https://github.com/Guilhermecmt/Nous-Webui"
 

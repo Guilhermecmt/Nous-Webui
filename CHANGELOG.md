@@ -1,5 +1,103 @@
 # Changelog
 
+## [2.11.0] - 2026-10-25
+O Nous passa para o Open WebUI 0.12.3, abre no celular, sincroniza a agenda nos
+dois sentidos, se atualiza sozinho e ganha um ícone na bandeja.
+### Novo
+- **Open WebUI 0.12.3** (antes 0.9.6). Quem já tem o Nous é atualizado pelo
+  instalador ou pela atualização automática (`installer/atualizar-openwebui.ps1`):
+  encerra o que está aberto, faz um zip da `NousData` em `bkp\`, instala a versão
+  nova, sobe um servidor de teste para migrar o banco e confere contas, conversas,
+  memórias e arquivos; se algo falhar, volta a versão anterior e os dados do zip.
+  As telas do Nous passaram a se ancorar em ids e atributos estáveis em vez de
+  textos traduzidos, e as configurações lidas e gravadas pelo Nous funcionam nos
+  dois formatos de tabela do Open WebUI (`ajustes/config_db.py`). A busca na web e
+  os documentos seguem no modo "legacy" de ferramentas, porque o modo nativo do
+  0.10+ não funciona com modelos pequenos. O ambiente do servidor mora agora em
+  `launchers/nous-env.ps1`, usado pelo lançador e pelo atualizador.
+- **Loja** com catálogo novo (qwen3.5, qwen3.6, qwen3.8, gemma4 12b/26b/31b,
+  gpt-oss, ministral-3) e um campo `ranking` explícito que ordena a lista e escolhe
+  os recomendados, sem usar o tamanho do arquivo como medida de qualidade.
+- **Usar no celular** (`celular/`, `branding/modules/celular.js`,
+  `docs/CELULAR.md`). O Nous abre no celular, em casa, pelo mesmo Wi-Fi. Vem
+  desligado: em Seu Nous > Celular você liga, lê um QR com um código de uso único
+  (vence em 5 minutos) e o celular guarda um cookie de aparelho (`HttpOnly`,
+  `SameSite=Strict`; só o hash fica no disco). Por trás há um portão próprio
+  (porta 8999) que só existe enquanto está ligado: aceita só IPs da rede de casa,
+  confere Host e Origin, freia tentativas de código e repassa o Open WebUI (HTTP,
+  streaming, WebSocket) e os serviços do Nous pela mesma origem. O Open WebUI e os
+  serviços continuam só em 127.0.0.1, e o Nous Code fica de fora. O Windows pede
+  permissão uma vez para uma regra de firewall só para rede Privada, removida ao
+  desligar e na desinstalação; em rede Pública o Nous não liga. É HTTP puro (um
+  certificado próprio assustaria quem não é técnico), então microfone e "instalar
+  como app" não funcionam no celular. Nos módulos, os endereços fixos
+  `127.0.0.1:89xx` viraram `NousUrl(porta)`.
+- **Agenda: sincronização de duas vias por CalDAV** (`agenda/caldav_sync.py`,
+  `docs/AGENDA-CALDAV.md`). Em Agenda > Calendário, conecte uma conta CalDAV
+  (iCloud, Nextcloud, Fastmail, Radicale... com senha de app), escolha os
+  calendários e o Nous sincroniza de 5 em 5 minutos e logo depois de cada mudança
+  feita aqui (sync-token, ctag e etag; envio com If-Match). O que o Nous não conhece
+  (participantes, exceções de séries, alarmes) é preservado, e o alarme do servidor
+  vira o lembrete do Nous. Se o mesmo compromisso mudar dos dois lados, vale o do
+  servidor e a versão do Nous fica guardada como "(versão do Nous)", com aviso. A
+  senha de app fica protegida pelo DPAPI do Windows. Dá para editar compromissos e
+  escolher onde guardar os novos. O Google Agenda não aceita senha de app no CalDAV
+  (só OAuth): o Nous explica e mantém o endereço iCal secreto, somente leitura.
+- **Ícone na bandeja** (`launchers/bandeja.ps1`): Abrir o Nous, Iniciar/Parar,
+  Nous Code, celular ligado ou não e o estado da máquina (rodando ou parado, placa
+  de vídeo ou processador, memória, modelo carregado). Sobe junto com o Nous;
+  abrir com o Windows é opcional e vem desligado.
+- **Atualização automática** (`atualizacao/nous-atualizar.ps1`,
+  `docs/DISTRIBUICAO.md`). O Nous procura versão nova no máximo 1 vez por dia (usa
+  a internet; dá para desligar no menu do ícone) e avisa no painel e na bandeja.
+  Nada é baixado sem o clique em "Atualizar": o pacote é conferido pelo SHA256
+  publicado na release, a versão atual é guardada e, se algo falhar, o Nous volta
+  sozinho. Modelos instalados com versão nova no registro do Ollama também são
+  avisados e atualizados com um clique.
+- **Instalador .exe** pronto para assinar: `tools/compilar-instalador.ps1` compila o
+  `Nous-Setup.exe`, `tools/assinar-instalador.ps1` assina quando houver certificado
+  (por enquanto o SmartScreen avisa) e `tools/empacotar-release.ps1` gera o pacote
+  da release com o hash.
+- **Nous Code**: depois de cada edição, o agente consulta o language server
+  (TypeScript, JavaScript e Python) e recebe só os erros que a edição criou, no
+  máximo 5, para corrigir no passo seguinte; o editor sublinha os mesmos erros. A
+  **tarefa separada** (menu ⋯ da conversa) faz o agente trabalhar numa cópia do
+  projeto (worktree do Git); no fim, "Revisar e aplicar" mostra o diff e leva as
+  mudanças ao projeto sem commitar, ou recusa sem tocar em nada se o projeto mudou
+  nos mesmos trechos. O `subagent` aceita `edit=true` com `files`: edita só esses
+  arquivos, não roda comandos e passa pela mesma aprovação com diff. O instalador
+  baixa o **Node.js 22 portátil** (zip oficial, SHA256 fixado) para `runtime\node`
+  quando o computador não tem Node 22.18+, sem mexer no PATH.
+- **Ollama**: quando o Nous instala o Ollama, a tela de boas-vindas dele já vem
+  concluída e a nuvem do Ollama desligada; modelos de nuvem ficam escondidos do
+  seletor.
+### Corrigido
+- **E-mail testado de ponta a ponta com um servidor IMAP/SMTP de mentira**
+  (`email/testes/`, 106 testes sem rede e sem Ollama). O Nous agora confere o
+  certificado do servidor (antes a senha podia ir para qualquer um no meio do
+  caminho), tem limite de tempo em toda conexão e explica os erros em português.
+  Nada é enviado sem confirmação explícita (`confirmado: true` em todo envio,
+  agendamento e descadastro) e um rascunho não sai duas vezes. Assuntos com quebra
+  de linha não injetam cabeçalhos. Modelos de nuvem do Ollama (`-cloud`,
+  `remote_host`) deixaram de receber e-mail. Senhas com acento funcionam, a
+  triagem lê o começo do corpo (antes só o assunto), corpos com charset
+  desconhecido não ficam vazios e o resumo de uma conta não aparece em outra.
+- **Motor de imagem testado de ponta a ponta** numa RX 9070 XT, com ROCm nativo no
+  Windows (sem ZLUDA nem HIP SDK). O `install-comfyui.ps1` confere o espaço em
+  disco e o `download-models.ps1` retoma downloads. O Pipe de imagem reconhece mais
+  pedidos ("desenhe um farol"), libera a placa antes de gerar e solta a VRAM
+  depois; o link quebrado do termo de responsabilidade virou um aviso curto. O
+  monitor encerra o ComfyUI parado há 10 minutos (`NOUS_COMFY_IDLE_MIN`). Primeira
+  imagem em ~34 s com a placa livre.
+- Fusos (`TZID`) de compromissos importados no Windows sem o pacote tzdata.
+- As notas de versão em inglês do Open WebUI não aparecem mais num banco novo, e o
+  modelo escolhido na instalação segue como padrão.
+### Segurança
+- O servidor local só aceita pedidos do próprio Nous (CORS). Antes, sem login,
+  qualquer site aberto no navegador poderia conversar com ele.
+- Testes novos no `tools/lint.ps1`: CalDAV (servidor de mentira e Radicale),
+  e-mail (servidor falso) e o portão do celular. A CI usa o Node 22.
+
 ## [2.10.0] - 2026-10-17
 O Nous abre como um programa do computador: sem tela de login.
 ### Novo

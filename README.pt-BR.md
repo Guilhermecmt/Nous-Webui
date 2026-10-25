@@ -9,7 +9,7 @@
 Chat, documentos, agenda, e-mail, pesquisa e programação com IA local no Windows.<br>
 Sem nuvem, sem mensalidade e sem conta para criar.
 
-[![Versão](https://img.shields.io/badge/vers%C3%A3o-2.10.0-c8962e)](CHANGELOG.md)
+[![Versão](https://img.shields.io/badge/vers%C3%A3o-2.11.0-c8962e)](CHANGELOG.md)
 [![Licença MIT](https://img.shields.io/badge/licen%C3%A7a-MIT-1f1b16)](LICENSE)
 [![Windows 10 e 11](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6)](#requisitos)
 [![100% local](https://img.shields.io/badge/IA-100%25%20local-2ea44f)](#privacidade-e-segurança)
@@ -80,6 +80,14 @@ Um IDE com agente de programação que usa só IA local, aberto numa janela pró
 
 Precisa do [Node.js](https://nodejs.org) 22.18 ou mais novo (`winget install OpenJS.NodeJS.LTS`). Com ele presente, o instalador baixa o editor e cria o atalho. Detalhes técnicos em [`code/README.md`](code/README.md).
 
+## Novidades da versão 2.11
+
+- **No celular.** Em casa, pelo mesmo Wi-Fi: ligue em **Seu Nous › Celular** e leia o QR. Vem desligado, e só aparelhos que você parear entram. Veja [docs/CELULAR.md](docs/CELULAR.md).
+- **Agenda nos dois sentidos.** Conecte iCloud, Nextcloud ou Fastmail (CalDAV) e o que você muda aqui aparece lá, e vice-versa. Veja [docs/AGENDA-CALDAV.md](docs/AGENDA-CALDAV.md).
+- **Ícone na bandeja.** Perto do relógio: abrir, iniciar, parar e ver o estado do Nous sem janela nenhuma.
+- **Atualiza sozinho.** O Nous avisa quando há versão nova dele ou de um modelo e atualiza com um clique, voltando ao que era se algo der errado.
+- **Por dentro.** Open WebUI 0.12.3, Loja com modelos novos, e-mail e motor de imagem testados de ponta a ponta, e o Nous Code corrigindo os próprios erros.
+
 ## Novidades da versão 2.10
 
 - **Sem login.** O Nous abre direto no chat, como qualquer programa. A sua conta e as suas conversas antigas continuam lá. Com duas ou mais contas no mesmo PC, o login volta sozinho.
@@ -97,7 +105,6 @@ O histórico completo está no [CHANGELOG](CHANGELOG.md).
 | Memória RAM | 8 GB | 16 GB ou mais |
 | Placa de vídeo | Nenhuma: roda na CPU | 8 GB de VRAM ou mais |
 | Disco livre | 20 GB | 30 GB ou mais |
-| Nous Code (opcional) | Node.js 22.18 | Node.js LTS atual |
 
 Sem placa de vídeo dedicada, o Nous funciona na CPU e as respostas só demoram mais. A Loja de modelos percebe isso e recomenda modelos leves.
 
@@ -108,7 +115,7 @@ Sem placa de vídeo dedicada, o Nous funciona na CPU e as respostas só demoram 
 
 O instalador:
 - confere o hardware;
-- instala o Ollama, o Python 3.11 e a interface (sem mexer no que já existe na máquina);
+- instala o Ollama, o Python 3.11, a interface e o Node.js portátil do Nous Code (sem mexer no que já existe na máquina);
 - aplica a identidade do Nous;
 - cria os atalhos na área de trabalho e no Menu Iniciar.
 
@@ -226,7 +233,9 @@ Os relatórios ficam em **Ferramentas › Pesquisas**, baixam em PDF ou Word e p
 ## Privacidade e segurança
 
 - **Tudo local.** Os modelos rodam no Ollama da sua máquina. Conversas, memórias, documentos e índices ficam em `%USERPROFILE%\NousData`.
-- **Só o próprio PC.** O servidor do Nous e todos os serviços escutam apenas em `127.0.0.1`, então outros aparelhos da rede não chegam neles. Os serviços recusam páginas de outros sites.
+- **Só o próprio PC.** O servidor do Nous e todos os serviços escutam apenas em `127.0.0.1`, então outros aparelhos da rede não chegam neles. O servidor e os serviços recusam páginas de outros sites.
+- **Celular só se você ligar.** O portão do celular só existe enquanto está ligado, só atende a rede de casa (rede Privada no Windows) e só aparelhos pareados por QR. Quem entra usa o Nous inteiro, porque não há login. O Nous Code nunca passa por ele.
+- **Atualização com aviso.** Procurar versão nova é uma ida à internet, no máximo uma vez por dia, e dá para desligar no ícone da bandeja. Nada é baixado sem o seu clique.
 - **Sem login, com escolha.** Como ninguém de fora acessa o Nous, quem protege os dados é a senha do Windows. Para exigir login mesmo assim, crie um arquivo vazio `NousData\.exigir_login`.
 - **Nada sai sem você pedir.** A busca na web, a Nuvem NVIDIA e o e-mail são opcionais. A memória pessoal nunca vai para modelos de nuvem.
 - **Agente sob controle.** O Nous Code só mexe na pasta do projeto escolhido. Mudanças e comandos pedem aprovação, a internet pede permissão por conversa, e tudo o que ele muda pode ser desfeito.
@@ -260,13 +269,25 @@ Abra o Nous pelo atalho, que liga todos os serviços. Se continuar, use **Libera
 <details>
 <summary><b>O Nous Code não abre</b></summary>
 
-Instale o Node.js (`winget install OpenJS.NodeJS.LTS`) e rode o `instalar.bat` de novo: ele baixa o editor e cria o atalho **Nous Code**.
+Rode o `instalar.bat` de novo: ele baixa o Node.js portátil (se o computador não tiver o Node 22.18 ou mais novo), baixa o editor e cria o atalho **Nous Code**.
 </details>
 
 <details>
 <summary><b>Quero a tela de login de volta</b></summary>
 
 Crie um arquivo vazio chamado `.exigir_login` em `%USERPROFILE%\NousData` e abra o Nous de novo. A sua conta volta ao e-mail e à senha de antes. Para tirar o login outra vez, apague o arquivo.
+</details>
+
+<details>
+<summary><b>Não acho o ícone do Nous perto do relógio</b></summary>
+
+No Windows 11 os ícones novos começam escondidos na setinha **^** da barra de tarefas. Abra a setinha e arraste a coruja para a barra.
+</details>
+
+<details>
+<summary><b>O celular não abre o Nous</b></summary>
+
+Confira se o celular está no mesmo Wi-Fi do computador e se a rede do Windows está como **Privada** (o painel do celular avisa e mostra o caminho). Na primeira vez que você liga, o Windows pede permissão para o firewall: aceite.
 </details>
 
 ## Desinstalar
@@ -279,7 +300,7 @@ Em **Configurações → Aplicativos → Aplicativos instalados**, procure **Nou
 
 ### Arquitetura
 
-O Nous é uma camada de produto sobre o Open WebUI 0.9.6 (versão fixada no instalador). Ele junta a identidade visual, injetada por um `loader.js` com os painéis, filtros e pipes registrados no banco e serviços locais pequenos, todos em `127.0.0.1`:
+O Nous é uma camada de produto sobre o Open WebUI 0.12.3 (versão fixada no instalador). Ele junta a identidade visual, injetada por um `loader.js` com os painéis, filtros e pipes registrados no banco e serviços locais pequenos, todos em `127.0.0.1`:
 
 | Porta | Serviço | Pasta |
 |---|---|---|
@@ -292,6 +313,7 @@ O Nous é uma camada de produto sobre o Open WebUI 0.9.6 (versão fixada no inst
 | 8996 | Agenda, lembretes e tarefas | `agenda/` |
 | 8997 | Habilidades | `skills/` |
 | 8998 | Nous Code (IDE e agente, Node) | `code/` |
+| 8999 | Portão do celular (só quando ligado; rede de casa) | `celular/` |
 | 8188 | ComfyUI (opcional) | `images/` |
 | 11434 | Ollama | |
 
@@ -325,11 +347,11 @@ tools/       lint, health check, backup, análise de hardware
 ### Testes e lint
 
 ```powershell
-tools\lint.ps1            # PowerShell 5.1, Python, JSON, JavaScript e os tipos e testes do Nous Code
+tools\lint.ps1            # PowerShell 5.1, Python, JSON, JavaScript, Nous Code e os testes da Agenda (CalDAV), do e-mail e do celular
 cd code; npm install; npm test
 ```
 
-O lint roda no CI a cada push. Os testes do Nous Code usam um Ollama de mentira para verificar as políticas do agente sem depender de modelo.
+O lint roda no CI a cada push. Os testes não dependem de rede nem de modelo: o Nous Code usa um Ollama de mentira, o e-mail um servidor IMAP/SMTP falso, a Agenda um servidor CalDAV de mentira (e o Radicale, se estiver instalado) e o celular um portão com Open WebUI de mentira.
 
 ### Instalação por linha de comando
 
