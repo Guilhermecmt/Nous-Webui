@@ -1,6 +1,7 @@
 /* =====================================================================
    Nous - Agenda (v2.7): notas, lembretes, calendario e tarefas agendadas.
-   Botao "Agenda" no card Recursos -> painel com 4 abas. Fala com o servico
+   Botao "Agenda" no card Recursos -> painel com 4 abas. Em Calendario:
+   sincronizacao de duas vias com uma conta CalDAV (iCloud, Nextcloud, Fastmail...). Fala com o servico
    local da agenda (127.0.0.1:8996). Avisos (lembretes, compromissos e
    tarefas prontas) aparecem como cartoes no canto da tela.
    Concatenado no loader.js pelo apply_branding.py; usa window.NousUI.
@@ -12,7 +13,7 @@
 	var UI = window.NousUI || {};
 	var esc = UI.esc || function (s) { return String(s || ''); };
 	var uid = null;
-	var ov = null, tab = 'hoje', calMonth = null, calDay = null, editNote = null;
+	var ov = null, tab = 'hoje', calMonth = null, calDay = null, editNote = null, editEv = null;
 	var DIAS = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sab'];
 	var MESES = ['janeiro', 'fevereiro', 'marco', 'abril', 'maio', 'junho', 'julho',
 		'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
@@ -468,6 +469,8 @@
 	}
 
 	/* ---------------------------------------------------------- Calendario */
+	var evById = {}, davBusy = false, davNote = null;
+
 	function renderCal(box) {
 		var now = new Date();
 		if (!calMonth) calMonth = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -479,9 +482,12 @@
 		gridEnd.setDate(gridStart.getDate() + 42);
 		Promise.all([
 			api('GET', qs('/events', { from: Math.floor(gridStart.getTime() / 1000), to: Math.floor(gridEnd.getTime() / 1000) })),
-			api('GET', qs('/subs'))
+			api('GET', qs('/subs')),
+			api('GET', qs('/caldav')).catch(function () { return { accounts: [] }; })
 		]).then(function (res) {
-			var evs = res[0].events, subs = res[1].subs, byDay = {};
+			var evs = res[0].events, subs = res[1].subs, accounts = res[2].accounts || [], byDay = {};
+			evById = {};
+			evs.forEach(function (e) { evById[e.id] = e; });
 			evs.forEach(function (e) {
 				var k = dayKey(new Date(e.occ_start * 1000));
 				(byDay[k] = byDay[k] || []).push(e);
@@ -507,35 +513,196 @@
 				html += '<div class="nous-ag-item"><span class="nous-ag-time">' + (e.all_day ? 'dia' : hm(e.occ_start)) + '</span>' +
 					'<div class="nous-ag-main"><div class="nous-ag-tt">' + esc(e.title) +
 					(e.rrule ? '<span class="nous-ag-tag">repete</span>' : '') +
-					(e.source !== 'local' ? '<span class="nous-ag-tag">assinatura</span>' : '') + '</div>' +
+					(e.source.indexOf('sub:') === 0 ? '<span class="nous-ag-tag">assinatura</span>' : '') +
+					(e.source.indexOf('dav:') === 0 ? '<span class="nous-ag-tag" title="Sincronizado com o servidor">' + esc(e.cal || 'servidor') + '</span>' : '') +
+					(e.dirty ? '<span class="nous-ag-tag" title="Ainda vai subir para o servidor">enviando</span>' : '') + '</div>' +
 					(e.location ? '<div class="nous-ag-sub">' + esc(e.location) + '</div>' : '') +
 					(e.description ? '<div class="nous-ag-sub">' + esc(e.description.slice(0, 300)) + '</div>' : '') + '</div>' +
-					(e.source === 'local' ? '<button class="nous-ag-act" title="Apagar" data-edel="' + e.id + '">🗑</button>' : '') + '</div>';
+					(e.source === 'local' || e.source.indexOf('dav:') === 0 ?
+						'<button class="nous-ag-act" title="Editar" data-eedit="' + e.id + '">✎</button>' +
+						'<button class="nous-ag-act" title="Apagar" data-edel="' + e.id + '">🗑</button>' : '') + '</div>';
 			});
-			html += eventForm() + subsHtml(subs);
+			html += eventForm(accounts) + davHtml(accounts) + subsHtml(subs);
 			box.innerHTML = html;
 			bindCal(box);
 		}).catch(function () { offline(box); });
 	}
 
-	function eventForm() {
-		var rep = Object.keys(REPEAT_LABEL).map(function (k) {
-			return '<option value="' + k + '">' + REPEAT_LABEL[k] + '</option>';
+	function davCalOptions(accounts, selected) {
+		var out = '<option value="">So neste computador</option>';
+		accounts.forEach(function (a) {
+			(a.calendars || []).forEach(function (c) {
+				if (!c.enabled) return;
+				out += '<option value="' + c.id + '"' + (c.id === selected ? ' selected' : '') + '>' +
+					esc(c.name) + ' (' + esc(a.name) + ')</option>';
+			});
+		});
+		return out;
+	}
+
+	function hasDavCal(accounts) {
+		return accounts.some(function (a) { return (a.calendars || []).some(function (c) { return c.enabled; }); });
+	}
+
+	function eventForm(accounts) {
+		var ed = editEv, rrKey = '', defCal = '';
+		var repKeys = Object.keys(REPEAT_LABEL);
+		if (ed && ed.rrule) {
+			repKeys.forEach(function (k) { if (k && REPEATS_RULE[k] === ed.rrule) rrKey = k; });
+			if (!rrKey) rrKey = '__keep';
+		}
+		var rep = repKeys.map(function (k) {
+			return '<option value="' + k + '"' + (k === rrKey ? ' selected' : '') + '>' + REPEAT_LABEL[k] + '</option>';
 		}).join('');
-		return '<div class="nous-ag-h">Novo compromisso</div><div class="nous-ag-form">' +
-			'<input id="nous-ag-et" placeholder="O que (ex.: Dentista)">' +
-			'<div class="nous-ag-row"><div><span class="nous-ag-lbl">Dia</span><input id="nous-ag-ed" type="date" value="' + calDay + '"></div>' +
-			'<div><span class="nous-ag-lbl">Inicio</span><input id="nous-ag-es" type="time" value="09:00"></div>' +
-			'<div><span class="nous-ag-lbl">Fim</span><input id="nous-ag-ee" type="time" value="10:00"></div></div>' +
+		if (rrKey === '__keep') rep = '<option value="__keep" selected>Como esta (repeticao personalizada)</option>' + rep;
+		accounts.forEach(function (a) {
+			(a.calendars || []).forEach(function (c) { if (c.enabled && c.is_default && !defCal) defCal = c.id; });
+		});
+		var day = calDay, st = '09:00', en = '10:00', allDay = false, remind = '30';
+		if (ed) {
+			var sd = new Date(ed.start_at * 1000), ee = new Date(ed.end_at * 1000);
+			day = dayKey(sd); st = d2(sd.getHours()) + ':' + d2(sd.getMinutes());
+			en = d2(ee.getHours()) + ':' + d2(ee.getMinutes()); allDay = !!ed.all_day;
+			remind = ed.remind_min === null || ed.remind_min === undefined ? '' : String(ed.remind_min);
+		}
+		function opt(v, label) { return '<option value="' + v + '"' + (remind === v ? ' selected' : '') + '>' + label + '</option>'; }
+		var calSel = '';
+		if (!ed && hasDavCal(accounts)) {
+			calSel = '<span class="nous-ag-lbl">Guardar em</span><select id="nous-ag-ec">' + davCalOptions(accounts, defCal) + '</select>';
+		}
+		return '<div class="nous-ag-h">' + (ed ? 'Editar compromisso' : 'Novo compromisso') + '</div><div class="nous-ag-form">' +
+			'<input id="nous-ag-et" placeholder="O que (ex.: Dentista)" value="' + esc(ed ? ed.title : '') + '">' +
+			'<div class="nous-ag-row"><div><span class="nous-ag-lbl">' + (ed && ed.rrule ? 'Dia (da 1a vez)' : 'Dia') + '</span><input id="nous-ag-ed" type="date" value="' + day + '"></div>' +
+			'<div><span class="nous-ag-lbl">Inicio</span><input id="nous-ag-es" type="time" value="' + st + '"></div>' +
+			'<div><span class="nous-ag-lbl">Fim</span><input id="nous-ag-ee" type="time" value="' + en + '"></div></div>' +
 			'<div class="nous-ag-row"><div><span class="nous-ag-lbl">Repetir</span><select id="nous-ag-er">' + rep + '</select></div>' +
 			'<div><span class="nous-ag-lbl">Avisar</span><select id="nous-ag-ea">' +
-			'<option value="">Sem aviso</option><option value="0">Na hora</option><option value="10">10 min antes</option>' +
-			'<option value="30" selected>30 min antes</option><option value="60">1 hora antes</option>' +
-			'<option value="1440">1 dia antes</option></select></div></div>' +
-			'<input id="nous-ag-el" placeholder="Local (opcional)">' +
-			'<label class="nous-ag-lbl"><input id="nous-ag-ew" type="checkbox">Dia inteiro</label><br><br>' +
-			'<button class="nous-ag-btn" id="nous-ag-eb" type="button">Salvar compromisso</button>' +
+			opt('', 'Sem aviso') + opt('0', 'Na hora') + opt('10', '10 min antes') +
+			opt('30', '30 min antes') + opt('60', '1 hora antes') + opt('1440', '1 dia antes') + '</select></div></div>' +
+			'<input id="nous-ag-el" placeholder="Local (opcional)" value="' + esc(ed ? ed.location : '') + '">' + calSel +
+			'<label class="nous-ag-lbl"><input id="nous-ag-ew" type="checkbox"' + (allDay ? ' checked' : '') + '>Dia inteiro</label><br><br>' +
+			'<button class="nous-ag-btn" id="nous-ag-eb" type="button">' + (ed ? 'Salvar alteracoes' : 'Salvar compromisso') + '</button>' +
+			(ed ? ' <button class="nous-ag-btn ghost" id="nous-ag-ex" type="button">Cancelar</button>' : '') +
 			'<span class="nous-ag-msg" id="nous-ag-em"></span></div>';
+	}
+
+	/* ---------------------------------------------------------- CalDAV */
+	var REPEATS_RULE = { diario: 'FREQ=DAILY', dias_uteis: 'FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR', semanal: 'FREQ=WEEKLY',
+		mensal: 'FREQ=MONTHLY', anual: 'FREQ=YEARLY' };
+	var DAV_PRESETS = { icloud: ['https://caldav.icloud.com', 'iCloud (Apple)'],
+		nextcloud: ['', 'Nextcloud (https://seu-servidor/remote.php/dav)'],
+		fastmail: ['https://caldav.fastmail.com', 'Fastmail'], outro: ['', 'Outro servidor CalDAV'] };
+
+	function davStatus(a) {
+		var now = Date.now() / 1000;
+		var t = a.last_ok ? 'Sincronizado ' + dayLabel(a.last_ok, now).toLowerCase() + ' ' + hm(a.last_ok) +
+			(a.last_summary ? ' - ' + a.last_summary : '') : (a.last_sync ? 'Ainda nao conseguiu sincronizar' : 'Ainda nao sincronizou');
+		if (a.pending) t += ' - ' + a.pending + ' alteracao(oes) aguardando para subir';
+		return t;
+	}
+
+	function davHtml(accounts) {
+		var html = '<div class="nous-ag-h">Sincronizar com o servidor (CalDAV)</div><div class="nous-ag-form">';
+		if (!accounts.length) {
+			html += '<div class="nous-ag-hint">Mantenha o Nous e a sua agenda do iCloud, Nextcloud ou Fastmail iguais nos dois sentidos: ' +
+				'o que voce criar, mudar ou apagar aqui sobe, e o que mudar la desce. Use uma <b>senha de app</b> ' +
+				'(criada nas configuracoes de seguranca do servico), nao a sua senha normal. ' +
+				'<b>Google Agenda:</b> o Google nao aceita senha de app no CalDAV, entao la so e possivel trazer a agenda ' +
+				'(somente leitura) pelo endereco secreto iCal, logo abaixo em "Outros calendarios".</div>' +
+				'<span class="nous-ag-lbl">Servico</span><select id="nous-dv-p">' +
+				Object.keys(DAV_PRESETS).map(function (k) { return '<option value="' + k + '">' + DAV_PRESETS[k][1] + '</option>'; }).join('') +
+				'</select><input id="nous-dv-u" placeholder="Endereco do servidor (https://...)" value="' + DAV_PRESETS.icloud[0] + '">' +
+				'<input id="nous-dv-n" placeholder="Usuario (e-mail ou Apple ID)" autocomplete="off">' +
+				'<input id="nous-dv-s" type="password" placeholder="Senha de app" autocomplete="new-password">' +
+				'<button class="nous-ag-btn" id="nous-dv-go" type="button">Conectar</button>';
+		}
+		accounts.forEach(function (a) {
+			var cals = a.calendars || [], any = cals.some(function (c) { return c.enabled; });
+			html += '<div class="nous-ag-item" data-acc="' + a.id + '"><div class="nous-ag-main"><div class="nous-ag-tt">' + esc(a.name) +
+				'<span class="nous-ag-tag">' + esc(a.username) + '</span></div>' +
+				'<div class="nous-ag-sub' + (a.last_error ? ' nous-ag-bad' : '') + '">' +
+				esc(a.last_error ? 'Problema: ' + a.last_error : davStatus(a)) + '</div></div></div>' +
+				'<div class="nous-ag-hint" style="margin-top:8px">' + (any ? 'Calendarios sincronizados (a bolinha marca onde ficam os compromissos novos):' :
+					'Conectado! Marque os calendarios que o Nous deve sincronizar:') + '</div>';
+			cals.forEach(function (c) {
+				html += '<div class="nous-ag-chk" style="justify-content:space-between"><label style="display:flex;gap:6px;align-items:center;flex:1">' +
+					'<input type="checkbox" data-dcal="' + c.id + '"' + (c.enabled ? ' checked' : '') + '> ' + esc(c.name) + '</label>' +
+					'<label title="Calendario padrao para compromissos novos" style="font-size:11px;opacity:.7"><input type="radio" name="nous-dv-def" data-ddef="' + c.id + '"' +
+					(c.is_default ? ' checked' : '') + '></label></div>' +
+					(c.last_error ? '<div class="nous-ag-sub nous-ag-bad">' + esc(c.last_error) + '</div>' : '');
+			});
+			html += '<div class="nous-ag-hint">Desmarcar um calendario tira os compromissos dele do Nous (no servidor nada e apagado). ' +
+				'Se o mesmo compromisso mudar aqui e la ao mesmo tempo, vale o do servidor e a sua versao fica guardada ' +
+				'com "(versao do Nous)" no nome, com um aviso.</div>' +
+				'<button class="nous-ag-btn" data-dsave="' + a.id + '" type="button">Salvar escolha</button> ' +
+				'<button class="nous-ag-btn ghost" data-dsync="' + a.id + '" type="button">Sincronizar agora</button> ' +
+				'<button class="nous-ag-btn ghost" data-ddis="' + a.id + '" type="button">Desconectar</button>';
+		});
+		html += '<span class="nous-ag-msg' + (davNote && davNote.bad ? ' nous-ag-bad' : '') + '" id="nous-dv-m">' + esc(davNote ? davNote.text : '') + '</span></div>';
+		return html;
+	}
+
+	function davMsg(box, text, bad) {
+		davNote = text ? { text: text, bad: !!bad } : null;
+		var m = box.querySelector('#nous-dv-m');
+		if (m) { m.textContent = text || ''; m.className = 'nous-ag-msg' + (bad ? ' nous-ag-bad' : ''); }
+	}
+
+	function davRun(box, label, req, done) {
+		if (davBusy) return;
+		davBusy = true;
+		davMsg(box, label);
+		box.querySelectorAll('button').forEach(function (b) { b.disabled = true; });
+		req().then(function (d) { davBusy = false; davMsg(box, ''); if (done) done(d); renderCal(box); })
+			.catch(function (err) { davBusy = false; box.querySelectorAll('button').forEach(function (b) { b.disabled = false; }); davMsg(box, err.message, true); });
+	}
+
+	function sumSync(d) {
+		var r = (d.sync && d.sync.length !== undefined ? d.sync : [d.sync || {}])[0] || {};
+		if (r.error) throw new Error(r.error);
+		davNote = { text: 'Pronto: ' + (r.summary || 'tudo em dia') + '.', bad: false };
+	}
+
+	function bindDav(box) {
+		var go = box.querySelector('#nous-dv-go');
+		if (go) {
+			var pre = box.querySelector('#nous-dv-p'), url = box.querySelector('#nous-dv-u');
+			pre.addEventListener('change', function () { url.value = DAV_PRESETS[pre.value][0]; url.focus(); });
+			go.addEventListener('click', function () {
+				davRun(box, 'Conectando... (pode levar alguns segundos)', function () {
+					return api('POST', '/caldav/connect', { server: url.value, username: box.querySelector('#nous-dv-n').value,
+						password: box.querySelector('#nous-dv-s').value, name: DAV_PRESETS[pre.value][1].split(' (')[0] });
+				});
+			});
+		}
+		box.querySelectorAll('[data-dsave]').forEach(function (b) {
+			b.addEventListener('click', function () {
+				var on = [], def = null;
+				box.querySelectorAll('[data-dcal]').forEach(function (c) { if (c.checked) on.push(c.getAttribute('data-dcal')); });
+				var r = box.querySelector('[data-ddef]:checked');
+				if (r) def = r.getAttribute('data-ddef');
+				davRun(box, 'Sincronizando... (a primeira vez pode demorar)', function () {
+					return api('POST', '/caldav/calendars', { account_id: b.getAttribute('data-dsave'), enabled: on, default_id: def });
+				}, function (d) { try { sumSync(d); } catch (e) { davNote = { text: e.message, bad: true }; } });
+			});
+		});
+		box.querySelectorAll('[data-dsync]').forEach(function (b) {
+			b.addEventListener('click', function () {
+				davRun(box, 'Sincronizando...', function () {
+					return api('POST', '/caldav/sync', { account_id: b.getAttribute('data-dsync'), force: true });
+				}, function (d) { try { sumSync(d); } catch (e) { davNote = { text: e.message, bad: true }; } });
+			});
+		});
+		box.querySelectorAll('[data-ddis]').forEach(function (b) {
+			b.addEventListener('click', function () {
+				window.NousUI.pede('Desconectar esta conta? Os compromissos dela saem do Nous (no servidor nada e apagado).').then(function (sim) {
+					if (!sim) return;
+					davRun(box, 'Desconectando...', function () {
+						return api('POST', '/caldav/disconnect', { account_id: b.getAttribute('data-ddis') });
+					});
+				});
+			});
+		});
 	}
 
 	function subsHtml(subs) {
@@ -579,6 +746,15 @@
 				});
 			});
 		});
+		box.querySelectorAll('[data-eedit]').forEach(function (b) {
+			b.addEventListener('click', function () {
+				editEv = evById[b.getAttribute('data-eedit')] || null;
+				renderCal(box);
+			});
+		});
+		var cancelEdit = box.querySelector('#nous-ag-ex');
+		if (cancelEdit) cancelEdit.addEventListener('click', function () { editEv = null; renderCal(box); });
+		bindDav(box);
 		box.querySelectorAll('[data-sdel]').forEach(function (b) {
 			b.addEventListener('click', function () {
 				window.NousUI.pede('Remover este calendario do Nous?').then(function (sim) {
@@ -596,7 +772,19 @@
 				location: box.querySelector('#nous-ag-el').value, repeat: box.querySelector('#nous-ag-er').value || null,
 				remind_min: box.querySelector('#nous-ag-ea').value
 			};
-			api('POST', '/events', p).then(function () { calDay = day; renderCal(box); })
+			var rr = box.querySelector('#nous-ag-er').value;
+			if (rr === '__keep') delete p.repeat;
+			else if (editEv) p.repeat = rr;  // '' = deixa de repetir
+			var req;
+			if (editEv) {
+				p.id = editEv.id;
+				req = api('POST', '/events/update', p);
+			} else {
+				var cs = box.querySelector('#nous-ag-ec');
+				if (cs && cs.value) p.calendar_id = cs.value;
+				req = api('POST', '/events', p);
+			}
+			req.then(function () { calDay = day; editEv = null; renderCal(box); })
 				.catch(function (err) { msg(box.querySelector('#nous-ag-em'), err.message, true); });
 		});
 		box.querySelector('#nous-ag-sb').addEventListener('click', function () {
@@ -766,11 +954,11 @@
 				items.forEach(function (n) {
 					var el = document.createElement('div');
 					el.className = 'nous-ag-toast';
-					var icon = n.kind === 'tarefa' ? '⚡ ' : n.kind === 'compromisso' ? '📅 ' : '⏰ ';
+					var icon = n.kind === 'tarefa' ? '⚡ ' : n.kind === 'compromisso' ? '📅 ' : n.kind === 'sincronizacao' ? '🔄 ' : '⏰ ';
 					el.innerHTML = '<b>' + icon + esc(n.title) + '</b>' + (n.body ? '<span>' + esc(n.body.slice(0, 220)) + '</span>' : '');
 					el.addEventListener('click', function () {
 						el.remove();
-						open(n.kind === 'tarefa' ? 'notas' : 'hoje');
+						open(n.kind === 'tarefa' ? 'notas' : n.kind === 'sincronizacao' ? 'cal' : 'hoje');
 					});
 					box.appendChild(el);
 					setTimeout(function () { el.remove(); }, 20000);
