@@ -364,12 +364,12 @@ function Start-CodeAPI {
     $srv = Join-Path $PSScriptRoot "..\code\servidor.ts"
     if (-not (Test-Path $srv)) { return }
     try { Invoke-RestMethod "http://127.0.0.1:8998/health" -TimeoutSec 2 | Out-Null; return } catch {}
-    $node = Get-Command node -ErrorAction SilentlyContinue
-    $exe = if ($node) { $node.Source } else { Join-Path $env:ProgramFiles "nodejs\node.exe" }
-    if (-not (Test-Path $exe)) { return }
-    $v = (& $exe --version) -replace '^v', ''
-    $p = $v.Split('.')
-    if ([int]$p[0] -lt 22 -or ([int]$p[0] -eq 22 -and [int]$p[1] -lt 18)) { return }
+    # o Node do computador ou o portatil que o instalador deixou em runtime\node
+    $lib = Join-Path $PSScriptRoot "node-nous.ps1"
+    if (-not (Test-Path $lib)) { return }
+    . $lib
+    $exe = Find-NousNode (Join-Path $PSScriptRoot "..")
+    if (-not $exe) { return }
     Start-Process -FilePath $exe -ArgumentList "`"$srv`"" -WorkingDirectory (Split-Path $srv) -WindowStyle Hidden
 }
 

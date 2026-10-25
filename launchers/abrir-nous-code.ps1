@@ -2,7 +2,8 @@
   Nous Code - abre o IDE numa janela propria (atalho "Nous Code").
   Liga o servico (code/servidor.ts, porta 8998) se ele nao estiver no ar e
   pede a ele para abrir a janela (modo app do Edge, sem abas nem barra).
-  Sem Node 22.18+ ou sem as dependencias, mostra o que fazer.
+  Usa o Node do computador ou o portatil do Nous (launchers\node-nous.ps1);
+  sem Node 22.18+ ou sem as dependencias, mostra o que fazer.
 #>
 $ErrorActionPreference = "SilentlyContinue"
 $code = Join-Path $PSScriptRoot "..\code"
@@ -20,17 +21,13 @@ function Test-Up {
 }
 
 if (-not (Test-Up)) {
-    $node = Get-Command node -ErrorAction SilentlyContinue
-    $exe = if ($node) { $node.Source } else { Join-Path $env:ProgramFiles "nodejs\node.exe" }
-    if (-not (Test-Path $exe)) {
+    # o Node do computador ou o portatil que o instalador deixou em <app>\runtime\node
+    . (Join-Path $PSScriptRoot "node-nous.ps1")
+    $exe = Find-NousNode (Join-Path $PSScriptRoot "..")
+    if (-not $exe) {
         Show-Error ("O Nous Code precisa do Node.js 22.18 ou mais novo.`n`n" +
-            "Instale pelo terminal com:  winget install OpenJS.NodeJS.LTS`n" +
-            "e abra o Nous Code de novo.")
-        return
-    }
-    $p = ((& $exe --version) -replace '^v', '').Split('.')
-    if ([int]$p[0] -lt 22 -or ([int]$p[0] -eq 22 -and [int]$p[1] -lt 18)) {
-        Show-Error "O Node.js instalado e' antigo demais (precisa do 22.18 ou mais novo). Atualize com: winget upgrade OpenJS.NodeJS.LTS"
+            "Rode o instalar.bat de novo, com internet: ele baixa o Node sozinho.`n" +
+            "(Ou instale pelo terminal com:  winget install OpenJS.NodeJS.LTS)")
         return
     }
     if (-not (Test-Path (Join-Path $code "node_modules\monaco-editor"))) {

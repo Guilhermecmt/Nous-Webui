@@ -61,6 +61,16 @@ const ORIGENS = new Set(['http://localhost:8080', 'http://127.0.0.1:8080',
   'http://localhost:' + PORTA, 'http://127.0.0.1:' + PORTA]);  // o Nous e a janela do IDE
 const MODELO_PADRAO = process.env.NOUS_CODE_MODEL || 'qwen2.5-coder:14b';
 fs.mkdirSync(DIR_SESSOES, { recursive: true });
+// Com o Node portatil do Nous (fora do PATH do sistema), os comandos do agente
+// e o terminal tambem precisam achar `node` e `npm`: so' neste processo e nos filhos.
+{
+  const nodeDir = path.dirname(process.execPath);
+  const chave = Object.keys(process.env).find((k) => k.toLowerCase() === 'path') || 'PATH';
+  const dirs = (process.env[chave] || '').split(path.delimiter);
+  if (!dirs.some((d) => d && path.resolve(d).toLowerCase() === nodeDir.toLowerCase())) {
+    process.env[chave] = nodeDir + path.delimiter + (process.env[chave] || '');
+  }
+}
 J.configurar(path.join(DADOS, 'jobs'));
 F.configurar(path.join(DADOS, 'saidas'), [path.join(DADOS, 'jobs')]);
 M.configurar(DADOS);
