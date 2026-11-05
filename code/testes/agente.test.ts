@@ -132,7 +132,9 @@ test('comando que passa do tempo vira job; o fim chega como aviso e job_output l
   roteiro = [chamar('pwsh', { description: 'Espera e escreve', command: 'Write-Output comeco; Start-Sleep -Seconds 6; Write-Output fim', timeoutMs: 3000 }), 'Esperando.'];
   const r = resultados(await rodar(s, 'rode'));
   assert.match(String(r[0].saida), /comeco\n\[still running after 3000ms; moved to background job j1\]\nThe command keeps running in the background/);
-  await new Promise((ok) => setTimeout(ok, 5500));
+  // espera o job de verdade: num CI lento o PowerShell demora a subir e um tempo fixo nao basta
+  const J = await import('../jobs.ts');
+  for (let i = 0; i < 300 && !J.pegar(s.id, 'j1').fim; i++) await new Promise((ok) => setTimeout(ok, 100));
   roteiro = [chamar('job_output', { job_id: 'j1' }), 'ok'];
   const r2 = resultados(await rodar(s, 'veja'));
   assert.ok(conteudos(s, 'user').some((u) => /^background job j1 \(pwsh: Espera e escreve\) finished \[status: completed, exit code: 0\]\. Read its output with job_output\.$/.test(u)));

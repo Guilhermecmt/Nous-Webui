@@ -28,7 +28,7 @@ O WhatsApp não tem um jeito oficial de fazer isto para uso pessoal. O Nous usa 
 - Precisa do Node.js, que vem com o Nous Code. Na primeira vez, o Nous baixa a ponte (`npm ci`), o que leva um minuto.
 - Ao ligar, a ponte consulta `raw.githubusercontent.com` para saber a versão atual do protocolo do WhatsApp. É a única chamada fora do WhatsApp.
 
-Para ligar: leia o aviso, marque que entendeu, **Ligar o WhatsApp**, e leia o QR em **Configurações › Aparelhos conectados › Conectar aparelho**. Desligar apaga a sessão e tira o computador dos aparelhos conectados.
+Para ligar: leia o aviso, marque que entendeu, **Ligar o WhatsApp**, e leia o QR em **Configurações › Aparelhos conectados › Conectar aparelho**. Desligar apaga a sessão deste computador. O aparelho continua na lista do celular até você removê-lo em **Configurações › Aparelhos conectados**.
 
 ## Por dentro
 
