@@ -495,6 +495,9 @@ class TarefaPeloChat(unittest.TestCase):
             if path == "/notes":
                 return {"note": {"id": "n1", "title": kw["json"]["title"], "body": "",
                                  "remind_at": kw["json"].get("remind_at")}}
+            if path == "/events":
+                return {"event": {"id": "e1", "title": kw["json"]["title"], "all_day": kw["json"]["all_day"],
+                                  "start_at": kw["json"]["start_at"]}}
             return {"ok": True}
         self.f._api = falso
 
@@ -602,6 +605,47 @@ class TarefaPeloChat(unittest.TestCase):
                     "todo dia a Maria reclama", "faz a tarefa de casa comigo"):
             self.assertFalse(chat._is_task(msg), msg)
 
+    def nota(self):
+        return [b for _m, p, b in self.posts if p == "/notes"][-1]
+
+    def test_bug_real_sexta_as_9h_nao_vira_semanal(self):
+        r = self.aplica("Me lembre de pagar a conta de luz sexta às 9h", acao="lembrete",
+                        titulo="Pagar a conta de luz", repetir="semanal")
+        self.assertIsNone(self.nota()["repeat"])
+        self.assertNotIn(", repetindo (", r)
+
+    def test_sem_palavra_de_repeticao_o_modelo_nao_decide(self):
+        for repetir in ("diario", "dias_uteis", "semanal", "mensal", "anual"):
+            self.aplica("me lembre de ligar para o banco amanhã às 10h", acao="lembrete",
+                        titulo="Ligar", repetir=repetir)
+            self.assertIsNone(self.nota()["repeat"], repetir)
+
+    def test_compromisso_sem_palavra_de_repeticao_nao_repete(self):
+        self.aplica("marca dentista dia 28 às 14h", acao="evento", titulo="Dentista", repetir="mensal")
+        ev = [b for _m, p, b in self.posts if p == "/events"][-1]
+        self.assertNotIn("repeat", ev)
+
+    def test_palavras_de_repeticao_mantem_o_que_o_modelo_disse(self):
+        casos = {"me lembre de tomar o remédio todo dia às 8h": "diario",
+                 "me lembre de pagar o aluguel todos os meses dia 5 às 9h": "mensal",
+                 "me lembre de regar as plantas toda sexta às 9h": "semanal",
+                 "me lembre de ir à feira todas as sextas às 9h": "semanal",
+                 "me lembre semanalmente às 9h de revisar as contas": "semanal",
+                 "me lembre diariamente às 9h de beber água": "diario",
+                 "me lembre mensalmente às 9h de ver o extrato": "mensal",
+                 "me lembre sempre às 9h de abrir o caixa": "diario",
+                 "me lembre a cada semana às 9h de ligar para a mãe": "semanal",
+                 "me lembre de tomar o remédio de segunda a sexta às 8h": "dias_uteis",
+                 "me lembre nos dias úteis às 8h de bater o ponto": "dias_uteis"}
+        for msg, repetir in casos.items():
+            self.aplica(msg, acao="lembrete", titulo="T", repetir=repetir)
+            self.assertEqual(self.nota()["repeat"], repetir, msg)
+
+    def test_horario_que_passou_nao_se_salva_com_repeticao_inventada(self):
+        r = self.aplica("me lembre de pagar a luz hoje às 8h", acao="lembrete", titulo="Luz", repetir="diario")
+        self.assertIn("ja passou", r)
+        self.assertEqual(self.posts, [])
+
     def test_desfazer_apaga_a_tarefa(self):
         self.aplica("todo dia às 8h me manda a agenda", titulo="Agenda do dia")
         r = self.f._undo(UID)
@@ -629,6 +673,13 @@ class TarefaPeloChat(unittest.TestCase):
     def test_a_troca_de_acentos_nao_mudou_a_leitura_de_datas(self):
         w = chat._parse_when("sábado às 14h30", self.agora)
         self.assertEqual(w["start"], datetime(2026, 11, 7, 14, 30))
+
+    def test_dia_da_semana_de_hoje_com_hora_que_passou_e_a_proxima_semana(self):
+        meio_dia = datetime(2026, 11, 5, 12, 7)  # quinta
+        self.assertEqual(chat._parse_when("levar o carro quinta às 10h", meio_dia)["start"], datetime(2026, 11, 12, 10, 0))
+        self.assertEqual(chat._parse_when("reunião quinta às 15h", meio_dia)["start"], datetime(2026, 11, 5, 15, 0))
+        # dito com todas as letras, continua sendo hoje: quem decide o que fazer e' o filtro
+        self.assertEqual(chat._parse_when("hoje às 10h", meio_dia)["start"], datetime(2026, 11, 5, 10, 0))
 
     def test_prompt_continua_formatavel(self):
         self.assertIn('"acao":"tarefa"', chat._PROMPT.format(msg="x"))
@@ -701,12 +752,42 @@ class NtfyEnvio(NtfyBase):
             self.tarefa_pronta()
         self.assertEqual(Ntfy.recebidos[0][1], "Bearer tk_segredo")
 
-    def test_lembrete_nao_manda_o_corpo_da_nota(self):
+    def test_lembrete_nao_manda_nem_o_titulo_nem_o_corpo(self):
         db.settings_set(self.cx, UID, {"ntfy_topico": self.topico})
-        api.deliver(self.cx, UID, "Lembrete: Exame", "resultado do exame de sangue")
+        api.deliver(self.cx, UID, "Lembrete: Exame de sangue", "levar o pedido")
         corpo = Ntfy.recebidos[0][2]
-        self.assertEqual(corpo["message"], "Lembrete: Exame")
-        self.assertNotIn("sangue", json.dumps(corpo))
+        self.assertEqual(corpo["message"], "Nous: você tem um lembrete")
+        self.assertEqual(corpo["title"], "Nous")
+        self.assertNotIn("sangue", json.dumps(corpo, ensure_ascii=False))
+        self.assertNotIn("pedido", json.dumps(corpo, ensure_ascii=False))
+
+    def test_lembrete_que_venceu_de_verdade_nao_vaza_o_titulo(self):
+        db.settings_set(self.cx, UID, {"ntfy_topico": self.topico})
+        db.note_create(self.cx, UID, {"title": "Consulta psiquiatra", "remind_at": self.agora})
+        with mock.patch.object(tasks, "due_tasks", return_value=[]):
+            api._tick_sync()
+        self.assertEqual([r[2]["message"] for r in Ntfy.recebidos], ["Nous: você tem um lembrete"])
+
+    def test_compromisso_tambem_nao_vaza(self):
+        db.settings_set(self.cx, UID, {"ntfy_topico": self.topico})
+        api.deliver(self.cx, UID, "Audiência do divórcio", "as 14:00 - Forum")
+        self.assertNotIn("divórcio", json.dumps(Ntfy.recebidos[0][2], ensure_ascii=False))
+
+    def test_com_a_opcao_ligada_o_lembrete_vai_inteiro(self):
+        db.settings_set(self.cx, UID, {"ntfy_topico": self.topico, "ntfy_conteudo": True})
+        api.deliver(self.cx, UID, "Lembrete: Exame", "levar o pedido")
+        corpo = Ntfy.recebidos[0][2]
+        self.assertEqual((corpo["title"], corpo["message"]), ("Nous - Lembrete: Exame", "levar o pedido"))
+
+    def test_com_a_opcao_ligada_lembrete_sem_corpo_manda_o_titulo(self):
+        db.settings_set(self.cx, UID, {"ntfy_topico": self.topico, "ntfy_conteudo": True})
+        api.deliver(self.cx, UID, "Lembrete: Exame", "")
+        self.assertEqual(Ntfy.recebidos[0][2]["message"], "Lembrete: Exame")
+
+    def test_teste_de_aviso_tem_texto_proprio(self):
+        db.settings_set(self.cx, UID, {"ntfy_topico": self.topico})
+        api.deliver(self.cx, UID, "Teste de aviso", "corpo", resumo="Teste de aviso")
+        self.assertEqual(Ntfy.recebidos[0][2]["message"], "Teste de aviso")
 
     def test_email_continua_recebendo_o_texto(self):
         db.settings_set(self.cx, UID, {"ntfy_topico": self.topico, "aviso_email": True})
@@ -750,7 +831,7 @@ class NtfyMigracao(Base):
         self.assertEqual(db.migrate_ntfy(self.cx), 1)
         self.assertEqual(db.migrate_ntfy(self.cx), 0)
         (n,) = self.notifs()
-        self.assertIn("só o nome da tarefa", n["body"])
+        self.assertIn("só um aviso curto", n["body"])
 
     def test_quem_nao_usa_ntfy_nao_recebe_aviso(self):
         db.settings_set(self.cx, UID, {"aviso_email": True})

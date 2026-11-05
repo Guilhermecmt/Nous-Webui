@@ -146,26 +146,30 @@ def toast(title, body):
 
 # ----------------------------------------------------------------- outros canais
 NTFY_URL = os.environ.get("NOUS_NTFY_URL", "https://ntfy.sh").rstrip("/")
+AVISO_SEGURO = "Nous: você tem um lembrete"
 
 
-def _ntfy(s, title, body):
-    """Por padrao so' o titulo sai do computador: sem token, o servidor publico nao
-    protege o que passa por ele. O texto vai apenas com ntfy_conteudo ligado."""
+def _ntfy(s, title, body, resumo):
+    """Por padrao nada do que a pessoa escreveu sai do computador: sem token, o servidor
+    publico nao protege o que passa por ele. Vai so' o resumo; titulo e texto, apenas com
+    ntfy_conteudo ligado."""
     headers = {}
     if s["ntfy_token"]:
         headers["Authorization"] = "Bearer " + dav.unseal(s["ntfy_token"])
-    com_texto = s["ntfy_conteudo"] == "1" and bool(body)
+    com_texto = s["ntfy_conteudo"] == "1"
     # JSON (e nao headers) para acentos chegarem certos no celular
     r = requests.post((s["ntfy_servidor"] or NTFY_URL) + "/", headers=headers, timeout=10,
                       json={"topic": s["ntfy_topico"], "tags": ["bell"],
                             "title": "Nous - " + title if com_texto else "Nous",
-                            "message": body if com_texto else title})
+                            "message": (body or title) if com_texto else resumo})
     r.raise_for_status()
 
 
-def deliver(cx, uid, title, body):
+def deliver(cx, uid, title, body, resumo=AVISO_SEGURO):
     """Alem do aviso do Windows: e-mail para a propria conta e/ou celular (ntfy),
     se o usuario ligou em Agenda > Avisos. Falha de um canal nao afeta os outros.
+    resumo = o que o ntfy recebe sem a opcao de conteudo. O padrao nao cita nada do
+    lembrete ou compromisso: o titulo deles e' texto da pessoa ("Exame de HIV").
     Devolve se o ntfy aceitou (None = desligado)."""
     s = db.settings_get(cx, uid)
     if s["aviso_email"] == "1":
@@ -176,7 +180,7 @@ def deliver(cx, uid, title, body):
     if not s["ntfy_topico"]:
         return None
     try:
-        _ntfy(s, title, body)
+        _ntfy(s, title, body, resumo)
         return True
     except Exception:
         return False
@@ -266,8 +270,8 @@ def _run_task_sync(task, chain=None, agendada=False):
             note = db.note_get(cx, task["user_id"], cx.execute(
                 "SELECT last_note FROM tasks WHERE id=?", (task["id"],)).fetchone()[0])
             if db.settings_get(cx, task["user_id"])["ntfy_topico"]:
-                deliver(cx, task["user_id"], "Tarefa concluída: " + task["name"],
-                        (note or {}).get("body", "")[:900])
+                pronta = "Tarefa concluída: " + task["name"]
+                deliver(cx, task["user_id"], pronta, (note or {}).get("body", "")[:900], resumo=pronta)
             # Cadeia: a proxima tarefa recebe este resultado como contexto
             nxt = task.get("then_task")
             seen = set((chain or {}).get("seen", ())) | {task["id"]}
@@ -621,7 +625,8 @@ async def h_settings_test(request):
     def run():
         cx = db.connect()
         try:
-            return deliver(cx, uid, "Teste de aviso", "Se voce esta lendo isto, os avisos do Nous chegam aqui.")
+            return deliver(cx, uid, "Teste de aviso", "Se voce esta lendo isto, os avisos do Nous chegam aqui.",
+                           resumo="Teste de aviso")
         finally:
             cx.close()
     return _ok({"ok": True, "ntfy": await asyncio.get_event_loop().run_in_executor(None, run)})

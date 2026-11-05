@@ -105,6 +105,21 @@ async def h_delete(request):
     return web.json_response({"ok": True})
 
 
+async def h_proposals(request):
+    return web.json_response({"proposals": store.list_proposals(request.query.get("user_id"))})
+
+
+async def h_proposal_approve(request):
+    d = await _body(request)
+    return web.json_response({"skill": store.approve_proposal(d.get("user_id"), d.get("id"))})
+
+
+async def h_proposal_reject(request):
+    d = await _body(request)
+    store.reject_proposal(d.get("user_id"), d.get("id"))
+    return web.json_response({"ok": True})
+
+
 async def h_fetch(request):
     d = await _body(request)
     url = store.raw_url(d.get("url"))
@@ -201,6 +216,9 @@ def build_app():
         web.get("/skills/get", h_get),
         web.post("/skills", h_save),
         web.post("/skills/delete", h_delete),
+        web.get("/skills/proposals", h_proposals),
+        web.post("/skills/proposals/approve", h_proposal_approve),
+        web.post("/skills/proposals/reject", h_proposal_reject),
         web.post("/skills/fetch", h_fetch),
         web.post("/skills/style", h_style),
     ])

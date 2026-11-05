@@ -25,7 +25,7 @@ Execucao que nao aconteceu:
   e so' depois registra a falha (last_status "tentando" e depois "erro").
   PC desligado: as perdas colapsam numa execucao so', e so' se a hora passou ha'
   menos de metade do periodo (minimo 2 min, maximo 2 h). Fora disso pula
-  (last_status "pulada"): "Bom dia 8h" nao roda as 23h.
+  (last_status "pulada"): "Bom dia 8h" nao roda as 23h. Tarefa de uma vez: 2 h.
 """
 import hashlib
 import json
@@ -128,8 +128,9 @@ def last_slot(schedule, ts):
 
 
 def catchup_window(schedule, slot):
-    """Quanto atraso ainda vale: metade do periodo, entre 2 min e 2 h. Tarefa de
-    uma vez nao tem periodo nem proxima chance: fica com a janela maior."""
+    """Quanto atraso ainda vale: metade do periodo, entre 2 min e 2 h.
+    Tarefa de uma vez: janela de 2 h, por decisao (o Hermes usa 2 min). Ela nao tem
+    periodo nem proxima chance, e fora da janela desliga de vez, avisando a pessoa."""
     nxt = next_run(schedule, slot)
     if nxt is None:
         return CATCHUP_MAX

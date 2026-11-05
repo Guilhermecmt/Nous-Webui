@@ -71,6 +71,9 @@ _TASK_HORA = re.compile(
     r"\b[aà]s \d{1,2}(?:(?::|h)\d{2}|h)?\b(?: horas?)?(?: da (?:manh[aã]|tarde|noite))?|"
     r"\b\d{1,2}(?::|h)\d{2}\b|\b\d{1,2}h\b|\b\d{1,2} horas\b|\bdia \d{1,2}\b", re.I)
 _TASK_NOME = {"resumo_dia": "Agenda do dia", "emails": "Resumo dos e-mails"}
+# Repeticao so' com palavra da pessoa: modelo pequeno le "sexta as 9h" como semanal
+_REPETE = re.compile(r"\b(?:tod[ao]s?|semanalmente|diariamente|mensalmente|anualmente|sempre|a cada|"
+                     r"de segunda a sexta|dias? [uú]te(?:is|l))\b", re.I)
 
 _DIAS = ["segunda", "terca", "quarta", "quinta", "sexta", "sabado", "domingo"]
 _EMBED = ("embed", "nomic", "minilm", "bge-", "e5-", "gte-")
@@ -126,6 +129,7 @@ def _parse_when(msg, now):
     t = " " + _fold(msg) + " "
     day = None
     hour = minute = None
+    dia_por_nome = False
 
     m = re.search(r"\bdaqui a (\d+|uma?|dois|duas|tres) (minutos?|horas?|dias?|semanas?)\b", t) or \
         re.search(r"\bem (\d+) (minutos?|horas?)\b", t)
@@ -189,6 +193,7 @@ def _parse_when(msg, now):
             # proxima ocorrencia; "sexta" numa sexta e' hoje, salvo "que vem"/"proxima"
             if delta == 0 and (m.group(1) or m.group(3)):
                 delta = 7
+            dia_por_nome = delta == 0
             day = (now + datetime.timedelta(days=delta)).date()
     if day is None and re.search(r"\bsemana que vem\b|\bproxima semana\b", t):
         day = (now + datetime.timedelta(days=7)).date()
@@ -227,6 +232,10 @@ def _parse_when(msg, now):
         if cand <= now:
             cand += datetime.timedelta(days=1)
         return {"start": cand, "has_time": True, "end": None}
+    # "quinta as 10h" dito numa quinta ao meio-dia e' a proxima quinta, nao um horario que
+    # ja passou: o pedido era recusado e o modelo pequeno confirmava mesmo assim
+    if dia_por_nome and hour is not None and datetime.datetime.combine(day, datetime.time(hour, minute or 0)) <= now:
+        day += datetime.timedelta(days=7)
     start = datetime.datetime.combine(day, datetime.time(hour or 0, minute or 0))
     end = None
     m = re.search(r"\bate (?:as )?(\d{1,2})(?::|h)?(\d{2})?\b", t)
@@ -390,7 +399,7 @@ class Filter:
         acao = (d.get("acao") or "nenhuma").lower()
         detalhes = _clean_details(d.get("detalhes"))
         repetir = d.get("repetir") if d.get("repetir") in (
-            "diario", "dias_uteis", "semanal", "mensal", "anual") else None
+            "diario", "dias_uteis", "semanal", "mensal", "anual") and _REPETE.search(msg) else None
         w = _parse_when(msg, now)
         start = w["start"]
         # O modelo pequeno confunde os tipos: as palavras do usuario decidem. "Nenhuma" do
@@ -529,7 +538,9 @@ class Filter:
 
         key = hashlib.sha1(f"{uid}\n{msg}".encode("utf-8")).hexdigest()
         t = time.time()
-        self._done = {k: v for k, v in self._done.items() if t - v[0] < 86400}
+        # So' protege o "regenerar resposta". Com 24 h, repetir o mesmo pedido no mesmo dia
+        # ("me lembre de beber agua em 1 hora") nao gravava nada e o modelo confirmava.
+        self._done = {k: v for k, v in self._done.items() if t - v[0] < 600}
         if key in self._done and (tarefa or not _QUERY.search(msg)):
             text = self._done[key][1]  # regenerou a resposta: ja foi gravado
         else:

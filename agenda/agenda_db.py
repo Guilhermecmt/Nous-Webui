@@ -181,7 +181,7 @@ def connect():
 # ------------------------------------------------------------------ preferencias
 
 # ntfy_token fica selado (caldav_sync.seal, feito na API) e nunca volta para a tela.
-# ntfy_conteudo: "1" so' por escolha explicita; o padrao manda apenas o titulo.
+# ntfy_conteudo: "1" so' por escolha explicita; o padrao manda um aviso sem texto da pessoa.
 SETTINGS = {"aviso_email": "0", "ntfy_topico": "", "ntfy_servidor": "", "ntfy_token": "",
             "ntfy_conteudo": "0"}
 
@@ -237,8 +237,9 @@ def migrate_ntfy(cx):
                       """).fetchall()
     for r in rows:
         notify(cx, r["user_id"], "tarefa", "Avisos no celular mudaram",
-               "Agora o celular recebe só o nome da tarefa, sem o resultado, para seus dados "
-               "não passarem por um servidor público. Para mudar, abra Agenda e toque na engrenagem.")
+               "Agora o celular recebe só um aviso curto, sem o resultado da tarefa nem o texto do "
+               "lembrete, para seus dados não passarem por um servidor público. Para mudar, abra "
+               "Agenda e toque na engrenagem.")
         cx.execute("INSERT OR REPLACE INTO settings (user_id, key, value) VALUES (?,?,?)",
                    (r["user_id"], "ntfy_migrado", "1"))
     cx.commit()

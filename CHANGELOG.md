@@ -39,14 +39,30 @@
   o Nous pergunta.
 - **ntfy com servidor e token próprios** (Agenda › engrenagem). O token fica guardado
   com a proteção do Windows e não volta para a tela.
+- **Aprender com correções** (`skills/nous_skills.py`). Quando você diz "de agora em
+  diante...", "pare de..." ou "não faça...", o Nous anota a conversa e, 15 segundos
+  depois do último turno, faz uma única chamada ao modelo para propor uma habilidade.
+  Qualquer turno novo cancela, até com a chamada em curso: a placa de vídeo é uma só.
+  A proposta fica pendente e nada é salvo sem aprovação. Pedido só para aquela resposta
+  não vira preferência, e problema de ambiente (programa não instalado, sem internet)
+  não vira lição. A aprovação é pela API (`/skills/proposals`); a tela ainda não existe.
+- **Histórico por data** (`history/nous_history.py`). "O que conversamos ontem?",
+  "semana passada" e "mês passado" filtram pela data certa.
 
 ### Mudado
-- **O celular recebe só o título.** O ntfy mandava até 900 caracteres do resultado
-  da tarefa para o servidor público ntfy.sh, sem token. Agora vai "Tarefa concluída:
-  nome da tarefa"; o texto de tarefas e lembretes só vai com a opção ligada, com
-  aviso na tela. Quem já usava segue no mesmo código, passa a esse padrão e recebe um
-  aviso uma única vez. O título do lembrete continua indo, senão o aviso não diria
-  nada.
+- **O celular recebe só um aviso curto.** O ntfy mandava até 900 caracteres do
+  resultado da tarefa para o servidor público ntfy.sh, sem token, e o título e o texto
+  dos lembretes. Agora vai "Tarefa concluída: nome da tarefa" ou "Nous: você tem um
+  lembrete"; título de lembrete e texto só vão com a opção ligada, com aviso na tela.
+  Quem já usava segue no mesmo código, passa a esse padrão e recebe um aviso uma
+  única vez.
+- **Aprender algo parecido atualiza a habilidade em vez de criar uma cópia "-2"**
+  (`skills/nous_skills.py`). O modelo junta os passos numa chamada e a versão anterior
+  fica em `.bak`. Se ele disser que são tarefas diferentes, cria outra; se a resposta
+  vier quebrada ou perder mais da metade dos passos, nada é alterado.
+- **O histórico traz um trecho por conversa** (antes vinham até 3 da mesma), com o que
+  veio antes e depois só no melhor resultado. Uma palavra solta em comum não traz mais
+  uma conversa sem relação com a pergunta (`history/nous_history.py`).
 - **Execuções perdidas com o PC desligado viram uma só**, e só se a hora passou há
   menos de metade do período (mínimo 2 min, máximo 2 h). Fora disso a tarefa pula para
   o próximo horário e o painel mostra que não rodou: "Bom dia 8h" não roda mais às
@@ -65,6 +81,23 @@
   `history/nous_history.py`).
 
 ### Corrigido
+- "Quinta às 10h" dito numa quinta depois das 10h era recusado como horário que já
+  passou, e o modelo pequeno confirmava mesmo assim. Agora vale a próxima quinta.
+- Repetir o mesmo pedido à agenda no mesmo dia não gravava nada: a proteção contra
+  "regenerar resposta" durava 24 horas e agora dura 10 minutos.
+- Ao juntar habilidades, passo antigo não some mais: modelos de 4B e 7B devolviam só
+  os passos novos, mesmo com a regra no prompt.
+- E-mail: rascunho que existe não aparece mais como "não encontrado" durante uma
+  gravação (leitura sem trava no Windows).
+- **Conversa apagada não volta mais como contexto.** O índice do histórico só era
+  limpo em reindexação, e a conversa apagada seguia aparecendo nas respostas. Agora
+  sai a cada ciclo, mesmo com o Ollama fora do ar, junto com a resposta ou pergunta
+  apagada sozinha, e o filtro confere no banco do Open WebUI antes de usar um trecho.
+  Se não conseguir conferir, não usa (`history/index_history.py`,
+  `history/nous_history.py`).
+- "Me lembre de pagar a luz sexta às 9h" virava lembrete semanal: o modelo pequeno lia
+  o dia da semana como repetição. Agora só repete se a frase disser (todo, toda,
+  sempre, a cada, diariamente...), diga o modelo o que disser (`agenda/nous_agenda.py`).
 - **Tarefa não se perde mais com o Ollama fora do ar.** O "Bom dia" sumia sem nova
   chance. Agora tenta de novo em 5, 15 e 30 minutos, só quando nenhuma chamada ao
   modelo foi respondida, e depois registra a falha no painel e no aviso. A pesquisa

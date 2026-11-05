@@ -14,10 +14,15 @@ Cada habilidade e' um arquivo Markdown legivel em
     1. Cumprimente pelo nome...
 
 O filtro nous_skills.py le estes mesmos arquivos (formato e' o contrato).
+
+<id>.md.bak e' a versao anterior a uma atualizacao. propostas/<id>.json sao regras
+tiradas de correcoes: so' viram habilidade quando a pessoa aprova aqui.
 """
 import os
 import re
 import sys
+import json
+import shutil
 import datetime
 import unicodedata
 
@@ -149,8 +154,79 @@ def save_skill(user_id, s, sid=None):
 
 def delete_skill(user_id, sid):
     p = os.path.join(user_dir(user_id), _safe(sid) + ".md")
+    for f in (p, p + ".bak"):  # apagar e' apagar: a copia nao fica para tras
+        if os.path.isfile(f):
+            os.remove(f)
+
+
+# ------------------------------------------------------------------ propostas
+
+def _proposal_path(user_id, pid):
+    pid = _safe(pid)
+    if not pid:
+        raise ValueError("proposta nao encontrada")
+    return os.path.join(user_dir(user_id), "propostas", pid + ".json")
+
+
+def list_proposals(user_id):
+    d = os.path.join(user_dir(user_id), "propostas")
+    if not os.path.isdir(d):
+        return []
+    out = []
+    for f in sorted(os.listdir(d)):
+        if f.endswith(".json"):
+            try:
+                with open(os.path.join(d, f), encoding="utf-8") as h:
+                    p = json.load(h)
+            except (OSError, ValueError):
+                continue
+            if isinstance(p, dict):
+                p["id"] = f[:-5]
+                out.append(p)
+    return out
+
+
+def reject_proposal(user_id, pid):
+    p = _proposal_path(user_id, pid)
     if os.path.isfile(p):
         os.remove(p)
+
+
+def _add_steps(corpo, passos):
+    """Acrescenta ao fim o que ainda nao esta la', sem precisar do modelo."""
+    linhas = corpo.strip().splitlines()
+    ja = {re.sub(r"^\s*(?:[-*]|\d+[.)])\s*", "", x).strip().casefold() for x in linhas}
+    n = sum(1 for x in linhas if re.match(r"\s*\d+[.)]", x))
+    for p in passos:
+        if p.casefold() not in ja:
+            n += 1
+            linhas.append(f"{n}. {p}")
+    return "\n".join(linhas)
+
+
+def approve_proposal(user_id, pid):
+    """Vira habilidade. Se ja' existe uma com esse nome, atualiza (com .bak) em vez de criar -2."""
+    p = _proposal_path(user_id, pid)
+    if not os.path.isfile(p):
+        raise ValueError("proposta nao encontrada")
+    with open(p, encoding="utf-8") as h:
+        d = json.load(h)
+    passos = [str(x).strip() for x in d.get("passos") or [] if str(x).strip()]
+    nome, quando = str(d.get("nome") or ""), str(d.get("quando_usar") or "")
+    # a conversa pode ter trazido texto da web: quem aprova nao ve ordem escondida
+    if ameacas.varrer("\n".join([nome, quando, *passos])):
+        raise ValueError("esta proposta tem trechos que tentam dar ordens escondidas para a IA e nao foi salva")
+    sid = slugify(nome)
+    atual = get_skill(user_id, sid)
+    if atual:
+        arq = os.path.join(user_dir(user_id), sid + ".md")
+        shutil.copy2(arq, arq + ".bak")
+        rec = save_skill(user_id, {**atual, "corpo": _add_steps(atual["corpo"], passos)}, sid=sid)
+    else:
+        corpo = "\n".join(f"{i + 1}. {x}" for i, x in enumerate(passos))
+        rec = save_skill(user_id, {"nome": nome, "quando_usar": quando, "corpo": corpo, "origem": "conversa"})
+    os.remove(p)
+    return rec
 
 
 def raw_url(url):

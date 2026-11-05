@@ -230,8 +230,8 @@
 				'<div class="nous-ag-form"><b style="font-size:12px">No celular, de graca (app ntfy)</b>' +
 				'<div class="nous-ag-hint">1. Instale o app <b>ntfy</b> (Android ou iPhone).<br>2. No app, toque em <b>+</b> e assine o codigo abaixo.<br>' +
 				'O codigo funciona como uma senha: quem souber dele recebe seus avisos.<br>' +
-				'Por segurança, o celular recebe só o título: "Tarefa concluída: nome da tarefa" ou o título do lembrete. ' +
-				'Esse título passa pelo servidor público ntfy.sh, a não ser que você use um servidor seu.</div>' +
+				'Por segurança, o celular recebe só um aviso curto: "Tarefa concluída: nome da tarefa" ou "Nous: você tem um lembrete". ' +
+				'Esse aviso passa pelo servidor público ntfy.sh, a não ser que você use um servidor seu.</div>' +
 				'<div class="nous-ag-row"><input id="nous-ag-st" value="' + esc(s.ntfy_topico || '') + '" placeholder="desligado">' +
 				'<button class="nous-ag-btn ghost" id="nous-ag-sg" type="button" style="flex:.45">Gerar codigo</button></div>' +
 				'<span class="nous-ag-lbl">Servidor próprio (opcional)</span>' +
