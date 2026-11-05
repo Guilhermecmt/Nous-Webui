@@ -18,6 +18,7 @@ import time
 import asyncio
 import datetime
 import sqlite3
+import unicodedata
 import aiohttp
 from typing import Optional
 from pydantic import BaseModel, Field
@@ -425,10 +426,24 @@ class Filter:
         async with aiohttp.ClientSession() as s:
             async with s.post(url, json=payload, timeout=aiohttp.ClientTimeout(total=60)) as r:
                 data = await r.json()
-        return _parse_facts((data or {}).get("response", ""))[: int(self.valves.MAX_FACTS_PER_TURN)]
+        fatos = [f for f in _parse_facts((data or {}).get("response", "")) if _ancorado(f, user_text)]
+        return fatos[: int(self.valves.MAX_FACTS_PER_TURN)]
 
 
 # --------------------------------------------------------------------- helpers
+def _palavras(s: str) -> set:
+    t = unicodedata.normalize("NFD", (s or "").lower())
+    t = "".join(c for c in t if unicodedata.category(c) != "Mn")
+    return {p for p in re.findall(r"[a-z0-9]+", t) if len(p) >= 4 or p.isdigit()}
+
+
+def _ancorado(fato: str, user_text: str) -> bool:
+    """Um fato so' entra se saiu do que a PESSOA escreveu. Modelo pequeno ignora o
+    "nao registre falas do assistente": perguntado onde a pessoa morava, um 7B chutou
+    Sao Paulo e o chute virou memoria, que voltava em toda conversa."""
+    return bool(_palavras(fato) & _palavras(user_text))
+
+
 def _normalize(s: str) -> str:
     s = (s or "").lower().strip()
     s = re.sub(r"\s+", " ", s)
