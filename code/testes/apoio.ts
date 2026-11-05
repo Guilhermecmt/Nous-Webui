@@ -7,7 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import type { AddressInfo } from 'node:net';
 
-export const estado = { roteiro: [] as string[], pedidos: [] as { messages: { role: string; content: string }[] }[] };
+export const estado = { roteiro: [] as string[], razoes: [] as string[], pedidos: [] as { messages: { role: string; content: string }[] }[] };
 
 const falso = http.createServer((req, res) => {
   let corpo = '';
@@ -18,7 +18,7 @@ const falso = http.createServer((req, res) => {
     const conteudo = estado.roteiro.shift() ?? 'Pronto.';
     if (b.stream === false) { res.end(JSON.stringify({ message: { role: 'assistant', content: conteudo }, done: true })); return; }
     res.write(JSON.stringify({ message: { role: 'assistant', content: conteudo }, done: false }) + '\n');
-    res.end(JSON.stringify({ message: { role: 'assistant', content: '' }, done: true, prompt_eval_count: 100, eval_count: 10 }) + '\n');
+    res.end(JSON.stringify({ message: { role: 'assistant', content: '' }, done: true, done_reason: estado.razoes.shift() ?? 'stop', prompt_eval_count: 100, eval_count: 10 }) + '\n');
   });
 });
 

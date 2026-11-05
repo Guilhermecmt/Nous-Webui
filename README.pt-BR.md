@@ -197,6 +197,10 @@ O documento salva sozinho, guarda versões (dá para comparar antes de voltar) e
 
 Datas e horas são lidas por regra, sem depender do palpite do modelo.
 
+### Telegram e WhatsApp (opcional)
+
+Fale com o Nous pelo celular, de qualquer lugar. Crie um bot no Telegram (grátis, pelo @BotFather), cole o token em **Seu Nous › Telegram e WhatsApp** e leia o QR. Quem não pareou não recebe resposta. Áudio é transcrito no computador. Como é a primeira vez que algo seu sai da máquina (o texto da conversa passa pelo Telegram), vem desligado e a tela explica antes. O WhatsApp é experimental, por um caminho não oficial que pode suspender o número; use um chip reserva. Veja [docs/MENSAGEIROS.md](docs/MENSAGEIROS.md).
+
 ### E-mail (opcional)
 
 Conecte Gmail, Outlook ou Yahoo, uma ou várias contas, com uma senha de aplicativo. O Nous:

@@ -18,6 +18,7 @@ import time
 import asyncio
 import datetime
 import sqlite3
+import unicodedata
 import aiohttp
 from typing import Optional
 from pydantic import BaseModel, Field
@@ -26,6 +27,9 @@ try:
     import numpy as np
 except Exception:
     np = None
+
+# Modelos de embedding nao servem para extrair fatos.
+_EMBED = ("embed", "nomic", "minilm", "bge-", "e5-", "gte-")
 
 # Fatos de identidade e de SAUDE: fixados sozinhos (entram em toda conversa, ate
 # MAX_AUTO_PINNED). Esquecer uma alergia numa sugestao de restaurante e' perigoso.
@@ -99,8 +103,8 @@ class Filter:
         )
         OLLAMA_BASE: str = Field(default="http://127.0.0.1:11434")
         EXTRACT_MODEL: str = Field(
-            default="gemma4:12b",
-            description="Modelo local que extrai os fatos. Pode ser um menor/rapido p/ economizar GPU.",
+            default="",
+            description="Modelo local que extrai os fatos. Vazio: usa o da conversa, que ja' esta' na GPU.",
         )
         MAX_MEMORIES: int = Field(default=200, description="Maximo de memorias injetadas por conversa.")
         MIN_USER_CHARS: int = Field(default=12, description="Ignora mensagens curtas demais.")
@@ -346,7 +350,7 @@ class Filter:
             return body
         try:
             existing = self._get_memories(user_id, persona)
-            facts = await self._extract(user_text, assistant_text, existing)
+            facts = await self._extract(user_text, assistant_text, existing, body.get("model") or "")
             added = self._add_memories(user_id, facts, persona)
             if added and __event_emitter__:
                 await __event_emitter__(
@@ -363,7 +367,29 @@ class Filter:
         return body
 
     # ----------------------------------------------------------------- extract
-    async def _extract(self, user_text: str, assistant_text: str, existing=None):
+    async def _extract_model(self, chat_model: str):
+        """O modelo da conversa, que ja' esta' carregado; se ele nao for local, o
+        primeiro local instalado. O instalador escolhe o modelo pela placa de video:
+        um nome fixo aqui dava 404 em quem tem outro e a extracao parava em silencio."""
+        fixo = (self.valves.EXTRACT_MODEL or "").strip()
+        if fixo:
+            return fixo
+        url = self.valves.OLLAMA_BASE.rstrip("/") + "/api/tags"
+        try:
+            async with aiohttp.ClientSession() as s:
+                async with s.get(url, timeout=aiohttp.ClientTimeout(total=5)) as r:
+                    data = await r.json()
+        except Exception:
+            return None
+        names = [m.get("name", "") for m in (data or {}).get("models", [])]
+        if chat_model in names or (chat_model + ":latest") in names:
+            return chat_model
+        return next((n for n in names if "/" not in n and not any(p in n.lower() for p in _EMBED)), None)
+
+    async def _extract(self, user_text: str, assistant_text: str, existing=None, chat_model: str = ""):
+        model = await self._extract_model(chat_model)
+        if not model:
+            return []
         today = datetime.date.today().isoformat()
         known = ""
         if existing:
@@ -387,7 +413,7 @@ class Filter:
             "JSON:"
         )
         payload = {
-            "model": self.valves.EXTRACT_MODEL,
+            "model": model,
             "prompt": prompt,
             "stream": False,
             "options": {"temperature": 0, "num_ctx": NUM_CTX},
@@ -400,10 +426,24 @@ class Filter:
         async with aiohttp.ClientSession() as s:
             async with s.post(url, json=payload, timeout=aiohttp.ClientTimeout(total=60)) as r:
                 data = await r.json()
-        return _parse_facts((data or {}).get("response", ""))[: int(self.valves.MAX_FACTS_PER_TURN)]
+        fatos = [f for f in _parse_facts((data or {}).get("response", "")) if _ancorado(f, user_text)]
+        return fatos[: int(self.valves.MAX_FACTS_PER_TURN)]
 
 
 # --------------------------------------------------------------------- helpers
+def _palavras(s: str) -> set:
+    t = unicodedata.normalize("NFD", (s or "").lower())
+    t = "".join(c for c in t if unicodedata.category(c) != "Mn")
+    return {p for p in re.findall(r"[a-z0-9]+", t) if len(p) >= 4 or p.isdigit()}
+
+
+def _ancorado(fato: str, user_text: str) -> bool:
+    """Um fato so' entra se saiu do que a PESSOA escreveu. Modelo pequeno ignora o
+    "nao registre falas do assistente": perguntado onde a pessoa morava, um 7B chutou
+    Sao Paulo e o chute virou memoria, que voltava em toda conversa."""
+    return bool(_palavras(fato) & _palavras(user_text))
+
+
 def _normalize(s: str) -> str:
     s = (s or "").lower().strip()
     s = re.sub(r"\s+", " ", s)

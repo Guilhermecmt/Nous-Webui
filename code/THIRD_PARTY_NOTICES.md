@@ -72,6 +72,51 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
+## Hermes Agent
+
+Partes do Nous Code e a barreira `utilidades/ameacas.py` adaptam o [Hermes Agent](https://github.com/NousResearch/hermes-agent), da Nous Research. Usamos o checkout de 05/11/2026, commit `d0001c5b`.
+
+| Parte | Arquivo no Nous | Origem no Hermes |
+|---|---|---|
+| Conserto de JSON e de nome de ferramenta | `code/reparo.ts` | `agent/message_sanitization.py`, `agent/agent_runtime_helpers.py` |
+| Resposta cortada, resposta vazia e os textos que voltam ao modelo | `code/agente.ts` | `agent/conversation_loop.py`, `agent/turn_truncation.py`, `agent/turn_empty_response.py` |
+| Chamada inválida devolvida ao modelo | `code/agente.ts` | `agent/turn_tool_validation.py` |
+| Aviso de ciclo de chamadas | `code/agente.ts`, `code/reparo.ts` | `agent/tool_guardrails.py` |
+| Leitura parcial e conteúdo numerado no `write` | `code/agente.ts`, `code/reparo.ts` | `tools/file_tools_read_tracking.py`, `tools/file_tools_write_guards.py` |
+| Aspas tipográficas, edit repetido e "Did you mean" | `code/ferramentas.ts` | `tools/fuzzy_match.py` |
+| Padrões de texto hostil | `code/ameacas.ts`, `utilidades/ameacas.py` | `tools/threat_patterns.py`, `agent/prompt_builder.py` |
+| Comandos perigosos no Windows | `code/ameacas.ts` | `tools/approval_detection.py` |
+
+Mudamos o seguinte:
+- JSON sem conserto volta como erro ao modelo; o Hermes troca por `{}`, o que aqui faria um `write` apagar o arquivo;
+- a retirada da vírgula sobrando olha só fora de string, para não mexer em código dentro de um `content`;
+- saíram da lista de texto hostil os termos de C2 e o ZWJ, e entraram padrões em português;
+- comando perigoso pede OK até no modo Acesso total.
+
+```
+MIT License
+
+Copyright (c) 2025 Nous Research
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
 ## Dependências instaladas pelo npm
 
 Elas não são copiadas para o repositório: o instalador baixa cada uma com a própria licença.

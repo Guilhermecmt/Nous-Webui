@@ -1495,7 +1495,7 @@
         '<div class="bt"><button class="nc-bt ouro" type="button" data-s>Permitir nesta conversa</button><button class="nc-bt borda" type="button" data-n>Não permitir</button></div></div>';
     } else {
       const titulo = e.tipo === 'comando' ? (e.descricao ? esc(e.descricao) : 'Rodar este comando?') : (e.novo ? 'Criar ' : 'Mudar ') + esc(e.arquivo) + '?';
-      const det = e.tipo === 'comando' ? '<pre>' + esc(e.comando) + '</pre>' + (e.fundo ? '<p class="nc-nota">Vai rodar em segundo plano.</p>' : '')
+      const det = e.tipo === 'comando' ? '<pre>' + esc(e.comando) + '</pre>' + (e.perigo ? '<p class="nc-perigo">Atenção: este comando ' + esc(e.perigo) + '. Pode não ter volta.</p>' : '') + (e.fundo ? '<p class="nc-nota">Vai rodar em segundo plano.</p>' : '')
         : '<pre class="nc-diff">' + diffHtml(e.diff) + '</pre>';
       html = '<div class="nc-pede" data-pede="' + e.id + '"><div class="t">' + titulo + (e.tipo === 'arquivo' ? '<span>+' + e.mais + ' −' + e.menos + '</span>' : '') + '</div>' + det +
         '<div class="bt"><button class="nc-bt ouro" type="button" data-s>' + (e.tipo === 'comando' ? 'Rodar' : 'Aplicar') + '</button>' +

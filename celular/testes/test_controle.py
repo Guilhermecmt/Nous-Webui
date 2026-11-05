@@ -40,7 +40,7 @@ class Controle(unittest.IsolatedAsyncioTestCase):
         self.d = self._t.name
         self._env = dict(os.environ)
         os.environ.update({"NOUS_CELULAR_SIMULAR": "1", "NOUS_CELULAR_PORT": str(porta_livre())})
-        os.environ.pop("NOUS_CELULAR_PERFIL_SIMULADO", None)
+        os.environ["NOUS_CELULAR_PERFIL_SIMULADO"] = "Private"
         app = web.Application()
         controle.add_routes(app, lambda: self.d)
         self.cli = TestClient(TestServer(app))

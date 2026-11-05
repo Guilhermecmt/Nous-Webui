@@ -95,6 +95,9 @@ foreach ($p in 8080, 8990, 8991, 8992, 8993, 8994, 8995, 8996, 8997, 8998, 8999)
 }
 Start-Sleep -Seconds 2
 Ok "processos encerrados"
+# a ponte do WhatsApp e' um node.exe fora do venv: o stop-nous acha pela porta, mas aqui garante
+Get-NetTCPConnection -LocalPort 8987 -State Listen -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }
+
 # regra do firewall do "Usar no celular" (so' existe se alguem ligou; remover pede permissao do Windows)
 $fw = Join-Path $PSScriptRoot "..\launchers\celular-firewall.ps1"
 if ((Test-Path $fw) -and (Get-NetFirewallRule -DisplayName "Nous - Usar no celular" -ErrorAction SilentlyContinue)) {
