@@ -131,6 +131,19 @@ class Memoria(ComOllama):
         self.assertEqual(self._extrair(self._filtro([]), "qwen3:14b"), [])
         self.assertEqual(OllamaFalso.pedidos, [])
 
+    def test_chute_do_modelo_nao_vira_memoria(self):
+        m = carregar("nous_memory", "memory", "nous_memory.py")
+        self.assertFalse(m._ancorado("São Paulo", "Em que cidade eu moro?"))
+        self.assertFalse(m._ancorado("Salvador", "Em que cidade eu moro?"))
+        self.assertTrue(m._ancorado("Morador de Salvador", "Eu moro em Salvador"))
+        self.assertTrue(m._ancorado("Alérgico a camarão", "sou alergico a camarao"))
+        self.assertTrue(m._ancorado("Filho nasceu em 2019", "meu filho nasceu em 2019"))
+
+    def test_extracao_descarta_o_que_a_pessoa_nao_disse(self):
+        f = self._filtro(["qwen3:14b"])
+        fatos = asyncio.run(f._extract("Em que cidade eu moro?", "Sao Paulo", [], "qwen3:14b"))
+        self.assertEqual(fatos, [])
+
     def test_valve_preenchida_manda(self):
         self._extrair(self._filtro(["qwen3:14b"], fixo="gemma4:12b"), "qwen3:14b")
         self.assertEqual(OllamaFalso.pedidos[-1]["model"], "gemma4:12b")

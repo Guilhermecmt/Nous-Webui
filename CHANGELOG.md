@@ -47,6 +47,9 @@
   modelo ficava sem memórias novas, sem aviso; quem tinha os dois trocava de modelo
   na placa de vídeo a cada mensagem. Agora usa o modelo da conversa
   (`memory/nous_memory.py`).
+- Fato que a pessoa não disse virava memória: perguntado onde ela morava, um modelo
+  pequeno chutou uma cidade e o chute ficava gravado. Agora o fato precisa ter
+  âncora no que a pessoa escreveu (`memory/nous_memory.py`).
 - Duas conversas que começavam com a mesma frase dividiam o resumo de conversa
   longa, até entre contas diferentes do mesmo PC (`utilidades/nous_compactar.py`).
 - Falta de memória na placa de vídeo não é mais tratada como contexto cheio, o
