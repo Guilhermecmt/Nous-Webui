@@ -20,13 +20,16 @@ Rotas (todas com user_id, como a Memory API):
   GET  /tasks?user_id=                 POST /tasks  POST /tasks/update  POST /tasks/delete
   POST /tasks/run {user_id, id}        roda agora
   GET  /recent?user_id=&secs=180       quantas notas/compromissos acabaram de ser criados
-  GET  /settings?user_id=              POST /settings {aviso_email, ntfy_topico}
+  GET  /settings?user_id=              (sem o token do ntfy, so' ntfy_token_salvo)
+  POST /settings {aviso_email, ntfy_topico, ntfy_servidor, ntfy_token, ntfy_token_apagar,
+                  ntfy_conteudo}       token em branco mantem o guardado
   POST /settings/test                  manda um aviso de teste pelos canais ligados
   GET  /notifications?user_id=         POST /notifications/seen {user_id, ids}
 
 CORS apenas de origem local (mesmo padrao do monitor).
 """
 import os
+import re
 import sys
 import time
 import asyncio
@@ -145,22 +148,38 @@ def toast(title, body):
 NTFY_URL = os.environ.get("NOUS_NTFY_URL", "https://ntfy.sh").rstrip("/")
 
 
+def _ntfy(s, title, body):
+    """Por padrao so' o titulo sai do computador: sem token, o servidor publico nao
+    protege o que passa por ele. O texto vai apenas com ntfy_conteudo ligado."""
+    headers = {}
+    if s["ntfy_token"]:
+        headers["Authorization"] = "Bearer " + dav.unseal(s["ntfy_token"])
+    com_texto = s["ntfy_conteudo"] == "1" and bool(body)
+    # JSON (e nao headers) para acentos chegarem certos no celular
+    r = requests.post((s["ntfy_servidor"] or NTFY_URL) + "/", headers=headers, timeout=10,
+                      json={"topic": s["ntfy_topico"], "tags": ["bell"],
+                            "title": "Nous - " + title if com_texto else "Nous",
+                            "message": body if com_texto else title})
+    r.raise_for_status()
+
+
 def deliver(cx, uid, title, body):
     """Alem do aviso do Windows: e-mail para a propria conta e/ou celular (ntfy),
-    se o usuario ligou em Agenda > Avisos. Falha de um canal nao afeta os outros."""
+    se o usuario ligou em Agenda > Avisos. Falha de um canal nao afeta os outros.
+    Devolve se o ntfy aceitou (None = desligado)."""
     s = db.settings_get(cx, uid)
     if s["aviso_email"] == "1":
         try:
             tasks.send_email_to_self("[Nous] " + title, body or title)
         except Exception:
             pass
-    if s["ntfy_topico"]:
-        try:
-            # JSON (e nao headers) para acentos chegarem certos no celular
-            requests.post(NTFY_URL + "/", json={"topic": s["ntfy_topico"], "title": "Nous - " + title,
-                                                "message": body or title, "tags": ["bell"]}, timeout=10)
-        except Exception:
-            pass
+    if not s["ntfy_topico"]:
+        return None
+    try:
+        _ntfy(s, title, body)
+        return True
+    except Exception:
+        return False
 
 
 # ----------------------------------------------------------------- GPU livre
@@ -234,17 +253,20 @@ def _tick_sync():
         cx.close()
 
 
-def _run_task_sync(task, chain=None):
+def _run_task_sync(task, chain=None, agendada=False):
     _running.add(task["id"])
     cx = db.connect()
     try:
-        ok, title = tasks.execute(cx, task, contexto=(chain or {}).get("texto"))
-        toast(("Tarefa pronta: " if ok else "Tarefa falhou: ") + task["name"], title)
-        if ok:
+        status, title = tasks.execute(cx, task, contexto=(chain or {}).get("texto"), agendada=agendada)
+        # "tentando" e "sem_novidade" ficam quietos; sem novidade a cadeia tambem para
+        if status == "erro":
+            toast("Tarefa falhou: " + task["name"], title)
+        if status == "ok":
+            toast("Tarefa pronta: " + task["name"], title)
             note = db.note_get(cx, task["user_id"], cx.execute(
                 "SELECT last_note FROM tasks WHERE id=?", (task["id"],)).fetchone()[0])
             if db.settings_get(cx, task["user_id"])["ntfy_topico"]:
-                deliver(cx, task["user_id"], "Tarefa pronta: " + task["name"],
+                deliver(cx, task["user_id"], "Tarefa concluída: " + task["name"],
                         (note or {}).get("body", "")[:900])
             # Cadeia: a proxima tarefa recebe este resultado como contexto
             nxt = task.get("then_task")
@@ -275,7 +297,7 @@ async def clock(app):
         try:
             due = await loop.run_in_executor(None, _tick_sync)
             for t in due:
-                loop.run_in_executor(None, _run_task_sync, t)
+                loop.run_in_executor(None, _run_task_sync, t, None, True)
             loop.run_in_executor(None, dav.sync_due, CALDAV_SYNC_S)
             if db.now() - last_sub >= SUB_SYNC_S:
                 last_sub = db.now()
@@ -286,6 +308,11 @@ async def clock(app):
 
 
 async def _start_clock(app):
+    cx = db.connect()
+    try:
+        db.migrate_ntfy(cx)
+    finally:
+        cx.close()
     app["clock"] = asyncio.get_event_loop().create_task(clock(app))
 
 
@@ -558,16 +585,31 @@ async def h_settings(request):
     uid = _uid(request.query)
     cx = db.connect()
     try:
-        return _ok({"settings": db.settings_get(cx, uid)})
+        return _ok({"settings": db.settings_public(db.settings_get(cx, uid))})
     finally:
         cx.close()
 
 
+def _token_field(d):
+    """Token novo vai selado; em branco mantem o guardado; apagar so' com pedido explicito."""
+    tok = str(d.pop("ntfy_token", "") or "").strip()
+    if tok:
+        if not re.fullmatch(r"[\x21-\x7e]+", tok):
+            raise ValueError("o token tem caracteres inválidos")
+        try:
+            d["ntfy_token"] = dav.seal(tok)
+        except dav.DavError as e:
+            raise ValueError(str(e))
+    elif d.get("ntfy_token_apagar"):
+        d["ntfy_token"] = ""
+
+
 async def h_settings_save(request):
     d = await _body(request)
+    _token_field(d)
     cx = db.connect()
     try:
-        return _ok({"settings": db.settings_set(cx, _uid(d), d)})
+        return _ok({"settings": db.settings_public(db.settings_set(cx, _uid(d), d))})
     finally:
         cx.close()
 
@@ -579,11 +621,10 @@ async def h_settings_test(request):
     def run():
         cx = db.connect()
         try:
-            deliver(cx, uid, "Teste de aviso", "Se voce esta lendo isto, os avisos do Nous chegam aqui.")
+            return deliver(cx, uid, "Teste de aviso", "Se voce esta lendo isto, os avisos do Nous chegam aqui.")
         finally:
             cx.close()
-    await asyncio.get_event_loop().run_in_executor(None, run)
-    return _ok()
+    return _ok({"ok": True, "ntfy": await asyncio.get_event_loop().run_in_executor(None, run)})
 
 
 async def h_notifs(request):

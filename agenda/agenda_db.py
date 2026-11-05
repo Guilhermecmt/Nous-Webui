@@ -163,7 +163,14 @@ def connect():
                 "ALTER TABLE events ADD COLUMN href TEXT",
                 "ALTER TABLE events ADD COLUMN etag TEXT",
                 "ALTER TABLE events ADD COLUMN dirty INTEGER NOT NULL DEFAULT 0",
-                "ALTER TABLE events ADD COLUMN raw TEXT"):
+                "ALTER TABLE events ADD COLUMN raw TEXT",
+                # Tarefas que nao se perdem: retry_count = tentativas ja' feitas com o modelo
+                # fora do ar; last_error = motivo mostrado no painel; aviso = sempre, mudou
+                # ou modelo; last_hash = resultado da ultima execucao que deu certo
+                "ALTER TABLE tasks ADD COLUMN retry_count INTEGER NOT NULL DEFAULT 0",
+                "ALTER TABLE tasks ADD COLUMN last_error TEXT",
+                "ALTER TABLE tasks ADD COLUMN aviso TEXT NOT NULL DEFAULT 'sempre'",
+                "ALTER TABLE tasks ADD COLUMN last_hash TEXT"):
         try:
             cx.execute(ddl)
         except sqlite3.OperationalError:
@@ -173,7 +180,10 @@ def connect():
 
 # ------------------------------------------------------------------ preferencias
 
-SETTINGS = {"aviso_email": "0", "ntfy_topico": ""}
+# ntfy_token fica selado (caldav_sync.seal, feito na API) e nunca volta para a tela.
+# ntfy_conteudo: "1" so' por escolha explicita; o padrao manda apenas o titulo.
+SETTINGS = {"aviso_email": "0", "ntfy_topico": "", "ntfy_servidor": "", "ntfy_token": "",
+            "ntfy_conteudo": "0"}
 
 
 def settings_get(cx, user_id):
@@ -184,20 +194,55 @@ def settings_get(cx, user_id):
     return out
 
 
+def settings_public(s):
+    """O que a tela pode ver: sem o token, so' se ele existe."""
+    out = dict(s)
+    out["ntfy_token_salvo"] = bool(out.pop("ntfy_token", ""))
+    return out
+
+
+def _clean_server(v):
+    v = str(v or "").strip().rstrip("/")
+    if v and not re.fullmatch(r"https?://[^\s/@?#]+(?:/[^\s?#]*)?", v, re.I):
+        raise ValueError("o endereço do servidor precisa começar com https://")
+    return v[:200]
+
+
 def settings_set(cx, user_id, d):
     for k in SETTINGS:
         if k in d:
             v = d[k]
-            if k == "aviso_email":
+            if k in ("aviso_email", "ntfy_conteudo"):
                 v = "1" if v in (True, 1, "1", "true") else "0"
+            if k == "ntfy_servidor":
+                v = _clean_server(v)
             if k == "ntfy_topico":
                 v = re.sub(r"[^A-Za-z0-9_-]", "", str(v or ""))[:64]
                 if v and len(v) < 12:
                     raise ValueError("use um codigo de pelo menos 12 letras/numeros (ele funciona como senha)")
+                # quem configura agora ja' ve o texto novo: nao precisa do aviso de migrate_ntfy
+                cx.execute("INSERT OR REPLACE INTO settings (user_id, key, value) VALUES (?,?,?)",
+                           (user_id, "ntfy_migrado", "1"))
             cx.execute("INSERT OR REPLACE INTO settings (user_id, key, value) VALUES (?,?,?)",
                        (user_id, k, v))
     cx.commit()
     return settings_get(cx, user_id)
+
+
+def migrate_ntfy(cx):
+    """Quem ja' usava o ntfy segue recebendo no mesmo codigo, mas so' o titulo (ntfy_conteudo
+    nasce "0"). Avisa uma vez, para o celular nao parar de mostrar o resultado sem explicacao."""
+    rows = cx.execute("""SELECT user_id FROM settings WHERE key='ntfy_topico' AND value<>''
+                         AND user_id NOT IN (SELECT user_id FROM settings WHERE key='ntfy_migrado')
+                      """).fetchall()
+    for r in rows:
+        notify(cx, r["user_id"], "tarefa", "Avisos no celular mudaram",
+               "Agora o celular recebe só o nome da tarefa, sem o resultado, para seus dados "
+               "não passarem por um servidor público. Para mudar, abra Agenda e toque na engrenagem.")
+        cx.execute("INSERT OR REPLACE INTO settings (user_id, key, value) VALUES (?,?,?)",
+                   (r["user_id"], "ntfy_migrado", "1"))
+    cx.commit()
+    return len(rows)
 
 
 def now():

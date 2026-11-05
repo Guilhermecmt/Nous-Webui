@@ -28,8 +28,30 @@
   entram no contexto, e a pessoa é avisada (`code/ameacas.ts`).
 - Habilidade importada de link e memória importada de arquivo passam pela mesma
   barreira (`utilidades/ameacas.py`).
+- **Tarefas que só avisam quando importa** (`agenda/agenda_tasks.py`, Agenda ›
+  Tarefas). Nova opção "Quando me avisar": sempre, só se o resultado mudar (compara
+  com a última vez) ou só se o Nous achar importante (o modelo decide com saída JSON
+  do Ollama). Sem aviso, não vira nota nem e-mail. Se a resposta do modelo vier
+  quebrada, avisa: melhor um aviso a mais que perder um.
+- **Criar tarefa pelo chat** (`agenda/nous_agenda.py`): "todo dia às 8h me manda a
+  agenda". O horário é lido por regra, não pelo modelo, a resposta confirma o que foi
+  criado e "desfazer" apaga. Sem hora, ou com mais de um dia da semana, nada é salvo e
+  o Nous pergunta.
+- **ntfy com servidor e token próprios** (Agenda › engrenagem). O token fica guardado
+  com a proteção do Windows e não volta para a tela.
 
 ### Mudado
+- **O celular recebe só o título.** O ntfy mandava até 900 caracteres do resultado
+  da tarefa para o servidor público ntfy.sh, sem token. Agora vai "Tarefa concluída:
+  nome da tarefa"; o texto de tarefas e lembretes só vai com a opção ligada, com
+  aviso na tela. Quem já usava segue no mesmo código, passa a esse padrão e recebe um
+  aviso uma única vez. O título do lembrete continua indo, senão o aviso não diria
+  nada.
+- **Execuções perdidas com o PC desligado viram uma só**, e só se a hora passou há
+  menos de metade do período (mínimo 2 min, máximo 2 h). Fora disso a tarefa pula para
+  o próximo horário e o painel mostra que não rodou: "Bom dia 8h" não roda mais às
+  23h. Tarefa de uma vez que perdeu a janela desliga e avisa. Lembretes atrasados
+  continuam avisando como antes.
 - **Comando sem volta pede OK até no modo Acesso total**, com o motivo no cartão:
   apagar pasta, `git reset --hard`, `git push --force`, formatar disco, baixar e
   executar script. Lembrete que roda sozinho não executa esses comandos.
@@ -43,6 +65,11 @@
   `history/nous_history.py`).
 
 ### Corrigido
+- **Tarefa não se perde mais com o Ollama fora do ar.** O "Bom dia" sumia sem nova
+  chance. Agora tenta de novo em 5, 15 e 30 minutos, só quando nenhuma chamada ao
+  modelo foi respondida, e depois registra a falha no painel e no aviso. A pesquisa
+  agendada com o Ollama fora também tenta de novo, em vez de salvar trechos soltos
+  da web como se tivesse dado certo (`agenda/agenda_tasks.py`).
 - A extração automática de memórias usava sempre `gemma4:12b`. Quem instalou outro
   modelo ficava sem memórias novas, sem aviso; quem tinha os dois trocava de modelo
   na placa de vídeo a cada mensagem. Agora usa o modelo da conversa
