@@ -199,6 +199,10 @@ Documents save themselves, keep versions (with a comparison before restoring) an
 
 Dates and times are parsed by rules, not guessed by the model.
 
+### Telegram and WhatsApp (optional)
+
+Talk to Nous from your phone, anywhere. Create a free Telegram bot with @BotFather, paste the token under **Your Nous › Telegram and WhatsApp** and scan the QR. Unpaired people get no reply. Voice notes are transcribed on your PC. It is the first thing that leaves your machine (the chat text goes through Telegram), so it ships off and the screen explains before you turn it on. WhatsApp is experimental, through an unofficial path that may get the number suspended; use a spare SIM. See [docs/MENSAGEIROS.md](docs/MENSAGEIROS.md).
+
 ### Email (optional)
 
 Connect one or more Gmail, Outlook or Yahoo accounts with an app password. Nous:
