@@ -9,6 +9,7 @@ description: >
   para o projeto...", "marca dentista dia 20 as 14h", "o que eu tenho amanha?".
   Quando a mensagem parece um pedido de agenda, o modelo LOCAL extrai os dados
   (titulo, data, repeticao) e o filtro grava no servico da agenda (porta 8996).
+  Tambem cria tarefas: "todo dia as 8h me manda a agenda".
   O modelo do chat so' confirma. Tudo fica na maquina.
 """
 import re
@@ -54,6 +55,26 @@ _EMAIL_REQ = re.compile(r"\b(?:mand[ae]r?|envi[ae]r?|escrev[ae]r?|responde[r]?)\
 _UNDO = re.compile(r"^\s*(?:↩\s*)?(desfaz(?:er|a)?|cancela(?:r)?(?: isso| esse| essa| o [uú]ltimo| a [uú]ltima)?|"
                    r"apaga (?:isso|esse|essa|o que voc[eê] (?:criou|marcou|anotou|salvou)))\s*[.!]?\s*$", re.I)
 
+# Tarefa = o Nous FAZ algo sozinho num horario: repeticao + verbo de pedido. "Me lembre
+# todo dia" nao entra (e' lembrete) e o horario sai da frase por regra, nunca do modelo.
+_RECORRENTE = re.compile(
+    r"\b(?:tod[ao]s? (?:[ao]s )?(?:dias?|manh[aã]s?|tardes?|noites?|semanas?|m[eê]s|meses|"
+    r"segundas?|ter[cç]as?|quartas?|quintas?|sextas?|s[aá]bados?|domingos?)(?:-feiras?)?|"
+    r"diariamente|semanalmente|mensalmente|de segunda a sexta|dias? [uú]te(?:is|l))\b", re.I)
+_TASK_VERB = re.compile(
+    r"\b(?:me (?:d[aáê]|diz|diga|fal[ae]|cont[ae]|pass[ae]|responde?)|"
+    r"mand(?:a|e|ar)|envi(?:a|e|ar)|traz|traga|mostr(?:a|e|ar)|pesquis(?:a|e|ar)|busc(?:a|ar)|busque|"
+    r"procur(?:a|e|ar)|resum(?:a|e|ir)|verifi(?:ca|que|car)|confer(?:e|ir)|confira|veja|prepar(?:a|e|ar)|"
+    r"ger(?:a|e|ar)|fa[çc]a|faz|escrev(?:a|e|er)|analis(?:a|e|ar)|list(?:a|e|ar))\b", re.I)
+_TASK_CMD = re.compile(r"\b(?:cri[ae]r?|agend[ae]r?|adicion[ae]r?)\b.{0,15}?\btarefa\b", re.I)
+_TASK_HORA = re.compile(
+    r"\b[aà]s \d{1,2}(?:(?::|h)\d{2}|h)?\b(?: horas?)?(?: da (?:manh[aã]|tarde|noite))?|"
+    r"\b\d{1,2}(?::|h)\d{2}\b|\b\d{1,2}h\b|\b\d{1,2} horas\b|\bdia \d{1,2}\b", re.I)
+_TASK_NOME = {"resumo_dia": "Agenda do dia", "emails": "Resumo dos e-mails"}
+# Repeticao so' com palavra da pessoa: modelo pequeno le "sexta as 9h" como semanal
+_REPETE = re.compile(r"\b(?:tod[ao]s?|semanalmente|diariamente|mensalmente|anualmente|sempre|a cada|"
+                     r"de segunda a sexta|dias? [uú]te(?:is|l))\b", re.I)
+
 _DIAS = ["segunda", "terca", "quarta", "quinta", "sexta", "sabado", "domingo"]
 _EMBED = ("embed", "nomic", "minilm", "bge-", "e5-", "gte-")
 
@@ -64,7 +85,8 @@ _PROMPT = """Classifique a mensagem do usuario (agenda pessoal, em portugues).
 Responda SO' com JSON: {{"acao": "...", "titulo": "...", "detalhes": "...", "repetir": "..."}}
 - acao: "lembrete" (quer ser AVISADO numa hora) | "evento" (compromisso marcado: consulta,
   reuniao, aniversario, viagem, aula) | "nota" (guardar uma ideia/informacao) |
-  "consulta" (quer SABER o que tem na agenda) | "nenhuma" (nao e' pedido de agenda)
+  "consulta" (quer SABER o que tem na agenda) | "tarefa" (quer que o Nous FACA algo sozinho
+  num horario: mandar a agenda, resumir e-mails, pesquisar) | "nenhuma" (nao e' pedido de agenda)
 - titulo: curto, SEM data, SEM hora e SEM verbos como "me lembre", "marca", "anota"
 - detalhes: o resto do conteudo util (local, observacoes) ou ""
 - repetir: "nenhum" | "diario" | "dias_uteis" | "semanal" | "mensal" | "anual"
@@ -74,6 +96,8 @@ Exemplos:
 "marca dentista dia 28 as 14h30 na clinica Sorriso" -> {{"acao":"evento","titulo":"Dentista","detalhes":"Clinica Sorriso","repetir":"nenhum"}}
 "anota: ideia de presente para a Ana, um livro" -> {{"acao":"nota","titulo":"Ideia de presente para a Ana","detalhes":"um livro","repetir":"nenhum"}}
 "o que eu tenho amanha?" -> {{"acao":"consulta","titulo":"","detalhes":"","repetir":"nenhum"}}
+"todo dia as 8h me manda a agenda" -> {{"acao":"tarefa","titulo":"Agenda do dia","detalhes":"","repetir":"diario"}}
+"toda segunda as 9h pesquise novidades sobre energia solar" -> {{"acao":"tarefa","titulo":"Novidades sobre energia solar","detalhes":"","repetir":"semanal"}}
 "qual a marca de carro mais vendida?" -> {{"acao":"nenhuma","titulo":"","detalhes":"","repetir":"nenhum"}}
 
 Mensagem: \"\"\"{msg}\"\"\""""
@@ -91,16 +115,21 @@ _CMD_PREFIX = re.compile(r"^\s*(me lembr[ae] (?:de|que)?|lembr[ae]-me (?:de)?|le
                          re.I)
 
 
+def _fold(msg):
+    t = (msg or "").lower()
+    return t.replace("ã", "a").replace("á", "a").replace("à", "a").replace("â", "a").replace("ç", "c") \
+            .replace("é", "e").replace("ê", "e").replace("í", "i").replace("ó", "o").replace("ú", "u")
+
+
 def _parse_when(msg, now):
     """Datas em portugues -> {"start": datetime|None, "has_time": bool, "end": datetime|None}.
     Determinístico: hoje/amanha/depois de amanha, dia da semana (+ "que vem"),
     "dia 28", "28 de outubro", "28/10[/2026]", "daqui a N min/horas/dias/semanas",
     horas "9h", "9h30", "14:30", "as 9 da noite", "meio-dia", periodos "de manha/a tarde/a noite"."""
-    t = " " + (msg or "").lower() + " "
-    t = t.replace("ã", "a").replace("á", "a").replace("à", "a").replace("â", "a").replace("ç", "c") \
-         .replace("é", "e").replace("ê", "e").replace("í", "i").replace("ó", "o").replace("ú", "u")
+    t = " " + _fold(msg) + " "
     day = None
     hour = minute = None
+    dia_por_nome = False
 
     m = re.search(r"\bdaqui a (\d+|uma?|dois|duas|tres) (minutos?|horas?|dias?|semanas?)\b", t) or \
         re.search(r"\bem (\d+) (minutos?|horas?)\b", t)
@@ -164,6 +193,7 @@ def _parse_when(msg, now):
             # proxima ocorrencia; "sexta" numa sexta e' hoje, salvo "que vem"/"proxima"
             if delta == 0 and (m.group(1) or m.group(3)):
                 delta = 7
+            dia_por_nome = delta == 0
             day = (now + datetime.timedelta(days=delta)).date()
     if day is None and re.search(r"\bsemana que vem\b|\bproxima semana\b", t):
         day = (now + datetime.timedelta(days=7)).date()
@@ -202,6 +232,10 @@ def _parse_when(msg, now):
         if cand <= now:
             cand += datetime.timedelta(days=1)
         return {"start": cand, "has_time": True, "end": None}
+    # "quinta as 10h" dito numa quinta ao meio-dia e' a proxima quinta, nao um horario que
+    # ja passou: o pedido era recusado e o modelo pequeno confirmava mesmo assim
+    if dia_por_nome and hour is not None and datetime.datetime.combine(day, datetime.time(hour, minute or 0)) <= now:
+        day += datetime.timedelta(days=7)
     start = datetime.datetime.combine(day, datetime.time(hour or 0, minute or 0))
     end = None
     m = re.search(r"\bate (?:as )?(\d{1,2})(?::|h)?(\d{2})?\b", t)
@@ -221,6 +255,64 @@ _DATE_BITS = re.compile(
     r"\b(?:[aà]s |at[eé] (?:[aà]s )?)\d{1,2}(?:(?::|h)\d{2}|h)?\b(?: da (?:manh[aã]|tarde|noite))?|"
     r"\b\d{1,2}(?::|h)\d{2}\b|\b\d{1,2}h\b|"
     r"\b(?:de|pela|[aà]) (?:manh[aã]|tarde|noite)\b|\bmeio[- ]dia\b|\bdaqui a \S+ \w+\b", re.I)
+
+
+def _is_task(msg):
+    if _TASK_CMD.search(msg):
+        return True
+    if re.search(r"\b(?:lembr|anot)", msg, re.I):
+        return False
+    # "manda um e-mail pra Maria todo dia" e' e-mail para outra pessoa: tarefa nao faz isso
+    if _EMAIL_REQ.search(msg) and not re.search(r"\bme\b|\bresum", msg, re.I):
+        return False
+    return bool(_RECORRENTE.search(msg) and _TASK_VERB.search(msg))
+
+
+def _task_schedule(msg, now):
+    """Frase -> agenda da tarefa ("diario 08:00", "semanal 1 07:00"...), por regra. None =
+    faltou a hora, ou pediu mais de um dia da semana (a tarefa so' aceita um)."""
+    t = " " + _fold(msg) + " "
+    w = _parse_when(msg, now)
+    if not w["has_time"]:
+        return None
+    hora = w["start"].strftime("%H:%M")
+    if not _RECORRENTE.search(msg):
+        return "uma_vez " + w["start"].strftime("%Y-%m-%dT%H:%M")
+    if re.search(r"\bde segunda a sexta\b|\bdias? ute?is\b|\bdia util\b", t):
+        return "dias_uteis " + hora
+    dia_mes = r"\bdia (\d{1,2})\b(?! ?h|:)"  # "todo dia 8h" e' hora, "todo dia 8" e' dia do mes
+    if re.search(r"\btodo " + dia_mes[2:] + r"|\b(?:todo|cada) mes\b|\bmensalmente\b", t):
+        m = re.search(dia_mes, t)
+        d = int(m.group(1)) if m else now.day
+        return f"mensal {d} {hora}" if 1 <= d <= 31 else None
+    dias = re.findall(r"\b(segunda|terca|quarta|quinta|sexta|sabado|domingo)s?\b", t)
+    if len(set(dias)) > 1:
+        return None
+    if re.search(r"\btod[ao]s? (?:[ao]s )?(?:semanas?|segunda|terca|quarta|quinta|sexta|sabado|domingo)"
+                 r"|\bsemanalmente\b", t):
+        return f"semanal {(_WD[dias[0]] if dias else now.weekday()) + 1} {hora}"
+    return "diario " + hora
+
+
+def _task_kind(msg):
+    t = _fold(_TASK_CMD.sub(" ", msg))
+    if re.search(r"\bpesquis|\bnoticias?\b|\bna (?:web|internet)\b", t):
+        return "pesquisa"
+    if re.search(r"\bagenda\b|\bcompromissos?\b|\bbom dia\b|\bmeu dia\b|\bresumo do dia\b", t):
+        return "resumo_dia"
+    if re.search(r"\be-?mails?\b|\bcaixa de entrada\b", t):
+        return "emails"
+    return "pesquisa" if re.search(r"\bnovidades?\b", t) else "pergunta"
+
+
+def _task_prompt(msg):
+    """O pedido com as palavras do usuario, sem o quando. "As novidades de hoje" fica:
+    so' a de uma vez perde data, porque nela a data ja' virou a agenda."""
+    s = _TASK_HORA.sub(" ", _RECORRENTE.sub(" ", _TASK_CMD.sub(" ", msg)))
+    if not _RECORRENTE.search(msg):
+        s = _DATE_BITS.sub(" ", s)
+    s = re.sub(r"\s+", " ", s).strip(" ,.;:-")
+    return re.sub(r"^(?:para|pra|de|que)\b[\s,.;:-]*", "", s, flags=re.I)
 
 
 def _clean_details(detalhes):
@@ -307,10 +399,15 @@ class Filter:
         acao = (d.get("acao") or "nenhuma").lower()
         detalhes = _clean_details(d.get("detalhes"))
         repetir = d.get("repetir") if d.get("repetir") in (
-            "diario", "dias_uteis", "semanal", "mensal", "anual") else None
+            "diario", "dias_uteis", "semanal", "mensal", "anual") and _REPETE.search(msg) else None
         w = _parse_when(msg, now)
         start = w["start"]
-        # O modelo pequeno confunde os tipos: as palavras do usuario decidem
+        # O modelo pequeno confunde os tipos: as palavras do usuario decidem. "Nenhuma" do
+        # modelo segura o falso alarme ("todo dia faz sol"); pergunta so' com o aval dele.
+        if _is_task(msg) and acao != "nenhuma" and (acao == "tarefa" or "?" not in msg):
+            return self._create_task(d, uid, msg, now, hoje)
+        if acao == "tarefa":
+            acao = "lembrete" if re.search(r"\b(lembr|avis)", msg, re.I) else "nenhuma"
         if acao == "consulta" or (_QUERY.search(msg) and not _CREATE.search(msg)):
             acao = "consulta"
         elif acao in ("lembrete", "nota", "evento"):
@@ -388,6 +485,25 @@ class Filter:
                     "quando. Pergunte o dia e a hora. Nada foi salvo ainda.")
         return None
 
+    def _create_task(self, d, uid, msg, now, hoje):
+        agenda = _task_schedule(msg, now)
+        if not agenda:
+            return (f"[Nous Agenda] {hoje}O usuario quer uma tarefa, mas NADA foi salvo: faltou a "
+                    "hora, ou pediu mais de um dia da semana (cada tarefa aceita um dia, ou todo "
+                    "dia, ou de segunda a sexta). Pergunte em uma frase curta.")
+        kind = _task_kind(msg)
+        pedido = _task_prompt(msg) or msg.strip()
+        # sem _clean_title: o prefixo de comando dele comeria o "Agenda" de "Agenda do dia"
+        nome = ((d.get("titulo") or "").strip(" .:-") or _TASK_NOME.get(kind) or pedido)[:200]
+        nome = nome[:1].upper() + nome[1:]
+        t = self._api("POST", "/tasks", json={
+            "user_id": uid, "name": nome, "kind": kind, "schedule": agenda,
+            "prompt": pedido if kind in ("pergunta", "pesquisa") else ""})["task"]
+        self._last[uid] = (time.time(), "tasks", t["id"], t["name"])
+        return (f"[Nous Agenda] {hoje}Tarefa criada: \"{t['name']}\", {t['quando']}. O Nous faz "
+                "sozinho nesse horario e o resultado vira uma nota e um aviso. Confirme ao "
+                "usuario em uma frase curta o que foi criado, repetindo exatamente esse horario.")
+
     # ---------------------------------------------------------- ciclo
     async def inlet(self, body: dict, __user__: Optional[dict] = None,
                     __event_emitter__=None) -> dict:
@@ -405,11 +521,12 @@ class Filter:
         # de compromisso + data, fora de pergunta ("tenho consulta amanha, o que levo?")
         implicit = (_EVENT_WORDS.search(msg or "") and "?" not in (msg or "")
                     and _parse_when(msg, datetime.datetime.now())["start"] is not None)
-        if not uid or not msg or not (_CREATE.search(msg) or _QUERY.search(msg) or implicit):
+        tarefa = bool(msg) and _is_task(msg)
+        if not uid or not msg or not (_CREATE.search(msg) or _QUERY.search(msg) or implicit or tarefa):
             return body
         if _OPEN_PANEL.search(msg):
             return body  # "abre minha agenda": quem resolve e' o Nous Comandos (abre o painel)
-        if _EMAIL_REQ.search(msg):
+        if _EMAIL_REQ.search(msg) and not tarefa:
             return body  # "manda um e-mail pra Maria marcando a reuniao de sexta" e' e-mail, nao agenda
 
         async def status(desc, done):
@@ -421,8 +538,10 @@ class Filter:
 
         key = hashlib.sha1(f"{uid}\n{msg}".encode("utf-8")).hexdigest()
         t = time.time()
-        self._done = {k: v for k, v in self._done.items() if t - v[0] < 86400}
-        if key in self._done and not _QUERY.search(msg):
+        # So' protege o "regenerar resposta". Com 24 h, repetir o mesmo pedido no mesmo dia
+        # ("me lembre de beber agua em 1 hora") nao gravava nada e o modelo confirmava.
+        self._done = {k: v for k, v in self._done.items() if t - v[0] < 600}
+        if key in self._done and (tarefa or not _QUERY.search(msg)):
             text = self._done[key][1]  # regenerou a resposta: ja foi gravado
         else:
             await status("Verificando a agenda...", False)
@@ -454,7 +573,7 @@ class Filter:
         except Exception as e:
             return f"[Nous Agenda] Nao consegui desfazer ({e}). Avise o usuario."
         self._last.pop(uid, None)
-        tipo = "o compromisso" if kind == "events" else "a nota/lembrete"
+        tipo = {"events": "o compromisso", "tasks": "a tarefa"}.get(kind, "a nota/lembrete")
         return (f"[Nous Agenda] Desfeito: {tipo} \"{title}\" foi apagado da agenda agora. "
                 "Confirme ao usuario em uma frase curta.")
 

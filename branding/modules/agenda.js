@@ -21,6 +21,8 @@
 		semanal: 'Toda semana', mensal: 'Todo mes', anual: 'Todo ano' };
 	var KIND_LABEL = { pergunta: 'Pergunta ao Nous', pesquisa: 'Pesquisa na web',
 		emails: 'Resumo dos e-mails', resumo_dia: 'Bom dia (agenda + e-mails)' };
+	var AVISO_LABEL = { sempre: 'Sempre que rodar', mudou: 'Só se o resultado mudar',
+		modelo: 'Só se o Nous achar importante' };
 
 	/* ---------------------------------------------------------- utilidades */
 	function api(method, path, body) {
@@ -227,9 +229,21 @@
 				(s.aviso_email === '1' ? ' checked' : '') + '>No seu e-mail (precisa do Assistente de Email conectado)</label></div>' +
 				'<div class="nous-ag-form"><b style="font-size:12px">No celular, de graca (app ntfy)</b>' +
 				'<div class="nous-ag-hint">1. Instale o app <b>ntfy</b> (Android ou iPhone).<br>2. No app, toque em <b>+</b> e assine o codigo abaixo.<br>' +
-				'O codigo funciona como uma senha: quem souber dele recebe seus avisos. As mensagens passam pelo servidor publico ntfy.sh.</div>' +
+				'O codigo funciona como uma senha: quem souber dele recebe seus avisos.<br>' +
+				'Por segurança, o celular recebe só um aviso curto: "Tarefa concluída: nome da tarefa" ou "Nous: você tem um lembrete". ' +
+				'Esse aviso passa pelo servidor público ntfy.sh, a não ser que você use um servidor seu.</div>' +
 				'<div class="nous-ag-row"><input id="nous-ag-st" value="' + esc(s.ntfy_topico || '') + '" placeholder="desligado">' +
 				'<button class="nous-ag-btn ghost" id="nous-ag-sg" type="button" style="flex:.45">Gerar codigo</button></div>' +
+				'<span class="nous-ag-lbl">Servidor próprio (opcional)</span>' +
+				'<input id="nous-ag-sv" value="' + esc(s.ntfy_servidor || '') + '" placeholder="https://ntfy.sh">' +
+				'<span class="nous-ag-lbl">Token do servidor (opcional)</span>' +
+				'<input id="nous-ag-sk" type="password" autocomplete="off" placeholder="' +
+				(s.ntfy_token_salvo ? 'Guardado. Deixe em branco para manter' : 'Sem token') + '">' +
+				(s.ntfy_token_salvo ? '<label class="nous-ag-lbl"><input id="nous-ag-sx" type="checkbox">Apagar o token guardado</label><br>' : '') +
+				'<label class="nous-ag-lbl" style="font-size:12px;opacity:1"><input id="nous-ag-sc" type="checkbox"' +
+				(s.ntfy_conteudo === '1' ? ' checked' : '') + '>Mandar também o texto do resultado</label>' +
+				'<div class="nous-ag-hint nous-ag-bad" style="opacity:1">Atenção: com isso ligado, o resultado das tarefas (e-mails, agenda, pesquisas) e o texto dos lembretes ' +
+				'saem do seu computador e passam pelo servidor do ntfy. Quem souber o código consegue ler. Ligue só se você aceita isso.</div>' +
 				'<button class="nous-ag-btn" id="nous-ag-ss2" type="button">Salvar</button> ' +
 				'<button class="nous-ag-btn ghost" id="nous-ag-tt" type="button">Mandar um teste</button>' +
 				'<span class="nous-ag-msg" id="nous-ag-sm2"></span></div>' +
@@ -237,7 +251,12 @@
 			box.querySelector('#nous-ag-sg').addEventListener('click', function () { box.querySelector('#nous-ag-st').value = randomTopic(); });
 			box.querySelector('#nous-ag-back').addEventListener('click', function () { show('hoje'); });
 			function save() {
-				return api('POST', '/settings', { aviso_email: box.querySelector('#nous-ag-se').checked, ntfy_topico: box.querySelector('#nous-ag-st').value.trim() });
+				var apagar = box.querySelector('#nous-ag-sx');
+				return api('POST', '/settings', {
+					aviso_email: box.querySelector('#nous-ag-se').checked, ntfy_topico: box.querySelector('#nous-ag-st').value.trim(),
+					ntfy_servidor: box.querySelector('#nous-ag-sv').value.trim(), ntfy_token: box.querySelector('#nous-ag-sk').value.trim(),
+					ntfy_token_apagar: !!(apagar && apagar.checked), ntfy_conteudo: box.querySelector('#nous-ag-sc').checked
+				});
 			}
 			box.querySelector('#nous-ag-ss2').addEventListener('click', function () {
 				save().then(function () { msg(box.querySelector('#nous-ag-sm2'), 'Salvo.'); })
@@ -245,7 +264,10 @@
 			});
 			box.querySelector('#nous-ag-tt').addEventListener('click', function () {
 				save().then(function () { return api('POST', '/settings/test', {}); })
-					.then(function () { msg(box.querySelector('#nous-ag-sm2'), 'Teste enviado. Chegou?'); })
+					.then(function (d) {
+						if (d.ntfy === false) msg(box.querySelector('#nous-ag-sm2'), 'O servidor do ntfy recusou o aviso. Confira o endereço e o token.', true);
+						else msg(box.querySelector('#nous-ag-sm2'), 'Teste enviado. Chegou?');
+					})
 					.catch(function (e) { msg(box.querySelector('#nous-ag-sm2'), e.message, true); });
 			});
 		}).catch(function () { offline(box); });
@@ -823,6 +845,9 @@
 		var kinds = Object.keys(KIND_LABEL).map(function (k) {
 			return '<option value="' + k + '">' + KIND_LABEL[k] + '</option>';
 		}).join('');
+		var avisos = Object.keys(AVISO_LABEL).map(function (k) {
+			return '<option value="' + k + '">' + AVISO_LABEL[k] + '</option>';
+		}).join('');
 		var wd = ['segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado', 'domingo'].map(function (d, i) {
 			return '<option value="' + (i + 1) + '">' + d + '</option>';
 		}).join('');
@@ -842,11 +867,25 @@
 			'<div id="nous-ag-tm-wrap" style="display:none"><span class="nous-ag-lbl">Dia do mes</span><input id="nous-ag-tm" type="number" min="1" max="31" value="1"></div>' +
 			'<div id="nous-ag-to-wrap" style="display:none"><span class="nous-ag-lbl">Data</span><input id="nous-ag-to" type="date"></div>' +
 			'<div><span class="nous-ag-lbl">Hora</span><input id="nous-ag-th" type="time" value="08:00"></div></div>' +
+			'<span class="nous-ag-lbl">Quando me avisar</span><select id="nous-ag-ta">' + avisos + '</select>' +
+			'<div class="nous-ag-hint">"Só se o resultado mudar" compara com a última vez. "Só se o Nous achar importante" deixa o Nous decidir ' +
+			'lendo o resultado; na dúvida, ele avisa. Sem aviso, também não vira nota nem e-mail.</div>' +
 			'<span class="nous-ag-lbl">Quando terminar, rodar em seguida (recebe este resultado)</span>' +
 			'<select id="nous-ag-tc">' + chain + '</select>' +
 			'<label class="nous-ag-lbl"><input id="nous-ag-te" type="checkbox">Enviar o resultado para o meu e-mail (precisa do Assistente de Email)</label><br><br>' +
 			'<button class="nous-ag-btn" id="nous-ag-tb" type="button">Criar tarefa</button>' +
 			'<span class="nous-ag-msg" id="nous-ag-tmsg"></span></div>';
+	}
+
+	/* O que aconteceu da ultima vez, em linguagem simples. */
+	function lastInfo(t) {
+		if (t.last_status === 'tentando') return 'sem resposta do motor de IA, vou tentar de novo às ' + hm(t.next_run);
+		if (t.last_status === 'pulada') return esc(t.last_error || 'não rodou na hora marcada');
+		if (!t.last_run) return 'ainda nao rodou';
+		var quando = 'ultima vez: ' + dayLabel(t.last_run, Date.now() / 1000).toLowerCase() + ' ' + hm(t.last_run);
+		if (t.last_status === 'erro') return quando + ' (falhou' + (t.last_error ? ': ' + esc(t.last_error) : '') + ')';
+		if (t.last_status === 'sem_novidade') return quando + ' (sem novidade, não avisei)';
+		return quando;
 	}
 
 	function renderTasks(box) {
@@ -858,11 +897,11 @@
 			d.tasks.forEach(function (t) {
 				var running = d.running.indexOf(t.id) >= 0;
 				if (t.then_task && names[t.then_task]) t.quando += ' · depois: ' + names[t.then_task];
-				var last = running ? 'rodando agora...' : (t.last_run ? 'ultima vez: ' + dayLabel(t.last_run, Date.now() / 1000).toLowerCase() +
-					' ' + hm(t.last_run) + (t.last_status === 'erro' ? ' (falhou)' : '') : 'ainda nao rodou');
+				var last = running ? 'rodando agora...' : lastInfo(t);
 				html += '<div class="nous-ag-item"><button class="nous-ag-act" title="' + (t.enabled ? 'Pausar' : 'Ativar') +
 					'" data-ton="' + t.id + '" data-v="' + (t.enabled ? 0 : 1) + '">' + (t.enabled ? '⏸' : '▶') + '</button>' +
-					'<div class="nous-ag-main"><div class="nous-ag-tt">' + esc(t.name) + '<span class="nous-ag-tag">' + KIND_LABEL[t.kind] + '</span></div>' +
+					'<div class="nous-ag-main"><div class="nous-ag-tt">' + esc(t.name) + '<span class="nous-ag-tag">' + KIND_LABEL[t.kind] + '</span>' +
+					(t.aviso && t.aviso !== 'sempre' ? '<span class="nous-ag-tag">' + AVISO_LABEL[t.aviso] + '</span>' : '') + '</div>' +
 					'<div class="nous-ag-sub">' + esc(t.quando) + (t.enabled ? '' : ' (pausada)') + ' · ' + last + '</div>' +
 					(t.prompt ? '<div class="nous-ag-sub">' + esc(t.prompt.slice(0, 200)) + '</div>' : '') + '</div>' +
 					(t.last_note ? '<button class="nous-ag-act" title="Ver resultado" data-tview="1">📄</button>' : '') +
@@ -903,7 +942,8 @@
 			api('POST', '/tasks', {
 				name: box.querySelector('#nous-ag-tn').value, kind: box.querySelector('#nous-ag-tk').value,
 				prompt: box.querySelector('#nous-ag-tp').value, schedule: sched,
-				email: box.querySelector('#nous-ag-te').checked, then_task: box.querySelector('#nous-ag-tc').value || null
+				email: box.querySelector('#nous-ag-te').checked, then_task: box.querySelector('#nous-ag-tc').value || null,
+				aviso: box.querySelector('#nous-ag-ta').value
 			}).then(function () { renderTasks(box); })
 				.catch(function (e) { msg(box.querySelector('#nous-ag-tmsg'), e.message, true); });
 		});
