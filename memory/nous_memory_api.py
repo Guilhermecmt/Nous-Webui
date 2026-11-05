@@ -415,11 +415,26 @@ def import_extract(user_id, nome=None, dados=None, texto=None):
     return {"fatos": fatos, "truncado": truncado, "origem": "modelo"}
 
 
+def _ameacas_mod():
+    import sys
+    p = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "utilidades")
+    if p not in sys.path:
+        sys.path.append(p)
+    import ameacas
+    return ameacas
+
+
 def import_apply(user_id, persona, fatos):
-    n = 0
+    """-> (guardadas, recusadas). Memoria entra no prompt de toda conversa: texto de
+    fora com cara de ordem para a IA fica de fora."""
+    n = recusadas = 0
+    ameacas = _ameacas_mod()
     for f in fatos[:2000]:
         t = str((f or {}).get("text") or "").strip()[:500]
         if not t:
+            continue
+        if ameacas.varrer(t):
+            recusadas += 1
             continue
         mid = add_memory(user_id, t, str(f.get("persona") or persona or "default")[:60])
         if mid is None:
@@ -427,7 +442,7 @@ def import_apply(user_id, persona, fatos):
         n += 1
         if f.get("pinned"):
             set_pinned(mid, user_id, True)
-    return n
+    return n, recusadas
 
 
 def add_memory(user_id, text, persona="default"):
@@ -625,8 +640,8 @@ async def h_import_apply(request):
     uid = body.get("user_id")
     if not uid:
         return web.json_response({"error": "user_id required"}, status=400)
-    n = import_apply(uid, body.get("persona") or "default", body.get("fatos") or [])
-    return web.json_response({"ok": True, "salvas": n})
+    n, recusadas = import_apply(uid, body.get("persona") or "default", body.get("fatos") or [])
+    return web.json_response({"ok": True, "salvas": n, "recusadas": recusadas})
 
 
 async def h_personas(request):

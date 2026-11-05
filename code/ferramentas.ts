@@ -12,6 +12,7 @@
 // ajustes para modelo local pequeno: limites menores, edicao tolerante e os
 // nomes antigos (read_file, edit_file, run_command...) aceitos como apelidos.
 
+import { semelhanca } from './reparo.ts';
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
@@ -493,6 +494,28 @@ export function buscar(raiz: string, a: Record<string, unknown>, sessao = ''): s
 }
 
 /* ------------------------------------------------------------ edit */
+/* Aspas curvas, travessoes e espacos especiais trocados um por um, para as
+ * posicoes continuarem valendo no texto original (Hermes: tools/fuzzy_match.py). */
+const TIPOGRAFIA: Record<string, string> = { '\u201c': '"', '\u201d': '"', '\u2018': "'", '\u2019': "'", '\u2013': '-', '\u2014': '-', '\u2212': '-', '\u00a0': ' ',
+  '\u2002': ' ', '\u2003': ' ', '\u2009': ' ', '\u202f': ' ', '\u3000': ' ' };
+const semTipografia = (s: string) => s.replace(/[\u201c\u201d\u2018\u2019\u2013\u2014\u2212\u00a0\u2002\u2003\u2009\u202f\u3000]/g, (c) => TIPOGRAFIA[c]);
+
+/* Linha parecida para mostrar no erro: o modelo ve o recuo e o texto de verdade. */
+function linhaParecida(txt: string, velho: string): string {
+  const alvo = (velho.split('\n').find((l) => l.trim()) || '').trim();
+  if (alvo.length < 4) return '';
+  const ls = txt.split('\n');
+  if (ls.length > 3000) return '';
+  let melhor = -1, nota = 0.6;
+  ls.forEach((l, i) => {
+    const t = l.trim();
+    if (t.length < 4 || t.length > alvo.length * 2 || alvo.length > t.length * 2) return;
+    const r = semelhanca(alvo.slice(0, 200), t.slice(0, 200));
+    if (r > nota) { nota = r; melhor = i; }
+  });
+  return melhor < 0 ? '' : `\nDid you mean line ${melhor + 1}?\n${ls[melhor].slice(0, 200)}`;
+}
+
 /* Calcula o arquivo novo de um edit sem gravar (para mostrar o diff antes).
  * Literal como no dsh; quando nao acha, tenta o que modelo pequeno costuma
  * errar: copiar com os numeros de linha do read ("12: ") ou com outro recuo. */
@@ -518,6 +541,23 @@ export function aplicarEdicao(atual: string, velho: string, novo: string, todas 
       }
     }
   }
+  if (quantas === 0 && /\\[ntr]/.test(v) && !v.includes('\n')) {
+    // \\n escrito como texto no lugar da quebra de linha
+    const solta = (s: string) => s.replace(/\\n/g, '\n').replace(/\\t/g, '\t').replace(/\\r/g, '');
+    if (txt.includes(solta(v))) { v = solta(v); n = solta(n); quantas = txt.split(v).length - 1; }
+  }
+  if (quantas === 0) {
+    // so' as aspas curvas ou os travessoes do arquivo sao diferentes
+    const base = semTipografia(txt), alvo = semTipografia(v);
+    const i = alvo ? base.indexOf(alvo) : -1;
+    if (i >= 0) {
+      const achou = base.split(alvo).length - 1;
+      if (achou > 1 && !todas) throw new Error(`old_string matched ${achou} times in "${mostra}"; provide a more specific old_string or set replace_all to true`);
+      let res = '', de = 0;
+      for (let k = base.indexOf(alvo); k >= 0; k = base.indexOf(alvo, k + alvo.length)) { res += txt.slice(de, k) + n; de = k + alvo.length; }
+      return volta(res + txt.slice(de));
+    }
+  }
   if (quantas === 0) {
     // mesma sequencia de linhas, so' o recuo/espacos diferentes
     const alvo = v.split('\n').map((l) => l.trim());
@@ -539,7 +579,9 @@ export function aplicarEdicao(atual: string, velho: string, novo: string, todas 
       return volta(res.join('\n'));
     }
     if (achou.length > 1) throw new Error(`old_string matched ${achou.length} times in "${mostra}"; provide a more specific old_string or set replace_all to true`);
-    throw new Error(`old_string was not found in "${mostra}". Read the file again and copy the text exactly (without the line numbers)`);
+    // edit repetido: o texto novo ja' esta' la' e o velho nao (vira "nada mudou", nao erro)
+    if (n.trim().length >= 8 && txt.includes(n)) return atual;
+    throw new Error(`old_string was not found in "${mostra}". Read the file again and copy the text exactly (without the line numbers)` + linhaParecida(txt, v));
   }
   if (quantas > 1 && !todas) throw new Error(`old_string matched ${quantas} times in "${mostra}"; provide a more specific old_string or set replace_all to true`);
   return volta(todas ? txt.split(v).join(n) : txt.replace(v, () => n));

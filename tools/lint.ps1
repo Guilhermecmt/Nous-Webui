@@ -74,6 +74,32 @@ if ($py) {
         } else { Write-Host "  (testes do e-mail pulados: faltam aiohttp/requests no Python)" -ForegroundColor DarkGray }
     }
 
+    # Memoria, resumo e barreira contra texto hostil (Ollama de mentira, sem rede).
+    if (Test-Path (Join-Path $root "utilidades/testes")) {
+        & $py.Source -c "import aiohttp, pydantic, requests" 2>$null
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "== Memoria, resumo e texto hostil" -ForegroundColor Cyan
+            $old = $ErrorActionPreference; $ErrorActionPreference = "Continue"
+            $out = & $py.Source -W ignore -m unittest discover -s utilidades/testes -t utilidades/testes 2>&1 | Out-String
+            $ok = $LASTEXITCODE -eq 0
+            $ErrorActionPreference = $old
+            if (-not $ok) { Write-Host $out; Bad "utilidades/testes: testes falharam" }
+        } else { Write-Host "  (testes de utilidades pulados: faltam aiohttp/pydantic/requests no Python)" -ForegroundColor DarkGray }
+    }
+
+    # Telegram e WhatsApp: Bot API e Open WebUI de mentira (sem rede, sem token, sem Ollama).
+    if (Test-Path (Join-Path $root "mensageiros/testes")) {
+        & $py.Source -c "import aiohttp, qrcode" 2>$null
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "== Telegram e WhatsApp (API de mentira)" -ForegroundColor Cyan
+            $old = $ErrorActionPreference; $ErrorActionPreference = "Continue"
+            $out = & $py.Source -W ignore -m unittest discover -s mensageiros/testes -t mensageiros/testes 2>&1 | Out-String
+            $ok = $LASTEXITCODE -eq 0
+            $ErrorActionPreference = $old
+            if (-not $ok) { Write-Host $out; Bad "mensageiros/testes: testes falharam" }
+        } else { Write-Host "  (testes dos mensageiros pulados: faltam aiohttp/qrcode no Python)" -ForegroundColor DarkGray }
+    }
+
     # Usar no celular: portao com Open WebUI e servicos de mentira (sem rede, sem Ollama).
     if (Test-Path (Join-Path $root "celular/testes")) {
         & $py.Source -c "import aiohttp" 2>$null
@@ -91,7 +117,7 @@ if ($py) {
 $node = Get-Command node -ErrorAction SilentlyContinue
 if ($node) {
     Write-Host "== JavaScript" -ForegroundColor Cyan
-    foreach ($f in $files | Where-Object { $_ -match '\.js$' }) {
+    foreach ($f in $files | Where-Object { $_ -match '\.js$' -and $_ -notmatch '^mensageiros/whatsapp-ponte/' }) {
         & $node.Source --check (Join-Path $root $f)
         if ($LASTEXITCODE -ne 0) { Bad "$f nao e' JavaScript valido" }
     }
