@@ -3,35 +3,14 @@
  * (a classe certa nao adianta se a cor nao chega) e guarda um screenshot por tema. */
 const { test, expect } = require('@playwright/test');
 const path = require('path');
-const { ligarMonitor } = require('./monitor-falso');
+const { TEMAS, entrar, medirContraste } = require('./ajuda');
 
 const SAIDA = path.join(__dirname, 'saida');
-
-const TEMAS = [
-  { nome: 'claro', valor: 'light', fundo: 'rgb(255, 255, 255)' },
-  { nome: 'escuro', valor: 'dark', fundo: 'rgb(20, 18, 16)' },
-];
 
 const JANELAS = [
   { nome: 'telegram-whatsapp', botao: 'nous-msg-open', caixa: '#nous-msg', fundo: '#nous-msg-ov', titulo: 'Telegram e WhatsApp', monitor: { mensageiros: 'conectado' } },
   { nome: 'celular', botao: 'nous-cel-open', caixa: '#nous-cel', fundo: '#nous-cel-ov', titulo: 'Usar no celular', monitor: { celular: 'ligado' } },
 ];
-
-async function entrar(page, tema, monitor, tamanho) {
-  const m = await ligarMonitor(page, monitor);
-  if (tamanho) await page.setViewportSize(tamanho);
-  await page.addInitScript(([token, valor, versao]) => {
-    localStorage.setItem('token', token);
-    localStorage.setItem('theme', valor);
-    localStorage.setItem('version', versao);
-    sessionStorage.setItem('nous-wizard-skip', '1');
-  }, [process.env.NOUS_TELA_TOKEN, tema.valor, process.env.NOUS_TELA_VERSAO]);
-  await page.goto('/');
-  /* em tela estreita o painel comeca fechado e so' a coruja aparece */
-  await expect(page.locator(tamanho ? '#nous-pn-alca' : '#nous-pn')).toBeVisible({ timeout: 30000 });
-  await expect(page.locator('html')).toHaveClass(tema.valor === 'dark' ? /(^|\s)dark(\s|$)/ : /^(?!.*\bdark\b)/);
-  return m;
-}
 
 function botaoDoPainel(page, id) { return page.locator('#nous-pn [data-abre="' + id + '"]'); }
 
@@ -39,30 +18,6 @@ async function abrir(page, j) {
   await botaoDoPainel(page, j.botao).click();
   await expect(page.locator(j.caixa)).toBeVisible();
   await expect(page.locator(j.caixa + '-body')).not.toBeEmpty();
-}
-
-/* menor contraste entre o texto visivel e o fundo real atras dele, somando as
- * camadas translucidas ate' a caixa */
-function medirContraste(sel) {
-  const caixa = document.querySelector(sel);
-  const rgba = (c) => { const n = c.match(/[\d.]+/g).map(Number); return { r: n[0], g: n[1], b: n[2], a: n.length > 3 ? n[3] : 1 }; };
-  const sobre = (c, f) => ({ r: c.r * c.a + f.r * (1 - c.a), g: c.g * c.a + f.g * (1 - c.a), b: c.b * c.a + f.b * (1 - c.a), a: 1 });
-  const lum = (c) => { const v = [c.r, c.g, c.b].map((x) => { x /= 255; return x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4); }); return 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2]; };
-  function fundo(el) {
-    const pilha = [];
-    for (let e = el; e; e = e.parentElement) { pilha.push(rgba(getComputedStyle(e).backgroundColor)); if (e === caixa) break; }
-    return pilha.reverse().reduce((f, c) => sobre(c, f), { r: 255, g: 0, b: 255, a: 1 });
-  }
-  const achados = [];
-  const andar = document.createTreeWalker(caixa, NodeFilter.SHOW_TEXT);
-  while (andar.nextNode()) {
-    const t = andar.currentNode.textContent.trim(), el = andar.currentNode.parentElement;
-    if (!t || !el.getClientRects().length || el.closest('[disabled]')) continue;
-    const f = fundo(el), c = sobre(rgba(getComputedStyle(el).color), f);
-    const a = lum(c), b = lum(f);
-    achados.push({ texto: t.slice(0, 40), razao: Math.round(((Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05)) * 100) / 100 });
-  }
-  return achados.sort((x, y) => x.razao - y.razao);
 }
 
 test('o painel "Seu Nous" aparece com as ferramentas', async ({ page }) => {

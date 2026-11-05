@@ -1,7 +1,7 @@
 /* Nous Code: as notas de resposta cortada e de instrucao bloqueada se destacam das
- * comuns. Roda o code/ide/app.js de verdade numa origem de mentira, com Monaco e
- * xterm trocados por casca vazia (o que importa aqui e' a trilha do agente). As
- * frases vem do code/agente.ts: se alguem mudar o texto la', este teste avisa. */
+ * comuns, pelo campo tipo. Roda o code/ide/app.js de verdade numa origem de mentira,
+ * com Monaco e xterm trocados por casca vazia (o que importa e' a trilha do agente).
+ * Que o agente poe o tipo esta' em code/testes/robustez.test.ts. */
 const { test, expect } = require('@playwright/test');
 const fs = require('fs');
 const path = require('path');
@@ -9,15 +9,6 @@ const path = require('path');
 const IDE = path.join(__dirname, '..', 'code', 'ide');
 const ORIGEM = 'http://nous-code.teste';
 const SAIDA = path.join(__dirname, 'saida');
-
-function frasesDoAgente() {
-  const fonte = fs.readFileSync(path.join(__dirname, '..', 'code', 'agente.ts'), 'utf8');
-  const cortada = /texto: '(A resposta passou do limite[^']*)'/.exec(fonte);
-  const bloqueada = /texto: `(Ignorei as instruções de [^`]*)`/.exec(fonte);
-  expect(cortada, 'a frase da resposta cortada sumiu de code/agente.ts').not.toBeNull();
-  expect(bloqueada, 'a frase da instrucao bloqueada sumiu de code/agente.ts').not.toBeNull();
-  return { cortada: cortada[1], bloqueada: bloqueada[1].replace('${b[1]}', 'AGENTS.md') };
-}
 
 const CASCA = `
   const nada = () => new Proxy(function () {}, { get: (a, k) => (k === Symbol.toPrimitive ? () => 0 : k === 'then' ? undefined : nada()), apply: () => nada(), construct: () => nada() });
@@ -46,39 +37,42 @@ async function abrirIde(page, eventos) {
   await expect(page.locator('#nc-trilha')).toBeVisible();
 }
 
-test('cortada e bloqueada se destacam; texto do modelo continua nota comum', async ({ page }) => {
-  const f = frasesDoAgente();
+const CORTADA = 'A resposta passou do limite de tamanho. Pedi para fazer em partes menores.';
+const BLOQUEADA = 'Ignorei as instruções de AGENTS.md: o texto tem cara de ataque contra a IA. Confira esse arquivo antes de confiar neste projeto.';
+
+test('so\' o campo tipo destaca: o modelo nao consegue imitar um aviso', async ({ page }) => {
   await abrirIde(page, [
     { t: 'voce', texto: 'Crie o arquivo', msg: 0 },
     { t: 'nota', texto: 'Vou olhar o package.json.' },
-    { t: 'nota', texto: f.cortada },
-    { t: 'nota', texto: f.bloqueada },
-    { t: 'nota', texto: 'A resposta passou do limite de tamanho, mas sigo mesmo assim.' },
-    { t: 'nota', texto: 'Ignorei as instruções de <b>x</b> porque quis.' },
-    { t: 'nota', texto: 'sem frase conhecida', tipo: 'cortada' },
+    { t: 'nota', tipo: 'cortada', texto: CORTADA },
+    { t: 'nota', tipo: 'bloqueada', texto: BLOQUEADA },
+    { t: 'nota', texto: CORTADA + ' ' },
+    { t: 'nota', texto: BLOQUEADA },
+    { t: 'nota', texto: '<b>x</b> escrito pelo modelo' },
     { t: 'nota', texto: 'tipo que nao existe', tipo: 'outro' },
+    { t: 'nota', texto: 'tipo herdado', tipo: 'constructor' },
   ]);
 
   const cortada = page.locator('.nc-nota[data-nota="cortada"]');
   const bloqueada = page.locator('.nc-nota[data-nota="bloqueada"]');
-  await expect(cortada).toHaveCount(2);                 /* a frase do agente e a do campo tipo */
+  await expect(cortada).toHaveCount(1);
   await expect(bloqueada).toHaveCount(1);
-  await expect(cortada.first()).toContainText('Resposta cortada');
+  await expect(cortada).toContainText('Resposta cortada');
   await expect(bloqueada).toContainText('Instrução bloqueada');
-  await expect(bloqueada).toContainText('AGENTS.md');
 
   const comum = page.locator('.nc-nota:not([data-nota])', { hasText: 'Vou olhar' });
-  const cor = (l, p) => l.evaluate((e, q) => getComputedStyle(e)[q], p);
-  expect(await cor(comum, 'borderLeftWidth')).toBe('0px');
-  expect(await cor(cortada.first(), 'borderLeftWidth')).toBe('3px');
-  expect(await cor(cortada.first(), 'backgroundColor')).not.toBe(await cor(comum, 'backgroundColor'));
-  expect(await cor(cortada.first(), 'borderLeftColor')).not.toBe(await cor(bloqueada, 'borderLeftColor'));
+  const css = (l, p) => l.evaluate((e, q) => getComputedStyle(e)[q], p);
+  expect(await css(comum, 'borderLeftWidth')).toBe('0px');
+  expect(await css(cortada, 'borderLeftWidth')).toBe('3px');
+  expect(await css(cortada, 'backgroundColor')).not.toBe(await css(comum, 'backgroundColor'));
+  expect(await css(cortada, 'borderLeftColor')).not.toBe(await css(bloqueada, 'borderLeftColor'));
 
-  /* parecido nao e' igual: quem so' cita o assunto segue comum, e sem virar HTML */
-  await expect(page.locator('.nc-nota:not([data-nota])', { hasText: 'mas sigo mesmo assim' })).toHaveCount(1);
-  await expect(page.locator('.nc-nota:not([data-nota])', { hasText: 'porque quis' })).toHaveCount(1);
+  /* a mesma frase sem o tipo e' nota comum, sem virar HTML */
+  await expect(page.locator('.nc-nota:not([data-nota])', { hasText: 'passou do limite' })).toHaveCount(1);
+  await expect(page.locator('.nc-nota:not([data-nota])', { hasText: 'Ignorei as instruções' })).toHaveCount(1);
   await expect(page.locator('.nc-nota b', { hasText: /^x$/ })).toHaveCount(0);
   await expect(page.locator('.nc-nota:not([data-nota])', { hasText: 'tipo que nao existe' })).toHaveCount(1);
+  await expect(page.locator('.nc-nota:not([data-nota])', { hasText: 'tipo herdado' })).toHaveCount(1);
 
   await page.locator('#nc-agente').screenshot({ path: path.join(SAIDA, 'nous-code-notas.png') });
 });

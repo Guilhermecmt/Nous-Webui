@@ -11,6 +11,16 @@
 	var UI = window.NousUI || {};
 	var esc = UI.esc || function (s) { return String(s || ''); };
 	var ov = null, tab = 'caixa', account = null, accounts = [], current = null;
+	var dlg = UI.dialogo({ id: 'nous-em', titulo: '✉ Assistente de Email',
+		cabeca: '<select id="nous-em-acc" title="Conta" style="display:none"></select>',
+		antesDoCorpo: '<div id="nous-em-tabs">' + ['caixa:Caixa', 'rascunhos:Rascunhos', 'news:Newsletters', 'contatos:Contatos', 'contas:Contas']
+			.map(function (t) { var p = t.split(':'); return '<button class="nous-em-tab" type="button" data-tab="' + p[0] + '">' + p[1] + '</button>'; }).join('') + '</div>',
+		aoMontar: function (o) {
+			o.querySelectorAll('.nous-em-tab').forEach(function (b) {
+				b.addEventListener('click', function () { show(b.getAttribute('data-tab')); });
+			});
+			o.querySelector('#nous-em-acc').addEventListener('change', function (e) { account = e.target.value; show(tab); });
+		} });
 
 	function api(method, path, body) {
 		var opt = { method: method, headers: {} };
@@ -48,40 +58,37 @@
 		if (document.getElementById('nous-em-style')) return;
 		var g = 'rgba(200,150,46,';
 		var css =
-			'#nous-em-ov{position:fixed;inset:0;z-index:10001;background:rgba(0,0,0,.55);display:flex;align-items:center;' +
-			'justify-content:center;backdrop-filter:blur(3px)}#nous-em-ov.nous-hidden{display:none}' +
 			'#nous-em{width:600px;max-width:95vw;height:84vh;display:flex;flex-direction:column;font-family:Inter,system-ui,sans-serif;' +
-			'font-size:13px;color:#eee;background:rgba(18,18,22,.97);border:1px solid ' + g + '.4);border-radius:16px;' +
-			'box-shadow:0 16px 48px rgba(0,0,0,.55);overflow:hidden}' +
+			'font-size:13px;color:var(--nd-txt);background:var(--nd-bg);border:1px solid ' + g + '.4);border-radius:16px;' +
+			'box-shadow:0 16px 48px var(--nd-sombra);overflow:hidden}' +
 			'#nous-em-head{display:flex;align-items:center;gap:8px;padding:14px 16px 8px}' +
-			'#nous-em-head span{flex:1;font-weight:700;font-size:15px;color:#e7c069}' +
-			'#nous-em-acc{background:rgba(255,255,255,.07);border:1px solid ' + g + '.3);border-radius:7px;color:#eee;font-size:11px;padding:3px 6px;color-scheme:dark}' +
-			'#nous-em-close{background:none;border:none;color:#888;cursor:pointer;font-size:19px}' +
+			'#nous-em-head span{flex:1;font-weight:700;font-size:15px;color:var(--nd-texto-ouro)}' +
+			'#nous-em-acc{background:rgba(var(--nd-tom),.07);border:1px solid ' + g + '.3);border-radius:7px;color:var(--nd-txt);font-size:11px;padding:3px 6px;color-scheme:var(--nd-esquema)}' +
 			'#nous-em-tabs{display:flex;gap:2px;padding:0 12px;border-bottom:1px solid ' + g + '.15);flex-wrap:wrap}' +
-			'.nous-em-tab{background:none;border:none;border-bottom:2px solid transparent;color:#aaa;padding:8px 9px;cursor:pointer;font-size:12px;font-weight:600}' +
-			'.nous-em-tab.on{color:#e7c069;border-bottom-color:#c8962e}' +
+			'.nous-em-tab{background:none;border:none;border-bottom:2px solid transparent;color:var(--nd-mut);padding:8px 9px;cursor:pointer;font-size:12px;font-weight:600}' +
+			'.nous-em-tab.on{color:var(--nd-texto-ouro);border-bottom-color:#c8962e}' +
 			'.nous-em-badge{display:inline-block;min-width:16px;padding:0 4px;margin-left:4px;border-radius:8px;background:#c8962e;color:#111;font-size:10px}' +
 			'#nous-em-body{flex:1;overflow-y:auto;padding:12px 16px 16px}' +
-			'.nous-em-row{padding:8px 9px;border-radius:9px;background:rgba(255,255,255,.04);margin-bottom:5px;cursor:pointer}' +
+			'.nous-em-row{padding:8px 9px;border-radius:9px;background:rgba(var(--nd-tom),.04);margin-bottom:5px;cursor:pointer}' +
 			'.nous-em-row:hover{background:' + g + '.08)}.nous-em-row.unread .nous-em-subj{font-weight:700}' +
 			'.nous-em-top{display:flex;gap:6px;align-items:center}.nous-em-from{font-size:12px;font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
-			'.nous-em-subj{font-size:12px;margin:2px 0}.nous-em-sub{font-size:11px;opacity:.6;line-height:1.45}' +
-			'.nous-em-cat{font-size:10px;padding:1px 6px;border-radius:9px;background:' + g + '.2);color:#e7c069;white-space:nowrap}' +
-			'.nous-em-cat.imp{background:rgba(220,80,60,.25);color:#f3a08f}.nous-em-cat.spam{opacity:.5}' +
+			'.nous-em-subj{font-size:12px;margin:2px 0}.nous-em-sub{font-size:11px;color:var(--nd-mut);line-height:1.45}' +
+			'.nous-em-cat{font-size:10px;padding:1px 6px;border-radius:9px;background:' + g + '.2);color:var(--nd-texto-ouro);white-space:nowrap}' +
+			'.nous-em-cat.imp{background:rgba(220,80,60,.25);color:var(--nd-perigo)}.nous-em-cat.spam{color:var(--nd-mut);background:none}' +
 			'.nous-em-btn{padding:6px 11px;border:1px solid ' + g + '.45);border-radius:8px;cursor:pointer;background:' + g + '.18);' +
-			'color:#e7c069;font-weight:600;font-size:12px;margin:3px 4px 3px 0}.nous-em-btn:hover{background:' + g + '.32)}' +
-			'.nous-em-btn.ghost{background:transparent}.nous-em-btn.danger{border-color:rgba(220,80,80,.5);color:#f08080;background:transparent}' +
+			'color:var(--nd-texto-ouro);font-weight:600;font-size:12px;margin:3px 4px 3px 0}.nous-em-btn:hover{background:' + g + '.32)}' +
+			'.nous-em-btn.ghost{background:transparent}.nous-em-btn.danger{border-color:rgba(220,80,80,.5);color:var(--nd-perigo);background:transparent}' +
 			'.nous-em-btn:disabled{opacity:.4;cursor:default}' +
-			'.nous-em-box{background:rgba(255,255,255,.04);border-radius:10px;padding:9px 11px;margin:8px 0;font-size:12px;line-height:1.55;white-space:pre-wrap;word-wrap:break-word}' +
+			'.nous-em-box{background:rgba(var(--nd-tom),.04);border-radius:10px;padding:9px 11px;margin:8px 0;font-size:12px;line-height:1.55;white-space:pre-wrap;word-wrap:break-word}' +
 			'.nous-em-form input,.nous-em-form textarea,.nous-em-form select{box-sizing:border-box;width:100%;padding:7px 9px;margin:3px 0 8px;' +
-			'background:rgba(255,255,255,.07);border:1px solid ' + g + '.28);border-radius:8px;color:#eee;font-size:12px;outline:none;font-family:inherit;color-scheme:dark}' +
+			'background:rgba(var(--nd-tom),.07);border:1px solid ' + g + '.28);border-radius:8px;color:var(--nd-txt);font-size:12px;outline:none;font-family:inherit;color-scheme:var(--nd-esquema)}' +
 			'.nous-em-form textarea{min-height:170px;resize:vertical;line-height:1.5}' +
-			'.nous-em-lbl{font-size:11px;opacity:.65}.nous-em-msg{font-size:11px;margin-left:4px}.nous-em-bad{color:#f08080}.nous-em-ok{color:#5fd693}' +
-			'.nous-em-empty{opacity:.65;text-align:center;padding:18px 8px;font-size:12px;line-height:1.6}' +
-			'.nous-em-hint{font-size:11px;opacity:.6;line-height:1.5;margin:2px 0 8px}' +
+			'.nous-em-lbl{font-size:11px;color:var(--nd-mut)}.nous-em-msg{font-size:11px;margin-left:4px}.nous-em-bad{color:var(--nd-perigo)}.nous-em-ok{color:var(--nd-ok)}' +
+			'.nous-em-empty{color:var(--nd-mut);text-align:center;padding:18px 8px;font-size:12px;line-height:1.6}' +
+			'.nous-em-hint{font-size:11px;color:var(--nd-mut);line-height:1.5;margin:2px 0 8px}' +
 			'.nous-em-st{font-size:10px;padding:1px 6px;border-radius:9px;margin-left:6px}' +
-			'.nous-em-st.pendente{background:' + g + '.25);color:#e7c069}.nous-em-st.agendado{background:rgba(110,150,230,.2);color:#9db8ee}' +
-			'.nous-em-st.enviado{background:rgba(58,208,122,.15);color:#5fd693}.nous-em-st.erro{background:rgba(220,60,60,.2);color:#f08080}';
+			'.nous-em-st.pendente{background:' + g + '.25);color:var(--nd-texto-ouro)}.nous-em-st.agendado{background:rgba(110,150,230,.2);color:var(--nd-azul)}' +
+			'.nous-em-st.enviado{background:rgba(58,208,122,.15);color:var(--nd-ok)}.nous-em-st.erro{background:rgba(220,60,60,.2);color:var(--nd-perigo)}';
 		var st = document.createElement('style');
 		st.id = 'nous-em-style';
 		st.textContent = css;
@@ -89,29 +96,8 @@
 	}
 
 	/* ---------------------------------------------------------- montagem */
-	function build() {
-		if (ov && document.body.contains(ov)) return;
-		ov = document.createElement('div');
-		ov.id = 'nous-em-ov';
-		ov.className = 'nous-hidden';
-		ov.innerHTML = '<div id="nous-em"><div id="nous-em-head"><span>✉ Assistente de Email</span>' +
-			'<select id="nous-em-acc" title="Conta" style="display:none"></select>' +
-			'<button id="nous-em-close" type="button" aria-label="Fechar">&#x2715;</button></div>' +
-			'<div id="nous-em-tabs">' + ['caixa:Caixa', 'rascunhos:Rascunhos', 'news:Newsletters', 'contatos:Contatos', 'contas:Contas']
-				.map(function (t) { var p = t.split(':'); return '<button class="nous-em-tab" type="button" data-tab="' + p[0] + '">' + p[1] + '</button>'; }).join('') +
-			'</div><div id="nous-em-body"></div></div>';
-		document.body.appendChild(ov);
-		ov.addEventListener('click', function (e) { if (e.target === ov) close(); });
-		ov.querySelector('#nous-em-close').addEventListener('click', close);
-		ov.querySelectorAll('.nous-em-tab').forEach(function (b) {
-			b.addEventListener('click', function () { show(b.getAttribute('data-tab')); });
-		});
-		ov.querySelector('#nous-em-acc').addEventListener('change', function (e) { account = e.target.value; show(tab); });
-	}
-
 	function open(which) {
-		build();
-		ov.classList.remove('nous-hidden');
+		ov = dlg.abrir();
 		loading('Verificando contas...');
 		fetch(EM + '/status', { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (d) {
 			accounts = d.accounts || [];
@@ -126,7 +112,7 @@
 		}).catch(fail);
 		badge();
 	}
-	function close() { ov.classList.add('nous-hidden'); }
+	function close() { dlg.fechar(); }
 
 	function show(which) {
 		tab = which;
@@ -295,7 +281,7 @@
 					(x.status !== 'enviado' ? '<div style="margin-top:5px"><button class="nous-em-btn" data-send="' + x.id + '" type="button">Enviar</button>' +
 						'<button class="nous-em-btn ghost" data-edit="' + x.id + '" type="button">Editar</button>' +
 						'<input type="datetime-local" data-when="' + x.id + '" value="' + localInput(Date.now() / 1000 + 3600) + '" ' +
-						'style="background:rgba(255,255,255,.07);border:1px solid rgba(200,150,46,.28);border-radius:7px;color:#eee;font-size:11px;padding:4px;color-scheme:dark">' +
+						'style="background:rgba(var(--nd-tom),.07);border:1px solid rgba(200,150,46,.28);border-radius:7px;color:var(--nd-txt);font-size:11px;padding:4px;color-scheme:var(--nd-esquema)">' +
 						'<button class="nous-em-btn ghost" data-sched="' + x.id + '" type="button">Agendar</button>' +
 						'<button class="nous-em-btn danger" data-del="' + x.id + '" type="button">Apagar</button></div>' : '') + '</div>';
 			});

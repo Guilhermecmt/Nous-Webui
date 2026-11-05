@@ -6,11 +6,13 @@
      confirmar(texto, {ok, cancelar, perigo, titulo}) -> Promise<boolean>
          caixa no visual do Nous (no lugar do confirm() cinza do navegador);
          o botao repete o verbo ("Apagar", nao "OK")
-     dialogo({id, titulo, largura, aoFechar}) -> {abrir, fechar, aberto, repintar}
+     dialogo({id, titulo, largura, cabeca, antesDoCorpo, aoMontar, aoFechar})
+         -> {montar, abrir, fechar, aberto, repintar}
          janela do Nous que acompanha o tema: Esc e clique fora fecham, o foco
          fica preso dentro e volta ao botao que abriu
-   Tema: a classe .nous-tema da' as cores (--nd-*) do tema claro e do escuro, a
-   partir dos tokens --pn-* do painel. Toast, confirmar e dialogo ja' usam.
+   Tema: --nd-* no :root e no .dark da' as cores dos dois temas, a partir dos
+   tokens --pn-* do painel. --nd-tom e' o "branco" dos tons translucidos:
+   rgba(var(--nd-tom),.07) e' claro sobre o escuro e escuro sobre o claro.
    ===================================================================== */
 (function () {
 	'use strict';
@@ -23,13 +25,17 @@
 		st.id = 'nous-base-style';
 		st.textContent =
 			/* cores: as do painel, com reserva porque a tela de entrada nao tem painel.
-			 * --nd-texto-ouro e' o ouro que se le' em cima do fundo (ouro claro no escuro) */
-			'.nous-tema{--nd-bg:var(--pn-bg,#fff);--nd-alto:var(--pn-alto,#faf6ee);--nd-linha:var(--pn-linha,rgba(138,100,20,.16));' +
-			'--nd-ouro:var(--pn-ouro,#a87a1c);--nd-texto-ouro:var(--pn-ouro2,#8a6414);--nd-txt:var(--pn-txt,#2a251e);' +
-			'--nd-mut:var(--pn-mut,#7a6f5d);--nd-perigo:#a8322a;--nd-campo:#fff;--nd-veu:rgba(40,30,10,.38);--nd-sombra:rgba(60,45,15,.28)}' +
-			'.dark .nous-tema{--nd-bg:var(--pn-bg,#141210);--nd-alto:var(--pn-alto,#1c1916);--nd-linha:var(--pn-linha,rgba(231,192,105,.12));' +
+			 * --nd-texto-ouro e' o ouro que se le' em cima do fundo (ouro claro no escuro).
+			 * No claro, ele e --nd-mut sao um tom mais fortes que os do painel: aqui o texto
+			 * e' miudo e fica em cima de fundo tingido. */
+			':root{--nd-bg:var(--pn-bg,#fff);--nd-alto:var(--pn-alto,#faf6ee);--nd-linha:var(--pn-linha,rgba(138,100,20,.16));' +
+			'--nd-ouro:var(--pn-ouro,#a87a1c);--nd-texto-ouro:#7f5b10;--nd-txt:var(--pn-txt,#2a251e);' +
+			'--nd-mut:#6f6453;--nd-perigo:#a8322a;--nd-ok:#2a7247;--nd-azul:#35589c;--nd-campo:#fff;--nd-tom:70,52,18;' +
+			'--nd-esquema:light;--nd-veu:rgba(40,30,10,.38);--nd-sombra:rgba(60,45,15,.28)}' +
+			'.dark{--nd-bg:var(--pn-bg,#141210);--nd-alto:var(--pn-alto,#1c1916);--nd-linha:var(--pn-linha,rgba(231,192,105,.12));' +
 			'--nd-ouro:var(--pn-ouro,#c8962e);--nd-texto-ouro:var(--pn-ouro2,#e7c069);--nd-txt:var(--pn-txt,#ddd5c6);' +
-			'--nd-mut:var(--pn-mut,#958a76);--nd-perigo:#f4a3a3;--nd-campo:rgba(0,0,0,.3);--nd-veu:rgba(0,0,0,.55);--nd-sombra:rgba(0,0,0,.55)}' +
+			'--nd-mut:var(--pn-mut,#958a76);--nd-perigo:#f4a3a3;--nd-ok:#5fd693;--nd-azul:#9db8ee;--nd-campo:rgba(0,0,0,.3);--nd-tom:255,255,255;' +
+			'--nd-esquema:dark;--nd-veu:rgba(0,0,0,.55);--nd-sombra:rgba(0,0,0,.55)}' +
 
 			'#nous-toasts{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);z-index:10050;display:flex;' +
 			'flex-direction:column;gap:8px;align-items:center;pointer-events:none;max-width:92vw}' +
@@ -65,7 +71,7 @@
 			'.nous-dlg-x{background:none;border:none;color:var(--nd-mut);cursor:pointer;font-size:19px}.nous-dlg-x:hover{color:var(--nd-txt)}' +
 			'.nous-dlg button:focus-visible,.nous-dlg a:focus-visible{outline:2px solid var(--nd-ouro);outline-offset:2px}' +
 			'.nous-dlg-corpo{padding:14px 16px 18px}.nous-dlg-corpo p{margin:0 0 10px}' +
-			'.nous-dlg-corpo a:not(.no-gold){color:var(--nd-texto-ouro);word-break:break-all}' +
+			'.nous-dlg-corpo a:not(.no-gold){color:var(--nd-texto-ouro);overflow-wrap:anywhere}' +
 			'.nous-dlg-aviso{padding:10px 12px;border-radius:10px;margin:0 0 12px;border:1px solid ' + g + '.35);background:' + g + '.1)}' +
 			'.nous-dlg-aviso.erro{border-color:rgba(220,80,80,.55);background:rgba(200,60,60,.12)}' +
 			'.nous-dlg-aviso b{color:var(--nd-texto-ouro)}.nous-dlg-mut{font-size:12px;color:var(--nd-mut)}' +
@@ -92,7 +98,6 @@
 		if (!b) {
 			b = document.createElement('div');
 			b.id = 'nous-toasts';
-			b.className = 'nous-tema';
 			b.setAttribute('role', 'status');
 			b.setAttribute('aria-live', 'polite');
 			document.body.appendChild(b);
@@ -140,9 +145,15 @@
 		});
 	}
 
+	/* outra peca do Nous por cima (dica do passeio, aviso, painel aberto de dentro
+	 * desta janela): ela cuida do proprio teclado e do proprio foco */
+	function outraPeca(topo, x) {
+		return !!x && !!x.closest && !topo.caixa.contains(x) && !!x.closest('[id^="nous-"]');
+	}
+
 	function tecla(e) {
 		var topo = pilha[pilha.length - 1];
-		if (!topo || e.isComposing) return;
+		if (!topo || e.isComposing || outraPeca(topo, document.activeElement)) return;
 		if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); topo.esc(); return; }
 		if (e.key !== 'Tab') return;
 		var f = focaveis(topo.caixa), a = document.activeElement, i = f.indexOf(a);
@@ -162,7 +173,7 @@
 		var topo = pilha[pilha.length - 1], t = e.target;
 		if (!topo) return;
 		if (topo.caixa.contains(t)) { topo.ultimo = t; return; }
-		if (t.closest && t.closest('#nous-toasts')) return;   /* o "Desfazer" do aviso */
+		if (outraPeca(topo, t)) return;
 		var agora = Date.now();
 		if (agora - desde > 1000) { desde = agora; puxadas = 0; }
 		if (++puxadas > 20) return;
@@ -206,14 +217,15 @@
 		var ov = null, caixa = null, corpo = null, origem = null, soltar = null;
 
 		function montar() {
-			if (ov && document.body.contains(ov)) return;
+			injectStyle();
+			if (ov && document.body.contains(ov)) return ov;
 			ov = document.createElement('div');
 			ov.id = op.id + '-ov';
-			ov.className = 'nous-dlg-ov nous-tema nous-hidden';
+			ov.className = 'nous-dlg-ov nous-hidden';
 			ov.innerHTML = '<div class="nous-dlg" id="' + op.id + '" role="dialog" aria-modal="true" aria-labelledby="' + op.id + '-tit" tabindex="-1">' +
 				'<div class="nous-dlg-head" id="' + op.id + '-head"><span class="nous-dlg-tit" id="' + op.id + '-tit"></span>' +
-				'<button class="nous-dlg-x" id="' + op.id + '-close" type="button" aria-label="Fechar">&#x2715;</button></div>' +
-				'<div class="nous-dlg-corpo" id="' + op.id + '-body"></div></div>';
+				(op.cabeca || '') + '<button class="nous-dlg-x" id="' + op.id + '-close" type="button" aria-label="Fechar">&#x2715;</button></div>' +
+				(op.antesDoCorpo || '') + '<div class="nous-dlg-corpo" id="' + op.id + '-body"></div></div>';
 			caixa = ov.firstChild;
 			corpo = caixa.lastChild;
 			if (op.largura) caixa.style.width = op.largura + 'px';
@@ -225,18 +237,20 @@
 			ov.addEventListener('mousedown', function (e) { noFundo = e.target === ov; });
 			ov.addEventListener('click', function (e) { if (e.target === ov && noFundo) fechar(); });
 			document.body.appendChild(ov);
+			if (op.aoMontar) op.aoMontar(ov);
+			return ov;
 		}
 
 		function aberto() { return !!soltar; }
 
 		function abrir() {
-			injectStyle();
-			if (aberto()) return;
+			if (aberto()) return ov;
 			montar();
 			origem = document.activeElement;
 			ov.classList.remove('nous-hidden');
 			soltar = cercar(caixa, fechar);
 			ov.querySelector('.nous-dlg-x').focus();
+			return ov;
 		}
 
 		function fechar() {
@@ -272,7 +286,7 @@
 			if (novo && cursor !== null) { try { novo.setSelectionRange(cursor, cursor); } catch (e) {} }
 		}
 
-		return { abrir: abrir, fechar: fechar, aberto: aberto, repintar: repintar };
+		return { montar: montar, abrir: abrir, fechar: fechar, aberto: aberto, repintar: repintar };
 	}
 
 	function confirmar(texto, op) {
@@ -282,7 +296,6 @@
 			var ov = document.createElement('div');
 			var origem = document.activeElement, soltar = null;
 			ov.id = 'nous-cf-ov';
-			ov.className = 'nous-tema';
 			ov.innerHTML = '<div id="nous-cf" role="alertdialog" aria-modal="true"><h3></h3><p></p><div class="nous-cf-row">' +
 				'<button type="button" class="nao"></button><button type="button" class="ok"></button></div></div>';
 			ov.querySelector('h3').textContent = op.titulo || 'Tem certeza?';
@@ -345,6 +358,8 @@
 	ui.dialogo = dialogo;
 	ui.pede = pede;
 	ui.aviso = aviso;
-	if (document.head) injectTitulos();
-	else document.addEventListener('DOMContentLoaded', injectTitulos);
+	/* ja' na carga tambem: as cores --nd-* valem para todos os paineis */
+	function injetar() { injectStyle(); injectTitulos(); }
+	if (document.head) injetar();
+	else document.addEventListener('DOMContentLoaded', injetar);
 })();

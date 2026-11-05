@@ -1299,18 +1299,13 @@
   function fecharPensamento() { if (pensamento) { pensamento.open = false; pensamento = null; } }
 
   /* O evento 'nota' serve para duas coisas: avisos do Nous e o texto que o modelo
-   * escreveu entre um passo e outro. Dois avisos merecem destaque. O agente ainda
-   * nao diz qual e' qual: aceita e.tipo se vier e, sem ele, compara a frase INTEIRA
-   * (a de code/agente.ts; tests-tela/nota.spec.js avisa se ela mudar). Comparar so'
-   * um pedaco pintaria de aviso o texto de um modelo que apenas falou no assunto. */
-  const NOTAS = [
-    { tipo: 'cortada', rotulo: 'Resposta cortada', frase: /^A resposta passou do limite de tamanho\. Pedi para fazer em partes menores\.$/ },
-    { tipo: 'bloqueada', rotulo: 'Instrução bloqueada', frase: /^Ignorei as instruções de \S+: o texto tem cara de ataque contra a IA\. Confira esse arquivo antes de confiar neste projeto\.$/ },
-  ];
+   * escreveu entre um passo e outro. So' o campo tipo, que o agente poe, faz o
+   * destaque: olhar o texto deixaria o modelo imitar um aviso. */
+  const NOTAS = { cortada: 'Resposta cortada', bloqueada: 'Instrução bloqueada' };
   function htmlNota(e) {
-    const n = NOTAS.find((x) => x.tipo === e.tipo) || NOTAS.find((x) => x.frase.test(e.texto));
-    if (!n) return '<div class="nc-nota">' + esc(e.texto) + '</div>';
-    return '<div class="nc-nota nc-aviso ' + n.tipo + '" data-nota="' + n.tipo + '"><b>' + n.rotulo + '</b>' + esc(e.texto) + '</div>';
+    const rotulo = Object.hasOwn(NOTAS, e.tipo) ? NOTAS[e.tipo] : '';
+    if (!rotulo) return '<div class="nc-nota">' + esc(e.texto) + '</div>';
+    return '<div class="nc-nota nc-aviso ' + e.tipo + '" data-nota="' + e.tipo + '"><b>' + rotulo + '</b>' + esc(e.texto) + '</div>';
   }
 
   function evento(e, historico, indice) {
