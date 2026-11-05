@@ -486,7 +486,7 @@ export async function turno(s: Sessao, pedido: string, ctx: Ctx, origem: 'humano
     s.instrEnviadas = true;
     const ins = C.instrucoes(s.pasta);
     if (ins) s.mensagens.push({ role: 'user', content: ins });
-    for (const b of ins.matchAll(/\[BLOCKED: (\S+) contained/g)) ev({ t: 'nota', texto: `Ignorei as instruções de ${b[1]}: o texto tem cara de ataque contra a IA. Confira esse arquivo antes de confiar neste projeto.` });
+    for (const b of ins.matchAll(/\[BLOCKED: (\S+) contained/g)) ev({ t: 'nota', tipo: 'bloqueada', texto: `Ignorei as instruções de ${b[1]}: o texto tem cara de ataque contra a IA. Confira esse arquivo antes de confiar neste projeto.` });
   }
   const cat = C.catalogo(s.pasta);
   const hc = cat ? crypto.createHash('sha256').update(cat).digest('hex').slice(0, 16) : '';
@@ -562,7 +562,7 @@ export async function turno(s: Sessao, pedido: string, ctx: Ctx, origem: 'humano
         ctx.salvar();
         return;
       }
-      ev({ t: 'nota', texto: 'A resposta passou do limite de tamanho. Pedi para fazer em partes menores.' });
+      ev({ t: 'nota', tipo: 'cortada', texto: 'A resposta passou do limite de tamanho. Pedi para fazer em partes menores.' });
       s.mensagens.push({ role: 'user', content: CORTE_FERRAMENTA });
       continue;
     }

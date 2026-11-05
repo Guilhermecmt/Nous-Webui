@@ -13,6 +13,14 @@
 	var esc = UI.esc || function (s) { return String(s || ''); };
 	var LETRAS = ['A', 'B', 'C', 'D'];
 	var ov = null, tab = 'comparar';
+	var dlg = UI.dialogo({ id: 'nous-cp', titulo: '⚖ Comparar modelos',
+		cabeca: '<button class="nous-cp-tab" data-t="comparar" type="button">Comparar</button>' +
+			'<button class="nous-cp-tab" data-t="placar" type="button">Placar</button>',
+		aoMontar: function (o) {
+			o.querySelectorAll('.nous-cp-tab').forEach(function (b) {
+				b.addEventListener('click', function () { tab = b.getAttribute('data-t'); render(); });
+			});
+		} });
 	var rodada = null;  /* {models, prompt, res: {model: {...}}, votado, cego} */
 
 	function injectStyle() {
@@ -22,40 +30,37 @@
 		st.id = 'nous-cp-style';
 		st.textContent =
 			'#nous-cmp-open{width:100%;margin-top:5px;padding:6px;border:1px solid ' + g + '.25);border-radius:8px;' +
-			'cursor:pointer;background:transparent;color:#e7c069;font-weight:600;font-size:12px}#nous-cmp-open:hover{background:' + g + '.12)}' +
-			'#nous-cp-ov{position:fixed;inset:0;z-index:10001;background:rgba(0,0,0,.55);display:flex;align-items:center;' +
-			'justify-content:center;backdrop-filter:blur(3px)}#nous-cp-ov.nous-hidden{display:none}' +
+			'cursor:pointer;background:transparent;color:var(--nd-texto-ouro);font-weight:600;font-size:12px}#nous-cmp-open:hover{background:' + g + '.12)}' +
 			'#nous-cp{width:1100px;max-width:96vw;max-height:88vh;display:flex;flex-direction:column;font-family:Inter,system-ui,sans-serif;' +
-			'font-size:13px;color:#eee;background:rgba(18,18,22,.97);border:1px solid ' + g + '.4);border-radius:16px;' +
-			'box-shadow:0 16px 48px rgba(0,0,0,.55);overflow:hidden}' +
+			'font-size:13px;color:var(--nd-txt);background:var(--nd-bg);border:1px solid ' + g + '.4);border-radius:16px;' +
+			'box-shadow:0 16px 48px var(--nd-sombra);overflow:hidden}' +
 			'#nous-cp-head{display:flex;align-items:center;gap:6px;padding:12px 16px 10px;border-bottom:1px solid ' + g + '.15)}' +
-			'#nous-cp-head span{flex:1;font-weight:700;font-size:15px;color:#e7c069}' +
-			'.nous-cp-tab{padding:5px 11px;border:1px solid ' + g + '.25);border-radius:8px;background:transparent;color:#ccc;cursor:pointer;font-size:12px}' +
-			'.nous-cp-tab.on{background:' + g + '.2);color:#e7c069;font-weight:600}' +
-			'#nous-cp-close{background:none;border:none;color:#888;cursor:pointer;font-size:19px;margin-left:6px}' +
+			'#nous-cp-head span{flex:1;font-weight:700;font-size:15px;color:var(--nd-texto-ouro)}' +
+			'.nous-cp-tab{padding:5px 11px;border:1px solid ' + g + '.25);border-radius:8px;background:transparent;color:var(--nd-txt);cursor:pointer;font-size:12px}' +
+			'.nous-cp-tab.on{background:' + g + '.2);color:var(--nd-texto-ouro);font-weight:600}' +
 			'#nous-cp-body{flex:1;overflow:auto;padding:12px 16px 16px;display:flex;flex-direction:column;gap:10px}' +
 			'.nous-cp-chips{display:flex;flex-wrap:wrap;gap:6px}' +
-			'.nous-cp-chip{padding:4px 10px;border:1px solid rgba(255,255,255,.15);border-radius:14px;cursor:pointer;font-size:12px;user-select:none}' +
-			'.nous-cp-chip.on{border-color:#c8962e;background:' + g + '.18);color:#e7c069}' +
-			'#nous-cp-q{width:100%;box-sizing:border-box;min-height:62px;padding:8px 10px;background:rgba(255,255,255,.05);' +
-			'border:1px solid ' + g + '.25);border-radius:9px;color:#eee;font:inherit;resize:vertical;outline:none}' +
+			'.nous-cp-chip{padding:4px 10px;border:1px solid rgba(var(--nd-tom),.15);border-radius:14px;cursor:pointer;font-size:12px;user-select:none}' +
+			'.nous-cp-chip.on{border-color:#c8962e;background:' + g + '.18);color:var(--nd-texto-ouro)}' +
+			'#nous-cp-q{width:100%;box-sizing:border-box;min-height:62px;padding:8px 10px;background:rgba(var(--nd-tom),.05);' +
+			'border:1px solid ' + g + '.25);border-radius:9px;color:var(--nd-txt);font:inherit;resize:vertical;outline:none}' +
 			'.nous-cp-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:12px}' +
 			'.nous-cp-btn{padding:6px 14px;border:1px solid ' + g + '.45);border-radius:8px;cursor:pointer;background:' + g + '.18);' +
-			'color:#e7c069;font-weight:600;font-size:12px}.nous-cp-btn:disabled{opacity:.4;cursor:default}' +
+			'color:var(--nd-texto-ouro);font-weight:600;font-size:12px}.nous-cp-btn:disabled{opacity:.4;cursor:default}' +
 			'.nous-cp-cols{display:grid;gap:10px;min-height:160px}' +
-			'.nous-cp-col{display:flex;flex-direction:column;border:1px solid rgba(255,255,255,.1);border-radius:11px;' +
-			'background:rgba(255,255,255,.03);min-width:0}' +
-			'.nous-cp-col.win{border-color:#5fd693;box-shadow:0 0 0 1px #5fd693 inset}' +
-			'.nous-cp-ch{padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.08);font-weight:700;color:#e7c069;' +
+			'.nous-cp-col{display:flex;flex-direction:column;border:1px solid rgba(var(--nd-tom),.1);border-radius:11px;' +
+			'background:rgba(var(--nd-tom),.03);min-width:0}' +
+			'.nous-cp-col.win{border-color:var(--nd-ok);box-shadow:0 0 0 1px var(--nd-ok) inset}' +
+			'.nous-cp-ch{padding:8px 10px;border-bottom:1px solid rgba(var(--nd-tom),.08);font-weight:700;color:var(--nd-texto-ouro);' +
 			'white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
-			'.nous-cp-st{font-size:11px;opacity:.65;font-weight:400;color:#ccc}' +
+			'.nous-cp-st{font-size:11px;font-weight:400;color:var(--nd-mut)}' +
 			'.nous-cp-tx{flex:1;overflow:auto;padding:9px 10px;white-space:pre-wrap;line-height:1.5;font-size:12.5px;max-height:52vh}' +
-			'.nous-cp-ft{padding:7px 10px;border-top:1px solid rgba(255,255,255,.08)}' +
+			'.nous-cp-ft{padding:7px 10px;border-top:1px solid rgba(var(--nd-tom),.08)}' +
 			'.nous-cp-tb{width:100%;border-collapse:collapse;font-size:12.5px}' +
-			'.nous-cp-tb th{text-align:left;font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:#c8962e;padding:6px 8px}' +
-			'.nous-cp-tb td{padding:7px 8px;border-top:1px solid rgba(255,255,255,.07)}' +
+			'.nous-cp-tb th{text-align:left;font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--nd-texto-ouro);padding:6px 8px}' +
+			'.nous-cp-tb td{padding:7px 8px;border-top:1px solid rgba(var(--nd-tom),.07)}' +
 			'.nous-cp-bar{height:6px;border-radius:3px;background:#c8962e;display:inline-block;vertical-align:middle;margin-right:6px}' +
-			'.nous-cp-dim{opacity:.6;font-size:12px;line-height:1.6}';
+			'.nous-cp-dim{color:var(--nd-mut);font-size:12px;line-height:1.6}';
 		document.head.appendChild(st);
 	}
 
@@ -78,22 +83,8 @@
 	}
 
 	function open(qual) {
-		if (!ov || !document.body.contains(ov)) {
-			ov = document.createElement('div');
-			ov.id = 'nous-cp-ov';
-			ov.innerHTML = '<div id="nous-cp"><div id="nous-cp-head"><span>⚖ Comparar modelos</span>' +
-				'<button class="nous-cp-tab" data-t="comparar" type="button">Comparar</button>' +
-				'<button class="nous-cp-tab" data-t="placar" type="button">Placar</button>' +
-				'<button id="nous-cp-close" type="button" aria-label="Fechar">&#x2715;</button></div><div id="nous-cp-body"></div></div>';
-			document.body.appendChild(ov);
-			ov.addEventListener('click', function (e) { if (e.target === ov) ov.classList.add('nous-hidden'); });
-			ov.querySelector('#nous-cp-close').addEventListener('click', function () { ov.classList.add('nous-hidden'); });
-			ov.querySelectorAll('.nous-cp-tab').forEach(function (b) {
-				b.addEventListener('click', function () { tab = b.getAttribute('data-t'); render(); });
-			});
-		}
 		if (qual) tab = qual;
-		ov.classList.remove('nous-hidden');
+		ov = dlg.abrir();
 		render();
 	}
 
@@ -117,7 +108,7 @@
 				box.innerHTML = '<div class="nous-cp-dim">Para comparar e\' preciso ter pelo menos 2 modelos de conversa instalados. ' +
 					'Baixe outro na Loja de modelos.</div><div><button class="nous-cp-btn" id="nous-cp-loja" type="button">Abrir a Loja</button></div>';
 				box.querySelector('#nous-cp-loja').addEventListener('click', function () {
-					ov.classList.add('nous-hidden');
+					dlg.fechar();
 					if (UI.openStore) UI.openStore();
 				});
 				return;
@@ -203,7 +194,7 @@
 			html += '<div class="nous-cp-col' + (r.votado === m ? ' win' : '') + '"><div class="nous-cp-ch">' + esc(nome(r, m, i)) +
 				(r.votado === m ? ' ✓' : '') + '<div class="nous-cp-st">' + esc(st) + '</div></div>' +
 				'<div class="nous-cp-tx">' + (x.estado === 'ok' ? esc(x.text || '(resposta vazia)') :
-					x.estado === 'erro' ? '<span style="color:#f08080">' + esc(x.erro) + '</span>' : '') + '</div>' +
+					x.estado === 'erro' ? '<span style="color:var(--nd-perigo)">' + esc(x.erro) + '</span>' : '') + '</div>' +
 				(acabou && r.votado === null && okCount >= 2 && x.estado === 'ok'
 					? '<div class="nous-cp-ft"><button class="nous-cp-btn" data-v="' + esc(m) + '" type="button" style="width:100%">Esta foi a melhor</button></div>' : '') +
 				'</div>';

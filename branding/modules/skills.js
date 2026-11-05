@@ -11,6 +11,7 @@
 	var UI = window.NousUI || {};
 	var esc = UI.esc || function (s) { return String(s || ''); };
 	var uid = null, ov = null;
+	var dlg = UI.dialogo({ id: 'nous-sk', titulo: '🧠 Habilidades' });
 	var ORIGEM = { conversa: 'aprendida no chat', manual: 'criada por voce', importada: 'importada',
 		estilo: 'seu jeito de escrever' };
 
@@ -34,39 +35,35 @@
 		var g = 'rgba(200,150,46,';
 		var css =
 			'#nous-skills-open{width:100%;margin-top:5px;padding:6px;border:1px solid ' + g + '.25);' +
-			'border-radius:8px;cursor:pointer;background:transparent;color:#e7c069;font-weight:600;font-size:12px}' +
+			'border-radius:8px;cursor:pointer;background:transparent;color:var(--nd-texto-ouro);font-weight:600;font-size:12px}' +
 			'#nous-skills-open:hover{background:' + g + '.12)}' +
-			'#nous-sk-ov{position:fixed;inset:0;z-index:10001;background:rgba(0,0,0,.55);display:flex;' +
-			'align-items:center;justify-content:center;backdrop-filter:blur(3px)}' +
-			'#nous-sk-ov.nous-hidden{display:none}' +
 			'#nous-sk{width:540px;max-width:95vw;max-height:84vh;display:flex;flex-direction:column;' +
-			'font-family:Inter,system-ui,sans-serif;font-size:13px;color:#eee;background:rgba(18,18,22,.97);' +
-			'border:1px solid ' + g + '.4);border-radius:16px;box-shadow:0 16px 48px rgba(0,0,0,.55);overflow:hidden}' +
+			'font-family:Inter,system-ui,sans-serif;font-size:13px;color:var(--nd-txt);background:var(--nd-bg);' +
+			'border:1px solid ' + g + '.4);border-radius:16px;box-shadow:0 16px 48px var(--nd-sombra);overflow:hidden}' +
 			'#nous-sk-head{display:flex;align-items:center;gap:8px;padding:14px 16px 10px;border-bottom:1px solid ' + g + '.15)}' +
-			'#nous-sk-head span{flex:1;font-weight:700;font-size:15px;color:#e7c069}' +
-			'#nous-sk-close{background:none;border:none;color:#888;cursor:pointer;font-size:19px}' +
+			'#nous-sk-head span{flex:1;font-weight:700;font-size:15px;color:var(--nd-texto-ouro)}' +
 			'#nous-sk-body{flex:1;overflow-y:auto;padding:12px 16px 16px}' +
-			'.nous-sk-hint{font-size:12px;opacity:.65;line-height:1.55;margin-bottom:10px}' +
-			'.nous-sk-item{padding:9px 10px;border-radius:10px;background:rgba(255,255,255,.04);margin-bottom:6px;' +
+			'.nous-sk-hint{font-size:12px;color:var(--nd-mut);line-height:1.55;margin-bottom:10px}' +
+			'.nous-sk-item{padding:9px 10px;border-radius:10px;background:rgba(var(--nd-tom),.04);margin-bottom:6px;' +
 			'display:flex;gap:8px;align-items:flex-start}' +
 			'.nous-sk-main{flex:1;min-width:0;cursor:pointer}' +
 			'.nous-sk-name{font-weight:700}' +
-			'.nous-sk-sub{font-size:11px;opacity:.6;margin-top:2px}' +
-			'.nous-sk-act{background:none;border:none;color:#888;cursor:pointer;font-size:13px}' +
-			'.nous-sk-act:hover{color:#e7c069}' +
+			'.nous-sk-sub{font-size:11px;color:var(--nd-mut);margin-top:2px}' +
+			'.nous-sk-act{background:none;border:none;color:var(--nd-mut);cursor:pointer;font-size:13px}' +
+			'.nous-sk-act:hover{color:var(--nd-texto-ouro)}' +
 			'.nous-sk-form input,.nous-sk-form textarea{box-sizing:border-box;width:100%;padding:7px 9px;margin:3px 0 9px;' +
-			'background:rgba(255,255,255,.07);border:1px solid ' + g + '.28);border-radius:8px;color:#eee;' +
+			'background:rgba(var(--nd-tom),.07);border:1px solid ' + g + '.28);border-radius:8px;color:var(--nd-txt);' +
 			'font-size:12px;outline:none;font-family:inherit}' +
 			'.nous-sk-form textarea{min-height:220px;resize:vertical;font-family:ui-monospace,Consolas,monospace;line-height:1.5}' +
-			'.nous-sk-lbl{font-size:11px;opacity:.65}' +
+			'.nous-sk-lbl{font-size:11px;color:var(--nd-mut)}' +
 			'.nous-sk-btn{padding:6px 12px;border:1px solid ' + g + '.45);border-radius:8px;cursor:pointer;' +
-			'background:' + g + '.18);color:#e7c069;font-weight:600;font-size:12px;margin-right:6px}' +
+			'background:' + g + '.18);color:var(--nd-texto-ouro);font-weight:600;font-size:12px;margin-right:6px}' +
 			'.nous-sk-btn:hover{background:' + g + '.32)}.nous-sk-btn.ghost{background:transparent}' +
 			'.nous-sk-row{display:flex;gap:8px;margin-bottom:10px}.nous-sk-row input{flex:1;margin:0}' +
-			'.nous-sk-msg{font-size:11px;margin-left:4px}.nous-sk-bad{color:#f08080}' +
+			'.nous-sk-msg{font-size:11px;margin-left:4px}.nous-sk-bad{color:var(--nd-perigo)}' +
 			'.nous-sk-warn{font-size:11px;line-height:1.5;padding:7px 9px;border-radius:8px;margin-bottom:9px;' +
 			'background:rgba(220,160,60,.1);border:1px solid rgba(220,160,60,.3)}' +
-			'.nous-sk-empty{opacity:.6;text-align:center;padding:16px 8px;font-size:12px;line-height:1.6}';
+			'.nous-sk-empty{color:var(--nd-mut);text-align:center;padding:16px 8px;font-size:12px;line-height:1.6}';
 		var st = document.createElement('style');
 		st.id = 'nous-sk-style';
 		st.textContent = css;
@@ -84,28 +81,14 @@
 		body.appendChild(b);
 	}
 
-	function build() {
-		if (ov && document.body.contains(ov)) return;
-		ov = document.createElement('div');
-		ov.id = 'nous-sk-ov';
-		ov.className = 'nous-hidden';
-		ov.innerHTML = '<div id="nous-sk"><div id="nous-sk-head"><span>🧠 Habilidades</span>' +
-			'<button id="nous-sk-close" type="button" aria-label="Fechar">&#x2715;</button></div>' +
-			'<div id="nous-sk-body"></div></div>';
-		document.body.appendChild(ov);
-		ov.addEventListener('click', function (e) { if (e.target === ov) close(); });
-		ov.querySelector('#nous-sk-close').addEventListener('click', close);
-	}
-
 	function open() {
 		(UI.loadUserId || function (cb) { cb(null); })(function (id) {
 			uid = id;
-			build();
-			ov.classList.remove('nous-hidden');
+			ov = dlg.abrir();
 			renderList();
 		});
 	}
-	function close() { if (ov) ov.classList.add('nous-hidden'); }
+	function close() { dlg.fechar(); }
 	function box() { return ov.querySelector('#nous-sk-body'); }
 
 	function renderList() {
@@ -205,8 +188,8 @@
 		b.innerHTML = '<div class="nous-sk-hint">Cole o link de um <b>SKILL.md</b> no GitHub (arquivo ou pasta). ' +
 			'O Nous baixa e mostra o conteudo para voce revisar antes de salvar.</div>' +
 			'<div class="nous-sk-row"><input id="nous-sk-u" placeholder="https://github.com/.../SKILL.md" ' +
-			'style="box-sizing:border-box;padding:7px 9px;background:rgba(255,255,255,.07);border:1px solid rgba(200,150,46,.28);' +
-			'border-radius:8px;color:#eee;font-size:12px;outline:none">' +
+			'style="box-sizing:border-box;padding:7px 9px;background:rgba(var(--nd-tom),.07);border:1px solid rgba(200,150,46,.28);' +
+			'border-radius:8px;color:var(--nd-txt);font-size:12px;outline:none">' +
 			'<button class="nous-sk-btn" id="nous-sk-get" type="button">Baixar</button></div>' +
 			'<button class="nous-sk-btn ghost" id="nous-sk-back" type="button">Voltar</button>' +
 			'<span class="nous-sk-msg" id="nous-sk-m"></span>';

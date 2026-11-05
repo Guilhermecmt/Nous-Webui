@@ -1298,6 +1298,16 @@
   function semTexto() { if (st.vivo) { st.vivo.remove(); st.vivo = null; } }
   function fecharPensamento() { if (pensamento) { pensamento.open = false; pensamento = null; } }
 
+  /* O evento 'nota' serve para duas coisas: avisos do Nous e o texto que o modelo
+   * escreveu entre um passo e outro. So' o campo tipo, que o agente poe, faz o
+   * destaque: olhar o texto deixaria o modelo imitar um aviso. */
+  const NOTAS = { cortada: 'Resposta cortada', bloqueada: 'Instrução bloqueada' };
+  function htmlNota(e) {
+    const rotulo = Object.hasOwn(NOTAS, e.tipo) ? NOTAS[e.tipo] : '';
+    if (!rotulo) return '<div class="nc-nota">' + esc(e.texto) + '</div>';
+    return '<div class="nc-nota nc-aviso ' + e.tipo + '" data-nota="' + e.tipo + '"><b>' + rotulo + '</b>' + esc(e.texto) + '</div>';
+  }
+
   function evento(e, historico, indice) {
     const t = trilha();
     const vz = $('[data-vazio]', t); if (vz) vz.remove();
@@ -1324,7 +1334,7 @@
         break;
       case 'texto': fecharPensamento(); if (!st.vivo) st.vivo = add('<div class="nc-resp"></div>'); st.vivo.textContent += e.d; break;
       case 'limpar': semTexto(); break;
-      case 'nota': semTexto(); add('<div class="nc-nota">' + esc(e.texto) + '</div>'); break;
+      case 'nota': semTexto(); add(htmlNota(e)); break;
       case 'resposta': semTexto(); fecharPensamento(); add('<div class="nc-resp">' + md(e.texto) + '</div>'); semVivo(); break;
       case 'ferramenta': {
         semTexto(); fecharPensamento();

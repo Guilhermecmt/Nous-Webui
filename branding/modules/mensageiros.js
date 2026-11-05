@@ -13,8 +13,9 @@
 	var MON = window.NousUrl(8990);
 	var UI = window.NousUI || {};
 	var esc = UI.esc || function (s) { return String(s || ''); };
-	var ov = null, est = null, cod = null, uid = null, relogio = null, atualiza = null, ocupado = false, aviso = null;
+	var est = null, cod = null, uid = null, relogio = null, atualiza = null, ocupado = false, aviso = null, visto = null;
 	var mostrarWa = false;
+	var dlg = UI.dialogo({ id: 'nous-msg', titulo: 'Telegram e WhatsApp', largura: 500, aoFechar: parar });
 
 	var ESTADO_TG = { conectado: ['on', 'Conectado: o bot está ouvindo.'], conflito: ['off', 'Outro programa está usando este bot. Aguardando...'],
 		token_invalido: ['erro', 'O Telegram recusou o token. Conecte de novo.'], sem_internet: ['off', 'Sem internet no computador.'] };
@@ -29,32 +30,6 @@
 		var st = document.createElement('style');
 		st.id = 'nous-msg-style';
 		st.textContent =
-			'#nous-msg-ov{position:fixed;inset:0;z-index:10001;background:rgba(0,0,0,.55);display:flex;align-items:center;' +
-			'justify-content:center;backdrop-filter:blur(3px)}#nous-msg-ov.nous-hidden{display:none}' +
-			'#nous-msg{width:500px;max-width:95vw;max-height:88vh;overflow-y:auto;font:13px/1.55 Inter,system-ui,sans-serif;color:#eee;' +
-			'background:rgba(18,18,22,.97);border:1px solid ' + g + '.4);border-radius:16px;box-shadow:0 16px 48px rgba(0,0,0,.55)}' +
-			'#nous-msg-head{display:flex;align-items:center;padding:14px 16px 10px;border-bottom:1px solid ' + g + '.15)}' +
-			'#nous-msg-head span{flex:1;font:600 16px Cinzel,Georgia,serif;letter-spacing:.05em;color:#e7c069}' +
-			'#nous-msg-close{background:none;border:none;color:#888;cursor:pointer;font-size:19px}' +
-			'#nous-msg-body{padding:14px 16px 18px}#nous-msg-body p{margin:0 0 10px}' +
-			'.nous-msg-aviso{padding:10px 12px;border-radius:10px;margin:0 0 12px;border:1px solid ' + g + '.35);background:' + g + '.1)}' +
-			'.nous-msg-aviso.erro{border-color:rgba(220,80,80,.55);background:rgba(200,60,60,.12)}' +
-			'.nous-msg-aviso b{color:#e7c069}.nous-msg-mut{font-size:12px;opacity:.7}' +
-			'.nous-msg-btn{padding:8px 14px;border:1px solid ' + g + '.5);border-radius:9px;cursor:pointer;background:' + g + '.2);' +
-			'color:#e7c069;font:600 13px Inter,system-ui,sans-serif;margin:2px 8px 2px 0}.nous-msg-btn:hover{background:' + g + '.34)}' +
-			'.nous-msg-btn:disabled{opacity:.5;cursor:default}.nous-msg-btn.sec{background:transparent}' +
-			'.nous-msg-btn.perigo{border-color:rgba(220,80,80,.6);color:#f4a3a3;background:transparent}' +
-			'.nous-msg-h{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#c8962e;margin:16px 0 6px}' +
-			'.nous-msg-in{width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid ' + g + '.35);border-radius:9px;background:rgba(0,0,0,.3);' +
-			'color:#eee;font:13px ui-monospace,Consolas,monospace;margin:4px 0 8px}' +
-			'.nous-msg-qr{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin:6px 0 10px}' +
-			'.nous-msg-qr img{width:176px;height:176px;background:#fff;padding:8px;border-radius:10px;image-rendering:pixelated}' +
-			'.nous-msg-ap{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.07)}' +
-			'.nous-msg-ap div:first-child{flex:1;min-width:0}.nous-msg-ap b{display:block}' +
-			'.nous-msg-ap button{padding:4px 10px;border:1px solid rgba(220,80,80,.5);border-radius:8px;background:transparent;' +
-			'color:#f4a3a3;cursor:pointer;font:600 12px Inter,system-ui,sans-serif}' +
-			'.nous-msg-pt{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:7px;background:#5fd693}' +
-			'.nous-msg-pt.off{background:#888}.nous-msg-pt.erro{background:#e06060}' +
 			'.nous-msg-ol{margin:0 0 10px 18px;padding:0}.nous-msg-ol li{margin:0 0 4px}' +
 			'.nous-msg-chk{display:flex;gap:8px;align-items:flex-start;margin:8px 0}.nous-msg-chk input{margin-top:3px}' +
 			'#nous-msg-open{width:100%;margin-top:5px;padding:6px;border:1px solid ' + g + '.25);border-radius:8px;cursor:pointer;' +
@@ -72,8 +47,13 @@
 	}
 
 	function carregar() {
-		return chamar('/mensageiros/estado').then(function (e) { est = e; if (ov && !ov.classList.contains('nous-hidden')) pintar(); })
-			.catch(function () { est = null; if (ov) pintar(); });
+		return chamar('/mensageiros/estado').then(function (e) {
+			est = e;
+			/* so' repinta se algo mudou: refazer a tela a cada 3 s apagava o token
+			 * que a pessoa estava colando e desmarcava o "Entendi" */
+			var marca = JSON.stringify(Object.assign({}, e, { agora: 0 }));
+			if (marca !== visto) { visto = marca; pintar(); }
+		}).catch(function () { est = null; visto = null; pintar(); });
 	}
 
 	function acao(caminho, corpo, aoFim) {
@@ -96,7 +76,7 @@
 		return e;
 	}
 	function botao(texto, cls, fn, desl) {
-		var b = el('button', 'nous-msg-btn' + (cls ? ' ' + cls : ''), texto);
+		var b = el('button', 'nous-dlg-btn' + (cls ? ' ' + cls : ''), texto);
 		b.type = 'button'; b.disabled = !!desl || ocupado;
 		b.addEventListener('click', fn);
 		return b;
@@ -104,7 +84,7 @@
 	function ponto(estado, mapa) {
 		var e = mapa[estado] || ['off', estado ? 'Estado: ' + estado : 'Iniciando...'];
 		var s = el('span');
-		s.appendChild(el('i', 'nous-msg-pt ' + e[0]));
+		s.appendChild(el('i', 'nous-dlg-pt ' + e[0]));
 		s.appendChild(document.createTextNode(e[1]));
 		return s;
 	}
@@ -125,7 +105,7 @@
 
 	function secaoTelegram(body) {
 		var tg = est.telegram;
-		body.appendChild(el('div', 'nous-msg-h', 'Telegram'));
+		body.appendChild(el('div', 'nous-dlg-h', 'Telegram'));
 		if (!tg.conectado) {
 			var p = el('p');
 			p.innerHTML = 'Crie um bot só seu, de graça, e fale com o Nous por ele:';
@@ -137,7 +117,7 @@
 				var li = el('li'); li.innerHTML = t; ol.appendChild(li);
 			});
 			body.appendChild(ol);
-			var inp = el('input', 'nous-msg-in');
+			var inp = el('input', 'nous-dlg-in');
 			inp.type = 'password'; inp.placeholder = '123456789:ABCdef...'; inp.id = 'nous-msg-token'; inp.autocomplete = 'off';
 			body.appendChild(inp);
 			body.appendChild(botao('Conectar o bot', '', function () {
@@ -147,14 +127,14 @@
 		}
 		var p2 = el('p');
 		p2.appendChild(ponto(tg.estado, ESTADO_TG));
-		p2.appendChild(el('span', 'nous-msg-mut', ' @' + tg.bot));
+		p2.appendChild(el('span', 'nous-dlg-mut', ' @' + tg.bot));
 		body.appendChild(p2);
 		if (cod) {
-			var qr = el('div', 'nous-msg-qr');
+			var qr = el('div', 'nous-dlg-qr');
 			if (cod.qr) { var img = el('img'); img.src = 'data:image/svg+xml;base64,' + cod.qr; img.alt = 'QR para abrir o bot'; qr.appendChild(img); }
 			var lado = el('div');
-			lado.innerHTML = '<p>Leia o QR com a câmera do celular, ou abra este link nele:</p><p><a href="' + esc(cod.link) + '" target="_blank" rel="noopener" style="color:#e7c069;word-break:break-all">' + esc(cod.link) + '</a></p>' +
-				'<p class="nous-msg-mut" id="nous-msg-tempo"></p><p class="nous-msg-mut">Depois toque em <b>Começar</b> no Telegram. O código vale uma vez só.</p>';
+			lado.innerHTML = '<p>Leia o QR com a câmera do celular, ou abra este link nele:</p><p><a href="' + esc(cod.link) + '" target="_blank" rel="noopener">' + esc(cod.link) + '</a></p>' +
+				'<p class="nous-dlg-mut" id="nous-msg-tempo"></p><p class="nous-dlg-mut">Depois toque em <b>Começar</b> no Telegram. O código vale uma vez só.</p>';
 			qr.appendChild(lado);
 			body.appendChild(qr);
 		} else {
@@ -163,11 +143,11 @@
 			}, !uid));
 		}
 		if (tg.pessoas.length) {
-			body.appendChild(el('div', 'nous-msg-h', 'Quem pode falar com o Nous'));
+			body.appendChild(el('div', 'nous-dlg-h', 'Quem pode falar com o Nous'));
 			tg.pessoas.forEach(function (d) {
-				var r = el('div', 'nous-msg-ap');
+				var r = el('div', 'nous-dlg-ap');
 				var i = el('div'); i.appendChild(el('b', '', d.nome || 'Sem nome'));
-				i.appendChild(el('span', 'nous-msg-mut', 'desde ' + new Date(d.desde * 1000).toLocaleDateString('pt-BR')));
+				i.appendChild(el('span', 'nous-dlg-mut', 'desde ' + new Date(d.desde * 1000).toLocaleDateString('pt-BR')));
 				r.appendChild(i);
 				var b = el('button', '', 'Remover'); b.type = 'button';
 				b.addEventListener('click', function () { acao('/mensageiros/telegram/remover', { id: d.id }, function () { carregar(); }); });
@@ -175,23 +155,25 @@
 				body.appendChild(r);
 			});
 		} else {
-			body.appendChild(el('p', 'nous-msg-mut', 'Ninguém conectado ainda. Quem escrever para o bot sem parear não recebe resposta nenhuma.'));
+			body.appendChild(el('p', 'nous-dlg-mut', 'Ninguém conectado ainda. Quem escrever para o bot sem parear não recebe resposta nenhuma.'));
 		}
 		body.appendChild(botao('Desconectar o bot', 'perigo', function () {
-			if (confirm('Desconectar o bot? Quem estava conectado deixa de falar com o Nous.')) acao('/mensageiros/telegram/desconectar', {}, function () { cod = null; });
+			UI.confirmar('Quem estava conectado deixa de falar com o Nous.', { titulo: 'Desconectar o bot?', ok: 'Desconectar', perigo: true }).then(function (sim) {
+				if (sim) acao('/mensageiros/telegram/desconectar', {}, function () { cod = null; });
+			});
 		}));
 	}
 
 	function secaoWhatsApp(body) {
 		var wa = est.whatsapp;
-		body.appendChild(el('div', 'nous-msg-h', 'WhatsApp (experimental)'));
+		body.appendChild(el('div', 'nous-dlg-h', 'WhatsApp (experimental)'));
 		if (!wa.ligado) {
 			if (!mostrarWa) {
-				body.appendChild(el('p', 'nous-msg-mut', 'Fale com o Nous mandando mensagem para o seu próprio número. Funciona, mas o WhatsApp não gosta.'));
+				body.appendChild(el('p', 'nous-dlg-mut', 'Fale com o Nous mandando mensagem para o seu próprio número. Funciona, mas o WhatsApp não gosta.'));
 				body.appendChild(botao('Quero saber mais', 'sec', function () { mostrarWa = true; pintar(); }));
 				return;
 			}
-			var av = el('div', 'nous-msg-aviso');
+			var av = el('div', 'nous-dlg-aviso');
 			av.innerHTML = '<b>Leia antes de ligar.</b><br>' +
 				'• O WhatsApp não tem um jeito oficial de fazer isto. O Nous usa um programa de código aberto que entra como um <b>aparelho conectado</b> da sua conta, e o WhatsApp pode <b>suspender o número</b> por isso. Use um chip que você pode perder.<br>' +
 				'• As suas mensagens para o Nous passam pelo WhatsApp, como qualquer conversa. O modelo continua no seu computador.<br>' +
@@ -211,29 +193,35 @@
 		p.appendChild(ponto(wa.estado, ESTADO_WA));
 		body.appendChild(p);
 		if (wa.qr && wa.estado === 'qr') {
-			var qr = el('div', 'nous-msg-qr');
+			var qr = el('div', 'nous-dlg-qr');
 			var img = el('img'); img.src = 'data:image/svg+xml;base64,' + wa.qr; img.alt = 'QR do WhatsApp'; qr.appendChild(img);
 			var lado = el('div');
-			lado.innerHTML = '<p>No WhatsApp do celular: <b>Configurações › Aparelhos conectados › Conectar aparelho</b> e leia este QR.</p><p class="nous-msg-mut">O QR muda a cada ~20 segundos; esta tela acompanha.</p>';
+			lado.innerHTML = '<p>No WhatsApp do celular: <b>Configurações › Aparelhos conectados › Conectar aparelho</b> e leia este QR.</p><p class="nous-dlg-mut">O QR muda a cada ~20 segundos; esta tela acompanha.</p>';
 			qr.appendChild(lado);
 			body.appendChild(qr);
 		}
-		if (wa.estado === 'conectado') body.appendChild(el('p', 'nous-msg-mut', 'Abra a conversa com você mesmo no WhatsApp ("Você") e escreva. A resposta chega lá, com o prefixo 🦉 Nous.'));
+		if (wa.estado === 'conectado') body.appendChild(el('p', 'nous-dlg-mut', 'Abra a conversa com você mesmo no WhatsApp ("Você") e escreva. A resposta chega lá, com o prefixo 🦉 Nous.'));
 		body.appendChild(botao('Desligar o WhatsApp', 'perigo', function () {
-			if (confirm('Desligar? O computador sai dos aparelhos conectados e a sessão é apagada.')) acao('/mensageiros/whatsapp/desligar');
+			/* o monitor so' apaga a sessao deste computador: nao ha' como sair da lista
+			 * de aparelhos daqui, e a pessoa precisa saber disso */
+			UI.confirmar('A sessão sai deste computador, mas ele continua na lista de aparelhos da sua conta. Para tirar de lá, ' +
+				'abra o WhatsApp no celular, vá em Configurações › Aparelhos conectados e remova este aparelho.',
+				{ titulo: 'Desligar o WhatsApp?', ok: 'Desligar', perigo: true }).then(function (sim) {
+				if (sim) acao('/mensageiros/whatsapp/desligar');
+			});
 		}));
 	}
 
-	function pintar() {
-		if (!ov) return;
-		var body = ov.querySelector('#nous-msg-body');
+	function pintar() { dlg.repintar(pintarCorpo); }
+
+	function pintarCorpo(body) {
 		body.innerHTML = '';
 		pintouEm = Date.now();
 		if (!est) { body.appendChild(el('p', '', 'Não consegui falar com o Nous. Ele está aberto?')); return; }
 		var intro = el('p');
 		intro.innerHTML = 'Fale com o Nous de qualquer lugar, pelo celular. O modelo continua no seu computador, que precisa estar <b>ligado</b>; só o texto e o áudio da conversa passam pelo Telegram ou pelo WhatsApp.';
 		body.appendChild(intro);
-		if (aviso) { var a = el('div', 'nous-msg-aviso' + (aviso.erro ? ' erro' : ''), aviso.texto); body.appendChild(a); }
+		if (aviso) { var a = el('div', 'nous-dlg-aviso' + (aviso.erro ? ' erro' : ''), aviso.texto); body.appendChild(a); }
 		secaoTelegram(body);
 		secaoWhatsApp(body);
 		pintarTempo();
@@ -242,17 +230,7 @@
 	/* ------------------------------------------------------------ abrir/fechar */
 	function abrir() {
 		injectStyle();
-		if (!ov) {
-			ov = document.createElement('div');
-			ov.id = 'nous-msg-ov';
-			ov.innerHTML = '<div id="nous-msg" role="dialog" aria-modal="true" aria-labelledby="nous-msg-t"><div id="nous-msg-head"><span id="nous-msg-t">Telegram e WhatsApp</span>' +
-				'<button id="nous-msg-close" type="button" aria-label="Fechar">✕</button></div><div id="nous-msg-body"></div></div>';
-			document.body.appendChild(ov);
-			ov.querySelector('#nous-msg-close').addEventListener('click', fechar);
-			ov.addEventListener('click', function (e) { if (e.target === ov) fechar(); });
-			ov.addEventListener('keydown', function (e) { if (e.key === 'Escape') fechar(); });
-		}
-		ov.classList.remove('nous-hidden');
+		dlg.abrir();
 		aviso = null;
 		if (UI.loadUserId) UI.loadUserId(function (u) { uid = u; pintar(); });
 		pintar();
@@ -260,13 +238,9 @@
 		clearInterval(atualiza); clearInterval(relogio);
 		atualiza = setInterval(carregar, 3000);
 		relogio = setInterval(pintarTempo, 1000);
-		ov.querySelector('#nous-msg-close').focus();
 	}
 
-	function fechar() {
-		if (ov) ov.classList.add('nous-hidden');
-		clearInterval(atualiza); clearInterval(relogio);
-	}
+	function parar() { clearInterval(atualiza); clearInterval(relogio); }
 
 	/* botao no antigo card Recursos: o painel "Seu Nous" mostra como ferramenta */
 	function ensureButton() {

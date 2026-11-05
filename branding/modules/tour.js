@@ -66,7 +66,8 @@
 	/* algum painel do Nous (ou o assistente de primeiro uso) aberto? */
 	function anyPanel() {
 		return ['nous-wiz-ov', 'nous-ag-ov', 'nous-em-ov', 'nous-sk-ov', 'nous-rp-ov', 'nous-pdf-ov', 'nous-ed-ov',
-			'nous-store-ov', 'nous-dg-ov', 'nous-voice-ov', 'nous-cp-ov', 'nous-gal-ov', 'nous-dc-ov', 'nous-pp-ov'].some(visible) || visible('nous-mem-panel');
+			'nous-store-ov', 'nous-dg-ov', 'nous-voice-ov', 'nous-cp-ov', 'nous-gal-ov', 'nous-dc-ov', 'nous-pp-ov'].some(visible) || visible('nous-mem-panel') ||
+			!!document.querySelector('.nous-dlg-ov:not(.nous-hidden)');   /* as janelas do NousUI.dialogo */
 	}
 	function passos(k) { var t = TOURS[k]; return estreita() && t.movel ? t.movel : t.steps; }
 	/* o elemento existe e esta' na tela (a gaveta fechada do painel ainda existe, mas fora da vista) */
@@ -95,17 +96,17 @@
 		var st = document.createElement('style');
 		st.id = 'nous-tour-style';
 		st.textContent =
-			'#nous-tour-halo{position:fixed;z-index:10005;border:2px solid #e7c069;border-radius:12px;pointer-events:none;' +
-			'box-shadow:0 0 0 4px rgba(200,150,46,.25),0 0 0 9999px rgba(0,0,0,.35);transition:all .25s}' +
+			'#nous-tour-halo{position:fixed;z-index:10005;border:2px solid var(--nd-texto-ouro);border-radius:12px;pointer-events:none;' +
+			'box-shadow:0 0 0 4px rgba(200,150,46,.25),0 0 0 9999px var(--nd-sombra);transition:all .25s}' +
 			'#nous-tour-card{position:fixed;z-index:10006;width:300px;max-width:88vw;padding:12px 14px;border-radius:12px;' +
-			'background:rgba(18,18,22,.98);border:1px solid rgba(200,150,46,.6);color:#eee;font:13px/1.5 Inter,system-ui,sans-serif;' +
-			'box-shadow:0 12px 32px rgba(0,0,0,.5)}' +
-			'#nous-tour-card b{color:#e7c069}#nous-tour-card .r{display:flex;gap:6px;margin-top:10px;align-items:center}' +
-			'#nous-tour-card .r span{flex:1;font-size:11px;opacity:.65}' +
+			'background:var(--nd-bg);border:1px solid rgba(200,150,46,.6);color:var(--nd-txt);font:13px/1.5 Inter,system-ui,sans-serif;' +
+			'box-shadow:0 12px 32px var(--nd-sombra)}' +
+			'#nous-tour-card b{color:var(--nd-texto-ouro)}#nous-tour-card .r{display:flex;gap:6px;margin-top:10px;align-items:center}' +
+			'#nous-tour-card .r span{flex:1;font-size:11px;color:var(--nd-mut)}' +
 			'#nous-tour-card button{padding:6px 12px;border-radius:8px;border:1px solid rgba(200,150,46,.5);cursor:pointer;' +
-			'background:rgba(200,150,46,.2);color:#e7c069;font-weight:600;font-size:12px}' +
-			'#nous-tour-card button.g{background:transparent;color:#aaa;border-color:rgba(255,255,255,.2)}' +
-			'#nous-tour-card button:focus-visible{outline:2px solid #e7c069;outline-offset:2px}' +
+			'background:rgba(200,150,46,.2);color:var(--nd-texto-ouro);font-weight:600;font-size:12px}' +
+			'#nous-tour-card button.g{background:transparent;color:var(--nd-mut);border-color:rgba(var(--nd-tom),.2)}' +
+			'#nous-tour-card button:focus-visible{outline:2px solid var(--nd-texto-ouro);outline-offset:2px}' +
 			'@media (max-width:767px){#nous-tour-card button{padding:9px 14px;font-size:13px}}' +
 			'@media (prefers-reduced-motion:reduce){#nous-tour-halo{transition:none}}';
 		document.head.appendChild(st);
