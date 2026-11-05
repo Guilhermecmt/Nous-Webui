@@ -28,6 +28,10 @@
   entram no contexto, e a pessoa é avisada (`code/ameacas.ts`).
 - Habilidade importada de link e memória importada de arquivo passam pela mesma
   barreira (`utilidades/ameacas.py`).
+- **Testes de tela** (`tests-tela/`, Playwright). Sobem um Open WebUI de verdade
+  com o branding aplicado e conferem, nos dois temas, a cor calculada, o contraste
+  do texto, Esc, clique fora e o foco. Precisam de `OWUI_VENV` apontando para um
+  venv com o open-webui; o monitor é falso e não abre porta do Nous.
 
 ### Mudado
 - **Comando sem volta pede OK até no modo Acesso total**, com o motivo no cartão:
@@ -51,6 +55,22 @@
   longa, até entre contas diferentes do mesmo PC (`utilidades/nous_compactar.py`).
 - Falta de memória na placa de vídeo não é mais tratada como contexto cheio, o
   que fazia o agente resumir a conversa inteira à toa (`code/modelo.ts`).
+- **Janelas pretas no tema claro.** Telegram e WhatsApp, Usar no celular, os
+  avisos e a caixa de confirmação agora acompanham o tema. Novo
+  `NousUI.dialogo`: tokens claro e escuro a partir dos `--pn-*`, Esc e clique fora
+  fecham, o foco fica preso dentro e volta ao botão que abriu. Ainda com fundo
+  escuro fixo: Agenda, Comparar, Diagnóstico, Formulários, Editar fotos, E-mail,
+  Documentos, primeiro uso, Pesquisas, Habilidades, dicas do passeio e os painéis
+  do `nous-loader.js`.
+- **Telegram e WhatsApp apagava o que a pessoa digitava.** A tela era refeita a
+  cada 3 segundos e levava o token e o "Entendi" junto. Agora só refaz quando algo
+  muda, e guarda campo e foco.
+- A caixa do chat e o passeio de primeiro uso não roubam mais o foco dessas janelas.
+- **"Desligar o WhatsApp" dizia uma coisa falsa.** A sessão só sai deste
+  computador; a tela agora manda remover o aparelho no celular, em Configurações ›
+  Aparelhos conectados.
+- **Nous Code:** os avisos de resposta cortada e de instrução bloqueada se destacam
+  do texto solto do modelo.
 
 ## [2.11.0] - 2026-10-25
 O Nous passa para o Open WebUI 0.12.3, abre no celular, sincroniza a agenda nos

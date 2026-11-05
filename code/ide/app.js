@@ -1298,6 +1298,21 @@
   function semTexto() { if (st.vivo) { st.vivo.remove(); st.vivo = null; } }
   function fecharPensamento() { if (pensamento) { pensamento.open = false; pensamento = null; } }
 
+  /* O evento 'nota' serve para duas coisas: avisos do Nous e o texto que o modelo
+   * escreveu entre um passo e outro. Dois avisos merecem destaque. O agente ainda
+   * nao diz qual e' qual: aceita e.tipo se vier e, sem ele, compara a frase INTEIRA
+   * (a de code/agente.ts; tests-tela/nota.spec.js avisa se ela mudar). Comparar so'
+   * um pedaco pintaria de aviso o texto de um modelo que apenas falou no assunto. */
+  const NOTAS = [
+    { tipo: 'cortada', rotulo: 'Resposta cortada', frase: /^A resposta passou do limite de tamanho\. Pedi para fazer em partes menores\.$/ },
+    { tipo: 'bloqueada', rotulo: 'Instrução bloqueada', frase: /^Ignorei as instruções de \S+: o texto tem cara de ataque contra a IA\. Confira esse arquivo antes de confiar neste projeto\.$/ },
+  ];
+  function htmlNota(e) {
+    const n = NOTAS.find((x) => x.tipo === e.tipo) || NOTAS.find((x) => x.frase.test(e.texto));
+    if (!n) return '<div class="nc-nota">' + esc(e.texto) + '</div>';
+    return '<div class="nc-nota nc-aviso ' + n.tipo + '" data-nota="' + n.tipo + '"><b>' + n.rotulo + '</b>' + esc(e.texto) + '</div>';
+  }
+
   function evento(e, historico, indice) {
     const t = trilha();
     const vz = $('[data-vazio]', t); if (vz) vz.remove();
@@ -1324,7 +1339,7 @@
         break;
       case 'texto': fecharPensamento(); if (!st.vivo) st.vivo = add('<div class="nc-resp"></div>'); st.vivo.textContent += e.d; break;
       case 'limpar': semTexto(); break;
-      case 'nota': semTexto(); add('<div class="nc-nota">' + esc(e.texto) + '</div>'); break;
+      case 'nota': semTexto(); add(htmlNota(e)); break;
       case 'resposta': semTexto(); fecharPensamento(); add('<div class="nc-resp">' + md(e.texto) + '</div>'); semVivo(); break;
       case 'ferramenta': {
         semTexto(); fecharPensamento();

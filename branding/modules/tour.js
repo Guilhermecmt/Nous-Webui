@@ -66,7 +66,8 @@
 	/* algum painel do Nous (ou o assistente de primeiro uso) aberto? */
 	function anyPanel() {
 		return ['nous-wiz-ov', 'nous-ag-ov', 'nous-em-ov', 'nous-sk-ov', 'nous-rp-ov', 'nous-pdf-ov', 'nous-ed-ov',
-			'nous-store-ov', 'nous-dg-ov', 'nous-voice-ov', 'nous-cp-ov', 'nous-gal-ov', 'nous-dc-ov', 'nous-pp-ov'].some(visible) || visible('nous-mem-panel');
+			'nous-store-ov', 'nous-dg-ov', 'nous-voice-ov', 'nous-cp-ov', 'nous-gal-ov', 'nous-dc-ov', 'nous-pp-ov'].some(visible) || visible('nous-mem-panel') ||
+			!!document.querySelector('.nous-dlg-ov:not(.nous-hidden)');   /* as janelas do NousUI.dialogo */
 	}
 	function passos(k) { var t = TOURS[k]; return estreita() && t.movel ? t.movel : t.steps; }
 	/* o elemento existe e esta' na tela (a gaveta fechada do painel ainda existe, mas fora da vista) */

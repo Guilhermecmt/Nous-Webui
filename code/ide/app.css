@@ -141,6 +141,11 @@ input, textarea, select { font: inherit; color: var(--txt); }
 .nc-resp pre code { background: none; padding: 0; }
 .nc-nota { color: var(--mut); font-size: 12.5px; margin: 6px 0; white-space: pre-wrap; }
 .nc-perigo { color: var(--vermelho); font-size: 12.5px; font-weight: 600; margin: 6px 0; }
+/* avisos do Nous no meio da conversa: se destacam do texto solto do modelo */
+.nc-aviso { color: var(--txt); margin: 8px 0; padding: 7px 10px; border-radius: 0 8px 8px 0; border-left: 3px solid var(--ouro); background: rgba(200, 150, 46, .1); }
+.nc-aviso b { display: block; font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--ouro2); }
+.nc-aviso.bloqueada { border-left-color: var(--vermelho); background: rgba(226, 154, 138, .1); }
+.nc-aviso.bloqueada b { color: var(--vermelho); }
 .nc-passos { border-left: 2px solid rgba(200, 150, 46, .35); padding: 2px 0 2px 11px; margin: 6px 0 6px 4px; }
 .nc-passo { position: relative; font-size: 12.5px; color: #b5ab98; padding: 2px 0; }
 .nc-passo::before { content: ""; position: absolute; left: -16px; top: 9px; width: 7px; height: 7px; border-radius: 50%; background: var(--noite2); border: 2px solid var(--ouro); }
