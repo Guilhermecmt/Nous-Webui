@@ -228,6 +228,48 @@ class TestServidorLlama(Base):
         self.assertEqual(await r.json(), {"ok": True, "motor": "llama"})
 
 
+class TestGuarda(Base):
+    async def test_pagina_de_outro_site_e_barrada(self):
+        r = await self.cli.post("/api/chat", headers={"Origin": "https://site-estranho.example"},
+                                json={"model": "qwen3:4b", "messages": [{"role": "user", "content": "oi"}]})
+        self.assertEqual(r.status, 403)
+        r = await self.cli.delete("/api/delete", headers={"Origin": "http://evil.localhost.example"}, json={"model": "qwen3:4b"})
+        self.assertEqual(r.status, 403)
+        self.assertIsNotNone(nous_motor.registro.achar(self.pasta, "qwen3:4b"))
+
+    async def test_host_que_nao_e_local_e_barrado(self):
+        r = await self.cli.get("/api/tags", headers={"Host": "rebind.example:8989"})
+        self.assertEqual(r.status, 403)
+
+    async def test_o_proprio_nous_e_chamadas_sem_origin_passam(self):
+        for cab in ({}, {"Origin": "http://localhost:8080"}, {"Origin": "http://127.0.0.1:8998"}):
+            r = await self.cli.get("/api/tags", headers=cab)
+            self.assertEqual(r.status, 200, cab)
+
+
+class TestVoltaParaOllama(unittest.IsolatedAsyncioTestCase):
+    async def test_modelo_que_nao_carrega_vai_para_o_ollama_se_ele_estiver_ligado(self):
+        # quem atualizou e tem placa/driver em que o llama-server nao carrega nao fica sem resposta
+        with tempfile.TemporaryDirectory() as d:
+            pasta = falsos.pasta_falsa(d)
+            fab = falsos.FabricaFalsa()
+            fab.morrer_ao_carregar = True
+            g = Gerente("llama-server.exe", iniciar=fab)
+            ol = falsos.OllamaFalso()
+            url = await ol.subir()
+            cli = TestClient(TestServer(nous_motor.criar_app("llama", pasta, g, url)))
+            await cli.start_server()
+            try:
+                r = await cli.post("/api/chat", json={"model": "qwen3:4b", "messages": [{"role": "user", "content": "oi"}]})
+                self.assertEqual(r.status, 200)
+                self.assertEqual([l["i"] for l in await linhas_ndjson(r)], [0, 1, 2])
+                self.assertEqual(r.headers.get("X-Nous-Motor"), "ollama")
+            finally:
+                await cli.close()
+                await ol.parar()
+                await g.soltar_todos()
+
+
 class TestServidorOllama(unittest.IsolatedAsyncioTestCase):
     async def test_modo_ollama_repassa(self):
         ol = falsos.OllamaFalso()

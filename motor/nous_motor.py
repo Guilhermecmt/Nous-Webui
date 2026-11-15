@@ -359,7 +359,10 @@ async def repassar(req):
     cab = {k: v for k, v in req.headers.items() if k.lower() in ("content-type", "accept", "authorization")}
     try:
         async with req.app[K_SESSAO].request(req.method, alvo, data=corpo or None, headers=cab) as up:
-            r = web.StreamResponse(status=up.status, headers={"Content-Type": up.headers.get("Content-Type", "application/json")})
+            cab_r = {"Content-Type": up.headers.get("Content-Type", "application/json")}
+            if req.app[K_MOTOR] == "llama":
+                cab_r["X-Nous-Motor"] = "ollama"  # volta para o Ollama (o llama-server nao carregou)
+            r = web.StreamResponse(status=up.status, headers=cab_r)
             await r.prepare(req)
             try:
                 async for pedaco in up.content.iter_any():
@@ -372,6 +375,39 @@ async def repassar(req):
 
 
 # ------------------------------------------------------------ app
+_HOSTS = {"127.0.0.1", "localhost", "::1"}
+_VOLTA = {"/api/chat", "/api/generate", "/api/embed", "/api/embeddings"}
+
+
+@web.middleware
+async def _guarda(req, handler):
+    """Como o Ollama: so' Host local (contra DNS rebinding) e nenhuma pagina de outro site."""
+    bruto = (req.headers.get("Host") or "").lower()
+    host = bruto[1:bruto.find("]")] if bruto.startswith("[") else bruto.rsplit(":", 1)[0]
+    if host and host not in _HOSTS:
+        return erro(403, "host nao permitido")
+    origem = req.headers.get("Origin")
+    if origem:
+        try:
+            from urllib.parse import urlparse
+            o = urlparse(origem)
+            ok = o.scheme in ("http", "https") and (o.hostname or "") in _HOSTS
+        except ValueError:
+            ok = False
+        if not ok:
+            return erro(403, "origem nao permitida")
+    return await handler(req)
+
+
+async def _ollama_vivo(app):
+    try:
+        async with app[K_SESSAO].get(app[K_OLLAMA].rstrip("/") + "/api/version",
+                                     timeout=aiohttp.ClientTimeout(total=2)) as r:
+            return r.status == 200
+    except (aiohttp.ClientError, asyncio.TimeoutError, OSError):
+        return False
+
+
 @web.middleware
 async def _erros(req, handler):
     try:
@@ -379,6 +415,13 @@ async def _erros(req, handler):
     except Recusa as e:
         return erro(e.status, str(e))
     except ErroMotor as e:
+        # o llama-server nao carregou (placa/driver sem Vulkan, falta de memoria): se o Ollama
+        # do usuario estiver ligado, este pedido vai para ele em vez de virar erro
+        if req.app[K_MOTOR] == "llama" and req.path in _VOLTA and await _ollama_vivo(req.app):
+            r = await repassar(req)
+            if not r.prepared:
+                r.headers["X-Nous-Motor"] = "ollama"
+            return r
         return erro(500, str(e))
     except web.HTTPException:
         raise
@@ -413,7 +456,7 @@ async def _ao_parar(app):
 
 
 def criar_app(motor, pasta, gerente, ollama_url, puxar=None):
-    app = web.Application(middlewares=[_erros], client_max_size=1024 ** 3)
+    app = web.Application(middlewares=[_guarda, _erros], client_max_size=1024 ** 3)
     app[K_MOTOR] = motor
     app[K_PASTA] = pasta
     app[K_OLLAMA] = ollama_url

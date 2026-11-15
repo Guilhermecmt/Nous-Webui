@@ -293,6 +293,8 @@ class OllamaFalso:
         self.pedidos.append((req.method, req.path, corpo))
         if req.path == "/api/tags":
             return web.json_response({"models": [{"name": "do-ollama:1b"}]})
+        if req.path == "/api/version":
+            return web.json_response({"version": "0.30.10"})
         if req.path in ("/api/chat", "/api/pull"):
             r = web.StreamResponse(headers={"Content-Type": "application/x-ndjson"})
             await r.prepare(req)
