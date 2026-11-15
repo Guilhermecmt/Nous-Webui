@@ -7,6 +7,7 @@ import dataclasses
 import hashlib
 import json
 import os
+import re
 import struct
 
 REGISTRY = "registry.ollama.ai"
@@ -93,6 +94,16 @@ class Modelo:
     gguf: dict
     modificado: float = 0.0
     manifesto: str = ""
+
+
+_NOME_OK = re.compile(r"^[a-z0-9][a-z0-9._-]*(/[a-z0-9][a-z0-9._-]*){0,3}:[a-z0-9][a-z0-9._-]*$")
+_cache = {}  # caminho do manifesto -> ((mtime, tamanho), Modelo)
+
+
+def nome_valido(nome):
+    """So' letras, numeros, . _ - e ate' 3 barras; nada de '..' (o nome vira caminho de arquivo)."""
+    n = normalizar_nome(nome)
+    return bool(_NOME_OK.match(n)) and ".." not in n
 
 
 def normalizar_nome(nome):
@@ -200,7 +211,9 @@ def listar(pasta):
 
 
 def caminho_manifesto(pasta, nome):
-    """Onde fica (ou ficaria) o manifesto de um nome."""
+    """Onde fica (ou ficaria) o manifesto de um nome. ValueError se o nome nao e' valido."""
+    if not nome_valido(nome):
+        raise ValueError("nome de modelo invalido: %r" % nome)
     n = normalizar_nome(nome)
     base, _, tag = n.rpartition(":")
     partes = base.split("/")
@@ -214,14 +227,25 @@ def caminho_manifesto(pasta, nome):
 
 
 def achar(pasta, nome):
+    if not nome_valido(nome):
+        return None
     n = normalizar_nome(nome)
     c = caminho_manifesto(pasta, n)
-    if not os.path.isfile(c):
-        return None
     try:
-        return _carregar(pasta, c, n)
+        st = os.stat(c)
+    except OSError:
+        return None
+    marca = (st.st_mtime_ns, st.st_size)
+    guardado = _cache.get(c)
+    if guardado and guardado[0] == marca and os.path.isfile(guardado[1].blob):
+        return guardado[1]
+    try:
+        m = _carregar(pasta, c, n)
     except (OSError, ValueError, KeyError, struct.error):
         return None
+    if m:
+        _cache[c] = (marca, m)
+    return m
 
 
 def capacidades(m):

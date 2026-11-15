@@ -98,6 +98,12 @@ class TestBaixar(unittest.IsolatedAsyncioTestCase):
         self.assertIn("error", ev[-1])
         self.assertIn("nada:1b", ev[-1]["error"])
 
+    async def test_nome_invalido_nao_vira_caminho(self):
+        ev = await self.puxar("../../fora:1")
+        self.assertEqual(len(ev), 1)
+        self.assertIn("invalido", ev[0]["error"])
+        self.assertFalse(baixar.apagar(self.pasta, "../../fora:1"))
+
     async def test_nome_com_dono(self):
         self.reg.publicar("fulano/coisa", "latest", [("model", self.modelo)])
         ev = await self.puxar("fulano/coisa")

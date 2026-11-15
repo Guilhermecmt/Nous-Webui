@@ -77,6 +77,9 @@ async def _baixar_blob(s, base, repo, camada, pasta):
 
 async def puxar(pasta, nome, registry=PADRAO):
     """Gera os eventos do /api/pull do Ollama; o ultimo e' {"status":"success"} ou {"error": ...}."""
+    if not registro.nome_valido(nome):
+        yield {"error": "nome de modelo invalido: '%s'" % nome}
+        return
     host, repo, tag = _partes(nome)
     base = ("https://" + host) if host else registry.rstrip("/")
     chave = (pasta, repo, tag)
@@ -138,6 +141,8 @@ def _digests(caminho_man):
 
 def apagar(pasta, nome):
     """Apaga o manifesto e os blobs que nenhum outro manifesto usa. False se o modelo nao existe."""
+    if not registro.nome_valido(nome):
+        return False
     alvo = registro.caminho_manifesto(pasta, nome)
     if not os.path.isfile(alvo):
         return False

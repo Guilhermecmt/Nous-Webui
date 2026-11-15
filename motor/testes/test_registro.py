@@ -98,6 +98,22 @@ class TestRegistro(unittest.TestCase):
         self.assertEqual([m.nome for m in registro.listar(self.p)], ["granite-embedding:278m", "qwen3:4b"])
         self.assertIsNone(registro.achar(self.p, "semblob:1b"))
 
+    def test_achar_usa_cache_ate_o_manifesto_mudar(self):
+        with mock.patch.object(registro, "ler_gguf", wraps=registro.ler_gguf) as lg:
+            registro.achar(self.p, "qwen3:4b")
+            registro.achar(self.p, "qwen3:4b")
+            self.assertEqual(lg.call_count, 1)
+            man = registro.caminho_manifesto(self.p, "qwen3:4b")
+            os.utime(man, (1, 1))
+            registro.achar(self.p, "qwen3:4b")
+            self.assertEqual(lg.call_count, 2)
+
+    def test_nome_invalido(self):
+        for ruim in ("../../x:1", "a/../b", "a\b:1", "a b:1", "", ":", "x:../y"):
+            self.assertIsNone(registro.achar(self.p, ruim), ruim)
+            with self.assertRaises(ValueError):
+                registro.caminho_manifesto(self.p, ruim)
+
     def test_pasta_inexistente(self):
         self.assertEqual(registro.listar(os.path.join(self.p, "nada")), [])
 
