@@ -554,10 +554,8 @@ if ($nodeOk -and (Test-Path (Join-Path $codeDir "package.json"))) {
     $binDir = Join-Path $REPO "bin"
     New-Item -ItemType Directory -Force -Path $binDir | Out-Null
     Copy-Item (Join-Path $REPO "launchers\nous.cmd") (Join-Path $binDir "nous.cmd") -Force
-    $pathUser = [Environment]::GetEnvironmentVariable("Path", "User")
-    if (-not (($pathUser -split ';') -contains $binDir)) {
-        [Environment]::SetEnvironmentVariable("Path", ((($pathUser + "").TrimEnd(';')) + ";" + $binDir).TrimStart(';'), "User")
-    }
+    . (Join-Path $REPO "launchers\path-nous.ps1")
+    Add-NousPath $binDir
     Ok "comando 'nous' no terminal (abra um terminal novo e digite: nous)"
 } else {
     Info "Nous Code (opcional): faltou o Node.js 22.18+ (precisa de internet para baixar). Rode o instalador de novo com internet."
