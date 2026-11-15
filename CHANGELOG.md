@@ -2,6 +2,29 @@
 
 ## [Não lançado]
 ### Adicionado
+- **Motor de IA próprio: o Ollama deixou de ser obrigatório** (`motor/`). O
+  serviço novo `nous-motor` (porta 8989) responde a mesma API do Ollama, e todo
+  o Nous fala com ele. Por dentro, ele sobe um `llama-server` (llama.cpp, build
+  Vulkan: AMD, NVIDIA e Intel) por modelo e derruba quando o tempo na memória
+  acaba. Os modelos que você já tem continuam onde estão, com os mesmos nomes,
+  e conversas, memórias e índices não mudam: os vetores saem iguais aos do
+  Ollama (cosseno ≥ 0,9997 medido em granite-embedding, bge-m3 e
+  nomic-embed-text). A Loja baixa e apaga modelos sem o Ollama, do mesmo
+  catálogo, com retomada e conferência do SHA256. Até 2 modelos de conversa
+  ficam carregados ao mesmo tempo (o dos filtros e o da conversa), e um modelo
+  com pedido em andamento nunca é derrubado. Um modelo maior que a VRAM livre
+  divide entre placa e CPU, e, se faltar memória, os modelos parados saem e o
+  carregamento tenta de novo. "Parar" corta a geração na placa na hora; se o
+  motor cair, os `llama-server` caem junto (Job do Windows), sem VRAM presa.
+  Na RX 9070 XT o qwen3:4b gerou ~155 tokens/s. O Ollama continua como
+  alternativa: `-ComOllama` no instalador, ou `{"motor": "ollama"}` em
+  `NousData\motor\ajustes.json`. Se o motor não subir, o Nous volta sozinho
+  para o Ollama.
+- **Instalação mais simples.** O instalador baixa só o `llama-server` (~40 MB,
+  versão e SHA256 fixados em `motor/LLAMA_VERSAO.json`) no lugar do Ollama
+  (~1,3 GB). O modelo escolhido é baixado pelo próprio Nous, e o comando
+  `nous` entra no PATH do usuário. O atualizador baixa o `llama-server` novo
+  quando a versão fixada muda.
 - **`nous` no terminal** (`code/cli.ts`, `code/cli/`, `launchers/nous.cmd`).
   Digite `nous` em qualquer pasta e o Nous Code abre uma conversa ali, como o
   `claude` e o `codex`: resposta aos poucos, uma linha por ferramenta,
@@ -119,6 +142,12 @@
   `history/nous_history.py`).
 
 ### Corrigido
+- O atualizador automático apagava a pasta `runtime` (Node portátil do Nous
+  Code) a cada atualização, porque o `robocopy /MIR` remove o que não vem no
+  pacote. Agora `runtime` e `bin` ficam.
+- A Loja dava erro 500 ao conferir um modelo de poucos MB (`all-minilm:22m`):
+  o tamanho arredondava para 0,0 GB e a estimativa de velocidade dividia por
+  zero.
 - **Pedidos do chat que viram ação não chegavam à tela** no Open WebUI 0.12:
   "/pc ..." respondia "Abrindo o Nous Code" e nada abria; "abre a agenda", o
   botão "↩ Desfazer" da agenda, os botões do e-mail e o aviso da Guarda também

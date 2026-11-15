@@ -25,7 +25,7 @@ Sem nuvem, sem mensalidade e sem conta para criar.
 
 ## Visão geral
 
-**Nous** (do grego *νοῦς*, "mente") transforma o [Open WebUI](https://github.com/open-webui/open-webui) e o [Ollama](https://ollama.com) num produto pronto para quem não é técnico. Ele instala com dois cliques, escolhe o modelo certo para o seu hardware e roda tudo em segundo plano, sem janelas de terminal.
+**Nous** (do grego *νοῦς*, "mente") transforma o [Open WebUI](https://github.com/open-webui/open-webui) e o [llama.cpp](https://github.com/ggml-org/llama.cpp) num produto pronto para quem não é técnico. Ele instala com dois cliques, escolhe o modelo certo para o seu hardware e roda tudo em segundo plano, sem janelas de terminal.
 
 - **Privado por padrão.** O modelo roda na sua máquina, o servidor só aceita conexões do próprio PC e conversas, memórias e arquivos ficam no seu disco.
 - **Pronto para usar.** Não pede conta, chave de API nem configuração. Na primeira vez, um assistente recomenda e baixa o modelo ideal para a sua placa de vídeo.
@@ -116,7 +116,8 @@ Sem placa de vídeo dedicada, o Nous funciona na CPU e as respostas só demoram 
 
 O instalador:
 - confere o hardware;
-- instala o Ollama, o Python 3.11, a interface e o Node.js portátil do Nous Code (sem mexer no que já existe na máquina);
+- baixa o motor de IA próprio (o `llama-server` do llama.cpp, ~40 MB; o Ollama não é mais necessário) e instala o Python 3.11, a interface e o Node.js portátil do Nous Code (sem mexer no que já existe na máquina);
+- põe o comando `nous` no terminal (o Nous Code em qualquer pasta, como o `claude` e o `codex`);
 - aplica a identidade do Nous;
 - cria os atalhos na área de trabalho e no Menu Iniciar.
 
@@ -238,7 +239,7 @@ Os relatórios ficam em **Ferramentas › Pesquisas**, baixam em PDF ou Word e p
 
 ## Privacidade e segurança
 
-- **Tudo local.** Os modelos rodam no Ollama da sua máquina. Conversas, memórias, documentos e índices ficam em `%USERPROFILE%\NousData`.
+- **Tudo local.** Os modelos rodam na sua máquina, pelo motor próprio do Nous (`nous-motor` + `llama-server`; o Ollama é opcional). Conversas, memórias, documentos e índices ficam em `%USERPROFILE%\NousData`.
 - **Só o próprio PC.** O servidor do Nous e todos os serviços escutam apenas em `127.0.0.1`, então outros aparelhos da rede não chegam neles. O servidor e os serviços recusam páginas de outros sites.
 - **Celular só se você ligar.** O portão do celular só existe enquanto está ligado, só atende a rede de casa (rede Privada no Windows) e só aparelhos pareados por QR. Quem entra usa o Nous inteiro, porque não há login. O Nous Code nunca passa por ele.
 - **Atualização com aviso.** Procurar versão nova é uma ida à internet, no máximo uma vez por dia, e dá para desligar no ícone da bandeja. Nada é baixado sem o seu clique.
@@ -320,8 +321,9 @@ O Nous é uma camada de produto sobre o Open WebUI 0.12.3 (versão fixada no ins
 | 8997 | Habilidades | `skills/` |
 | 8998 | Nous Code (IDE e agente, Node) | `code/` |
 | 8999 | Portão do celular (só quando ligado; rede de casa) | `celular/` |
+| 8989 | Motor de IA (`nous-motor`): a API do Ollama em cima do `llama-server` | `motor/` |
 | 8188 | ComfyUI (opcional) | `images/` |
-| 11434 | Ollama | |
+| 11434 | Ollama (opcional: `-ComOllama` ou `motor: ollama`) | |
 
 O lançador (`launchers/start-nous.ps1`) sobe tudo escondido e registra filtros e ajustes a cada início. As operações são idempotentes: rodar de novo não quebra nada.
 

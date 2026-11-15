@@ -70,7 +70,8 @@ pré-lançamento não contam como "última".
 ## O instalador (Nous-Setup.exe)
 
 `installer\nous-setup.iss` (Inno Setup 6) copia o app para `%LOCALAPPDATA%\Programs\Nous` e roda o
-`install-nous.ps1` para baixar e configurar o resto (Ollama, Python, Open WebUI). Atalhos: Nous, Parar Nous e
+`install-nous.ps1` para baixar e configurar o resto (motor de IA `llama-server` de ~40 MB com SHA256 fixado em
+`motor/LLAMA_VERSAO.json`, Python, Open WebUI; o Ollama só com `-ComOllama`). Atalhos: Nous, Parar Nous e
 Nous Bandeja no Menu Iniciar; Nous na Área de Trabalho (opcional). Há também a opção, desligada, de abrir o
 ícone da bandeja ao ligar o Windows (a mesma que o menu do ícone liga e desliga). Desinstalar: pelo
 Windows, que roda o `uninstall-nous.ps1` (para o ícone e o Nous, remove o ambiente; preserva `NousData`).
