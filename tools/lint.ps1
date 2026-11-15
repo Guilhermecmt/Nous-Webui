@@ -101,7 +101,7 @@ if ($py) {
     }
 
     # Historico e habilidades: Ollama de mentira, sem rede.
-    foreach ($par in @(@("history/testes", "Historico"), @("skills/testes", "Habilidades"), @("motor/testes", "Motor proprio (llama-server de mentira)"))) {
+    foreach ($par in @(@("history/testes", "Historico"), @("skills/testes", "Habilidades"), @("motor/testes", "Motor proprio (llama-server de mentira)"), @("monitor/testes", "Monitor e Loja"))) {
         if (Test-Path (Join-Path $root $par[0])) {
             & $py.Source -c "import aiohttp, pydantic, requests" 2>$null
             if ($LASTEXITCODE -eq 0) {

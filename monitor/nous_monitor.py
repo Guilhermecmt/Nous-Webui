@@ -346,7 +346,8 @@ def _ram_bandwidth(mts, dimms):
 
 def _speed(model, hw):
     """{tps, onde}: tokens/s estimados e onde o modelo roda (gpu|misto|cpu)."""
-    size = model["download_gb"] * 1.1  # pesos + buffers do runtime
+    # pesos + buffers do runtime; modelo de poucos MB arredonda para 0.0 GB
+    size = max(model["download_gb"], 0.05) * 1.1
     ram_bw = hw.get("ram_bw") or 50
     gpu_bw = hw.get("gpu_bw") or 0
     if hw["tier"] == "cpu" or not gpu_bw:
