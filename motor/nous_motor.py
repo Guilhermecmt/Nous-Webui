@@ -41,6 +41,7 @@ K_OLLAMA = web.AppKey("ollama", str)
 K_SESSAO = web.AppKey("sessao", object)
 K_PUXAR = web.AppKey("puxar", object)
 K_FAXINA = web.AppKey("faxina", object)
+K_LEITURA = web.AppKey("leitura", float)  # segundos sem nenhum byte do llama-server = travado
 
 
 class Recusa(Exception):
@@ -217,8 +218,20 @@ async def _conversar(req, tipo):
     junta = traduz.Juntador(m.nome, tipo, mostrar_pensamento=corpo.get("think") is not False)
     stream = corpo.get("stream", True) is not False
     sessao = req.app[K_SESSAO]
+    try:
+        return await _conversar_upstream(req, g, m, corpo, keep, pedido, junta, stream, sessao)
+    except asyncio.TimeoutError:
+        req["travou"] = True
+        raise Recusa(504, "o llama-server parou de responder (%s); ele foi reiniciado, tente de novo" % m.nome)
+    finally:
+        if req.get("travou"):
+            await g.soltar(m.nome)  # travado: sai assim que este pedido soltar; o proximo sobe outro
+
+
+async def _conversar_upstream(req, g, m, corpo, keep, pedido, junta, stream, sessao):
+    tempo = aiohttp.ClientTimeout(total=None, sock_connect=10, sock_read=req.app[K_LEITURA])
     async with g.usando(m, _ctx(corpo), keep) as url:
-        async with sessao.post(url + "/v1/chat/completions", json=pedido) as up:
+        async with sessao.post(url + "/v1/chat/completions", json=pedido, timeout=tempo) as up:
             if up.status != 200:
                 raise Recusa(up.status if 400 <= up.status < 600 else 500, await _erro_upstream(up))
             if not stream:
@@ -236,7 +249,9 @@ async def _conversar(req, tipo):
                 up.close()  # o cliente desistiu (Parar): fecha o llama-server, a placa para de gerar
                 return r
             except (aiohttp.ClientError, asyncio.TimeoutError) as e:
-                await r.write((json.dumps({"error": "o llama-server parou no meio: %s" % e}) + "\n").encode())
+                await r.write((json.dumps({"error": "o llama-server parou no meio: %s" % (e or type(e).__name__)}) + "\n").encode())
+                if isinstance(e, asyncio.TimeoutError):
+                    req["travou"] = True  # resposta ja' comecou: avisa na linha e reinicia o servidor
             return r
 
 
@@ -273,7 +288,8 @@ async def _embeddings(req, corpo, entradas):
     sessao = req.app[K_SESSAO]
     async with g.usando(m, _ctx(corpo), corpo.get("keep_alive")) as url:
         for tentativa in (1, 2):
-            async with sessao.post(url + "/v1/embeddings", json={"input": entradas, "model": m.nome}) as up:
+            tempo = aiohttp.ClientTimeout(total=None, sock_connect=10, sock_read=req.app[K_LEITURA])
+            async with sessao.post(url + "/v1/embeddings", json={"input": entradas, "model": m.nome}, timeout=tempo) as up:
                 if up.status == 200:
                     return m, await up.json()
                 msg = await _erro_upstream(up)
@@ -401,6 +417,7 @@ def criar_app(motor, pasta, gerente, ollama_url, puxar=None):
     app[K_MOTOR] = motor
     app[K_PASTA] = pasta
     app[K_OLLAMA] = ollama_url
+    app[K_LEITURA] = 600.0
     if gerente is not None:
         app[K_GERENTE] = gerente
     if puxar is not None:
@@ -452,7 +469,9 @@ def main():
     with open(os.path.join(pasta_motor, "motor.pid"), "w", encoding="utf-8") as f:
         f.write(str(os.getpid()))
     print("nous-motor: modo %s em http://127.0.0.1:%d (modelos em %s)" % (motor, porta, registro.pasta_modelos()), flush=True)
-    web.run_app(app, host="127.0.0.1", port=porta, print=None, access_log=None)
+    # handler_cancellation: cliente que desiste (Parar, filtro com timeout) cancela o pedido e
+    # fecha o llama-server, como o Ollama; sem isto a placa seguia gerando para ninguem
+    web.run_app(app, host="127.0.0.1", port=porta, print=None, access_log=None, handler_cancellation=True)
 
 
 if __name__ == "__main__":

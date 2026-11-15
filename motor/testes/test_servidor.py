@@ -173,6 +173,50 @@ class TestServidorLlama(Base):
         self.assertTrue(falso.fechou_antes_do_fim)
         self.assertFalse(falso.terminou_stream)
 
+    async def test_cliente_desiste_sem_stream_fecha_upstream(self):
+        # filtro com timeout (agenda 120 s) desiste: a placa nao pode seguir gerando
+        self.fab.opcoes["atraso_por_token"] = 0.05
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=0.6)) as s:
+            with self.assertRaises(asyncio.TimeoutError):
+                async with s.post(str(self.cli.make_url("/api/chat")), json={"model": "qwen3:4b", "stream": False,
+                                                                              "messages": [{"role": "user", "content": "oi"}]}) as r:
+                    await r.read()
+        falso = self.fab.processos[0].servidor
+        for _ in range(100):
+            if falso.fechou_antes_do_fim or falso.terminou_stream:
+                break
+            await asyncio.sleep(0.05)
+        self.assertTrue(falso.fechou_antes_do_fim)
+
+    async def test_pensamento_escondido_tambem_para(self):
+        # think:false nao escreve nada enquanto o modelo pensa: o Parar tem que valer mesmo assim
+        self.fab.opcoes["atraso_por_token"] = 0.05
+        async with aiohttp.ClientSession() as s:
+            r = await s.post(str(self.cli.make_url("/api/chat")), json={"model": "qwen3:4b", "think": False,
+                                                                         "messages": [{"role": "user", "content": "oi"}]})
+            await asyncio.sleep(0.5)
+            r.close()
+        falso = self.fab.processos[0].servidor
+        for _ in range(100):
+            if falso.fechou_antes_do_fim or falso.terminou_stream:
+                break
+            await asyncio.sleep(0.05)
+        self.assertTrue(falso.fechou_antes_do_fim)
+
+    async def test_llama_server_travado_nao_pendura_para_sempre(self):
+        self.app[nous_motor.K_LEITURA] = 0.5
+        self.fab.opcoes["atraso_por_token"] = 5
+        r = await self.cli.post("/api/chat", json={"model": "qwen3:4b", "stream": False,
+                                                   "messages": [{"role": "user", "content": "oi"}]})
+        self.assertEqual(r.status, 504)
+        self.assertIn("parou de responder", (await r.json())["error"])
+        for _ in range(100):  # o servidor travado sai assim que o pedido solta
+            if not self.gerente.ativos():
+                break
+            await asyncio.sleep(0.05)
+        self.assertEqual(self.gerente.ativos(), [])
+        self.assertTrue(self.fab.processos[0].encerrado)
+
     async def test_rotas_nao_suportadas(self):
         for rota in ("/api/create", "/api/copy", "/api/push"):
             r = await self.cli.post(rota, json={"model": "a"})
@@ -217,6 +261,15 @@ class TestServidorOllama(unittest.IsolatedAsyncioTestCase):
             self.assertIn("Ollama", (await r.json())["error"])
         finally:
             await cli.close()
+
+
+class TestMain(unittest.TestCase):
+    def test_main_cancela_o_pedido_quando_o_cliente_some(self):
+        # o TestServer dos testes ja' cancela; o run_app de producao so' com handler_cancellation=True
+        with tempfile.TemporaryDirectory() as d,                 mock.patch.dict(os.environ, {"DATA_DIR": d, "NOUS_MOTOR": "ollama", "NOUS_MOTOR_PORT": "18999"}),                 mock.patch.object(nous_motor.web, "run_app") as run:
+            nous_motor.main()
+        self.assertTrue(run.call_args.kwargs.get("handler_cancellation"))
+        self.assertEqual(run.call_args.kwargs.get("host"), "127.0.0.1")
 
 
 class TestEscolherMotor(unittest.TestCase):
