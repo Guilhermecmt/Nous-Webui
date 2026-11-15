@@ -1,0 +1,61 @@
+{
+  "padrao": "ouro",
+  "paletas": [
+    {
+      "id": "ouro", "nome": "Ouro", "tag": "o clássico do Nous",
+      "inspira": "Noite, ouro velho e pergaminho.",
+      "amostras": [["Ouro", "#c8962e"], ["Ouro claro", "#e7c069"], ["Azul de apoio", "#8fb8c9"]],
+      "cinza": {"matiz": 75, "croma": 0},
+      "claro":  {"bg": "#ffffff", "lado": "#faf6ee", "alto": "#faf6ee", "linha": "rgba(138,100,20,.16)", "txt": "#2a251e", "mut": "#7a6f5d", "acc": "#a87a1c", "on_acc": "#ffffff", "acc_txt": "#7f5b10", "sec": "#e7c069", "det": "#3f6f86", "ok": "#2f7d4a", "perigo": "#b8432e"},
+      "escuro": {"bg": "#141210", "lado": "#100e0c", "alto": "#1c1916", "linha": "rgba(231,192,105,.12)", "txt": "#ddd5c6", "mut": "#958a76", "acc": "#c8962e", "on_acc": "#1a1405", "acc_txt": "#e7c069", "sec": "#e7c069", "det": "#8fb8c9", "ok": "#5fd693", "perigo": "#f4a3a3"}
+    },
+    {
+      "id": "pitaya", "nome": "Pitaya", "tag": "natureza",
+      "inspira": "Casca magenta, pontas verde-lima e polpa branca com sementes pretas.",
+      "amostras": [["Magenta da casca", "#d81b73"], ["Verde das escamas", "#a6d96a"], ["Polpa e semente", "#fcf9fb", "#1d1d1d"]],
+      "cinza": {"matiz": 345, "croma": 0.014},
+      "claro":  {"bg": "#fcf9fb", "lado": "#f6eff3", "alto": "#ffffff", "linha": "rgba(194,24,91,.14)", "txt": "#26161f", "mut": "#725f6b", "acc": "#c2185b", "on_acc": "#ffffff", "acc_txt": "#a3124c", "sec": "#3f7a1a", "det": "#1d1d1d", "ok": "#3c7d2a", "perigo": "#c62828"},
+      "escuro": {"bg": "#151015", "lado": "#110c11", "alto": "#1f1720", "linha": "rgba(255,122,181,.14)", "txt": "#f1e7ee", "mut": "#a8949f", "acc": "#d81b73", "on_acc": "#ffffff", "acc_txt": "#ff7ab5", "sec": "#a6d96a", "det": "#fff4f8", "ok": "#a6d96a", "perigo": "#ff8a80"}
+    },
+    {
+      "id": "maracuja", "nome": "Maracujá", "tag": "natureza",
+      "inspira": "Polpa amarelo-alaranjada, casca roxa, flor lilás e folha verde.",
+      "amostras": [["Polpa", "#f5a623"], ["Flor lilás", "#b89cf0"], ["Folha", "#8cc152"], ["Casca", "#17111a"]],
+      "cinza": {"matiz": 315, "croma": 0.018},
+      "claro":  {"bg": "#fffaf1", "lado": "#fbf1de", "alto": "#ffffff", "linha": "rgba(196,120,0,.18)", "txt": "#2b1d10", "mut": "#77654f", "acc": "#e8930c", "on_acc": "#1d1203", "acc_txt": "#9a5400", "sec": "#6a45b8", "det": "#3f7a1a", "ok": "#3d7a24", "perigo": "#c0392b"},
+      "escuro": {"bg": "#17111a", "lado": "#120d15", "alto": "#221a26", "linha": "rgba(247,178,40,.14)", "txt": "#f3ebdf", "mut": "#aa9da2", "acc": "#f5a623", "on_acc": "#1d1203", "acc_txt": "#ffc04d", "sec": "#b89cf0", "det": "#8cc152", "ok": "#8cc152", "perigo": "#ff8a7a"}
+    },
+    {
+      "id": "melancia", "nome": "Melancia", "tag": "natureza",
+      "inspira": "Polpa vermelha, casca verde com listras, parte branca e sementes pretas.",
+      "amostras": [["Polpa", "#d6334a"], ["Listra da casca", "#8cc06e"], ["Casca", "#0f1612"], ["Parte branca", "#f8fbf6"]],
+      "cinza": {"matiz": 150, "croma": 0.014},
+      "claro":  {"bg": "#f8fbf6", "lado": "#eef5ea", "alto": "#ffffff", "linha": "rgba(47,107,63,.16)", "txt": "#17251c", "mut": "#5a6e61", "acc": "#d12f45", "on_acc": "#ffffff", "acc_txt": "#b0243a", "sec": "#2f6b3f", "det": "#1b1b1b", "ok": "#2f6b3f", "perigo": "#b45309"},
+      "escuro": {"bg": "#0f1612", "lado": "#0b110e", "alto": "#17221b", "linha": "rgba(140,192,110,.14)", "txt": "#e7efe9", "mut": "#8fa597", "acc": "#d6334a", "on_acc": "#ffffff", "acc_txt": "#ff7f8c", "sec": "#8cc06e", "det": "#f5f0e6", "ok": "#8cc06e", "perigo": "#ffab5e"}
+    },
+    {
+      "id": "ametista", "nome": "Ametista e Sol", "tag": "roxo, amarelo e branco acinzentado",
+      "inspira": "Violeta nos botões, amarelo nos detalhes e um branco acinzentado de base.",
+      "amostras": [["Violeta", "#6b2fd6"], ["Sol", "#ffd23f"], ["Branco acinzentado", "#eeedf1"]],
+      "cinza": {"matiz": 290, "croma": 0.016},
+      "claro":  {"bg": "#eeedf1", "lado": "#e5e3ea", "alto": "#fafafb", "linha": "rgba(91,44,200,.14)", "txt": "#1d1830", "mut": "#5f586f", "acc": "#6b2fd6", "on_acc": "#ffffff", "acc_txt": "#5a22bf", "sec": "#f5c400", "det": "#f5c400", "ok": "#2e7d4f", "perigo": "#c62828"},
+      "escuro": {"bg": "#121019", "lado": "#0e0c14", "alto": "#1c1926", "linha": "rgba(183,155,255,.14)", "txt": "#ece9f3", "mut": "#9c95ad", "acc": "#7c4dea", "on_acc": "#ffffff", "acc_txt": "#b79bff", "sec": "#ffd23f", "det": "#ffd23f", "ok": "#7fd6a0", "perigo": "#ff8f8f"}
+    },
+    {
+      "id": "ceu", "nome": "Céu e Flamingo", "tag": "azul claro, rosa e tangerina",
+      "inspira": "Azul-céu nos botões, rosa-flamingo como segunda cor e tangerina nos detalhes.",
+      "amostras": [["Céu", "#8ecbf5"], ["Flamingo", "#f7a8c8"], ["Tangerina", "#ffa552"], ["Noite", "#0f1520"]],
+      "cinza": {"matiz": 250, "croma": 0.02},
+      "claro":  {"bg": "#f6f9fd", "lado": "#eaf2fa", "alto": "#ffffff", "linha": "rgba(31,111,178,.14)", "txt": "#15233a", "mut": "#586880", "acc": "#7cc3f2", "on_acc": "#0f2742", "acc_txt": "#1f6aa8", "sec": "#f48fb8", "det": "#e8780c", "ok": "#2e7d4f", "perigo": "#c62828"},
+      "escuro": {"bg": "#0f1520", "lado": "#0b101a", "alto": "#172030", "linha": "rgba(142,203,245,.14)", "txt": "#e6edf6", "mut": "#8f9db2", "acc": "#8ecbf5", "on_acc": "#0d2036", "acc_txt": "#9fd4f8", "sec": "#f7a8c8", "det": "#ffa552", "ok": "#86d5a8", "perigo": "#ff8f8f"}
+    },
+    {
+      "id": "mata", "nome": "Mata", "tag": "verde, terracota e ipê",
+      "inspira": "Verde-folha, terracota do barro e o amarelo do ipê nos detalhes.",
+      "amostras": [["Folha", "#2f7d4a"], ["Terracota", "#e08a5f"], ["Ipê", "#f2c14e"], ["Mata fechada", "#10140f"]],
+      "cinza": {"matiz": 135, "croma": 0.012},
+      "claro":  {"bg": "#f7f6f1", "lado": "#eeece3", "alto": "#ffffff", "linha": "rgba(47,107,63,.16)", "txt": "#1d241b", "mut": "#5f6a5a", "acc": "#2f7d4a", "on_acc": "#ffffff", "acc_txt": "#2a6e41", "sec": "#b35a32", "det": "#d9a520", "ok": "#2f7d4a", "perigo": "#b42318"},
+      "escuro": {"bg": "#10140f", "lado": "#0c100b", "alto": "#181e16", "linha": "rgba(127,191,127,.13)", "txt": "#e9ede4", "mut": "#959f8f", "acc": "#4f9d69", "on_acc": "#0b1a10", "acc_txt": "#8fd0a0", "sec": "#e08a5f", "det": "#f2c14e", "ok": "#8fd0a0", "perigo": "#ff9b8a"}
+    }
+  ]
+}

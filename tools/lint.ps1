@@ -127,6 +127,22 @@ if ($py) {
             if (-not $ok) { Write-Host $out; Bad "celular/testes: testes falharam" }
         } else { Write-Host "  (testes do celular pulados: falta aiohttp no Python)" -ForegroundColor DarkGray }
     }
+
+    # Paletas e icone (branding/testes: so' biblioteca padrao + Pillow) e a escolha da
+    # paleta no monitor (monitor/testes: aiohttp).
+    foreach ($par in @(@("branding/testes", "Paletas e icone", "PIL"), @("monitor/testes", "Aparencia (monitor)", "aiohttp"))) {
+        if (Test-Path (Join-Path $root $par[0])) {
+            & $py.Source -c "import $($par[2])" 2>$null
+            if ($LASTEXITCODE -eq 0) {
+                Write-Host "== $($par[1])" -ForegroundColor Cyan
+                $old = $ErrorActionPreference; $ErrorActionPreference = "Continue"
+                $out = & $py.Source -W ignore -m unittest discover -s $par[0] -t $par[0] 2>&1 | Out-String
+                $ok = $LASTEXITCODE -eq 0
+                $ErrorActionPreference = $old
+                if (-not $ok) { Write-Host $out; Bad "$($par[0]): testes falharam" }
+            } else { Write-Host "  ($($par[0]) pulado: falta $($par[2]) no Python)" -ForegroundColor DarkGray }
+        }
+    }
 }
 
 $node = Get-Command node -ErrorAction SilentlyContinue
