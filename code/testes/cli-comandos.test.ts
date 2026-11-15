@@ -205,3 +205,19 @@ test('IDE: a janela abre a conversa pedida pelo terminal', () => {
   assert.equal(urlJanela(8998, 'C:\\p', undefined, 'abc123xyz'), 'http://127.0.0.1:8998/?pasta=C%3A%5Cp&sessao=abc123xyz');
   assert.equal(urlJanela(8998, undefined, undefined, 'abc123xyz'), 'http://127.0.0.1:8998/', 'sem pasta nao ha o que abrir');
 });
+
+test('launchers/nous.cmd: acha o Node, roda de qualquer pasta (com espaco e acento) e devolve o codigo de saida', { skip: process.platform !== 'win32' }, async () => {
+  const { spawnSync } = await import('node:child_process');
+  const cmd = path.resolve(import.meta.dirname, '..', '..', 'launchers', 'nous.cmd');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'nc cli ação-'));
+  const roda = (...args: string[]) => spawnSync('cmd.exe', ['/d', '/c', cmd, ...args], { cwd: dir, encoding: 'utf8', windowsHide: true });
+  const v = roda('--versao');
+  assert.equal(v.status, 0, v.stderr);
+  assert.match(v.stdout, /^nous \d+\.\d+\.\d+ \(Nous Code \d+\.\d+\.\d+\)/);
+  const a = roda('--ajuda');
+  assert.equal(a.status, 0);
+  assert.match(a.stdout, /nous -p "pedido"/);
+  const e = roda('--modo', 'xyz');
+  assert.equal(e.status, 2, 'o codigo de saida do CLI chega a quem chamou o .cmd');
+  assert.match(e.stderr, /modo desconhecido: xyz/);
+});

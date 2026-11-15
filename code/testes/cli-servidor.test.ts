@@ -315,7 +315,7 @@ test('/modo e /alcance pedem confirmacao antes de liberar mais; recusar nao muda
 test('o alcance do servico decide a pasta: a pasta do usuario e recusada, e --alcance usuario a libera', async () => {
   const repl = novoRepl(srv.casa);
   await repl.carregarPadroes();
-  await assert.rejects(repl.garantirSessao(), /sua pasta de usuario inteira/);
+  await assert.rejects(repl.garantirSessao(), /sua pasta de usuario inteira.*nous --alcance usuario/);
   const r2 = new Repl({ pasta: srv.casa, cliente: cli, io: new IoFalso(), est, prefs: { alcance: 'usuario' } });
   await r2.carregarPadroes();
   const id = await r2.garantirSessao();

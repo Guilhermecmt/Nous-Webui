@@ -2,6 +2,23 @@
 
 ## [Não lançado]
 ### Adicionado
+- **`nous` no terminal** (`code/cli.ts`, `code/cli/`, `launchers/nous.cmd`).
+  Digite `nous` em qualquer pasta e o Nous Code abre uma conversa ali, como o
+  `claude` e o `codex`: resposta aos poucos, uma linha por ferramenta,
+  aprovação com o diff colorido (`[s]im / [n]ão / [a] sempre`), perguntas do
+  agente e plano aprovados no terminal, `Esc` ou `Ctrl+C` para interromper,
+  histórico, Tab para `/comandos` e `@arquivos`, e rodapé com modelo,
+  raciocínio, modo e contexto. Comandos `/ajuda`, `/modelo`, `/effort`,
+  `/modo`, `/alcance`, `/plano`, `/objetivo`, `/compactar`, `/contexto`,
+  `/novo`, `/conversas`, `/desfazer`, `/mudancas`, `/exportar`, `/mcp`,
+  `/skills`, `/ide`, `/padrao` e `/sair`, com apelidos em inglês (`/model`,
+  `/permissions`, `/resume`, `/undo`...). `nous -p "pedido"` (ou texto pelo
+  pipe) roda um pedido só, com a resposta no stdout e a atividade no stderr;
+  `--model`, `--effort`, `--modo`, `--alcance`, `-c`. É cliente do mesmo serviço
+  do IDE (liga o serviço sozinho): as conversas aparecem na janela do Nous
+  Code. O serviço passa a aceitar o terminal por um token aleatório em
+  `NousData\code\cli-token`; as páginas do navegador continuam barradas.
+  `/abrir-janela` aceita `sessao` e o IDE abre direto aquela conversa.
 - **Telegram e WhatsApp** (`mensageiros/`, painel **Seu Nous › Telegram e
   WhatsApp**). Fale com o Nous pelo celular de qualquer lugar: a mensagem entra
   pelo mesmo caminho da conversa normal (memória, agenda, habilidades e e-mail

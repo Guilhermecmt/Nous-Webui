@@ -86,9 +86,60 @@ Formato do `.mcp.json` do Claude Code:
 - **De um projeto:** `.mcp.json` ou `.nous/mcp.json` na pasta dele. Esses rodam programas de quem fez o projeto. Só ligam depois que você permite, no cartão que aparece na conversa ou com `/mcp`; se o arquivo mudar, a permissão cai.
 - **Permissões das ferramentas:** chamar uma ferramenta que não é só de leitura segue as permissões da conversa, como um comando.
 
+## No terminal
+
+Digite `nous` em qualquer pasta e a conversa abre ali, como `claude` ou `codex`. O terminal é um cliente do mesmo serviço do IDE (liga o serviço sozinho se ele não estiver no ar), então a conversa aparece na lista da janela do Nous Code, e permissões, MCP, lembretes e histórico são os mesmos.
+
+```powershell
+nous                          # conversa interativa nesta pasta
+nous "conserte o teste que falha"   # já com o primeiro pedido
+nous -c                       # retoma a última conversa desta pasta
+nous -p "liste os arquivos"   # um pedido só: a resposta vai para o stdout, a atividade para o stderr
+git diff | nous -p "resuma essas mudanças"
+```
+
+**Opções:** `-p/--print [pedido]`, `-m/--model <nome>`, `--effort <auto|desligado|baixo|medio|alto>` (também `off|low|medium|high`), `--modo <leitura|perguntar|editar|total>`, `--alcance <projeto|usuario|computador>`, `-c/--continuar`, `-C/--pasta <pasta>`, `-v/--versao`, `-h/--ajuda`. No modo `-p` não há quem aprove: os pedidos de aprovação são recusados, a não ser com `--modo editar` (mudanças em arquivo e comandos comuns) ou `--modo total` (o mesmo; comando perigoso continua recusado). O código de saída é 0 em caso de sucesso, 1 se o pedido falhou ou foi interrompido e 2 para opção inválida.
+
+**Na conversa:** a resposta aparece aos poucos; o raciocínio vira uma linha apagada; cada ferramenta é uma linha (`● read src/x.ts`) com o resultado resumido embaixo. Mudar arquivo ou rodar comando mostra o diff colorido ou o comando e pergunta `[s]im / [n]ão / [a] sempre` (em arquivo, "sempre" muda o modo da conversa para editar; em comando, vale para aquele comando). Perguntas do agente (`ask_user_question`) têm opções numeradas, o plano proposto pede aprovar ou continuar planejando (com comentário), e a lista de tarefas aparece como checklist. Depois de cada resposta, uma linha mostra modelo, raciocínio, modo e contexto usado.
+
+| Teclas | |
+|---|---|
+| `Esc` ou `Ctrl+C` durante a resposta | Interrompe (chama o `/parar` do serviço). |
+| `Ctrl+C` duas vezes com a linha vazia, ou `Ctrl+D` | Sai. `Ctrl+C` com texto digitado só descarta a linha. |
+| `\` no fim da linha | Continua o pedido na linha de baixo. Colar várias linhas também vira um pedido só. |
+| `↑` `↓` | Histórico, guardado em `NousData\code\cli-historico`. |
+| `Tab` | Completa `/comandos`, valores (`/effort a`), `/skills` e `@arquivos` da pasta. |
+
+| Comando | O que faz |
+|---|---|
+| `/ajuda` (`/help`) | Lista os comandos. |
+| `/modelo` (`/model`) | Sem argumento, lista os modelos com tamanho e sinais (ferramentas, raciocínio) para escolher por número ou nome; com argumento, troca direto. |
+| `/effort` (`/raciocinio`) | `auto`, `desligado`, `baixo`, `medio` ou `alto` (aceita `off`, `low`, `medium`, `high`). |
+| `/modo` (`/permissions`) | `leitura`, `perguntar`, `editar` ou `total`. Pede confirmação antes de liberar mais. |
+| `/alcance` | `projeto`, `usuario` ou `computador`. Pede confirmação antes de ampliar. |
+| `/plano` (`/plan`) | Liga o modo plano (com um pedido, já o envia); `/plano sair` desliga. |
+| `/objetivo` (`/goal`) | `/objetivo <texto>` cria e segue em rodadas; sem argumento mostra; `pausar`, `retomar`, `limpar`. |
+| `/compactar` (`/compact`) | Resume a conversa para liberar contexto. |
+| `/contexto` (`/context`, `/status`) | Tokens usados, modelo, raciocínio, permissões, pasta e conversa. |
+| `/novo` (`/clear`, `/new`) | Conversa nova, mantendo modelo e permissões. A anterior fica em `/conversas`. |
+| `/conversas` (`/resume`) | Lista as conversas desta pasta e retoma uma, mostrando o fim dela. |
+| `/desfazer` (`/undo`) | Volta os arquivos que o agente mudou (todos, ou o indicado) ao que eram antes da conversa. |
+| `/mudancas` (`/diff`) | Arquivos mudados na conversa; `/mudancas <arquivo>` mostra o diff. |
+| `/exportar` (`/export`) | Salva a conversa em Markdown na pasta atual. |
+| `/mcp` | Servidores MCP do projeto; `/mcp permitir <nome>` e `/mcp desligar <nome>`. |
+| `/skills` | Skills do projeto e da sua pasta. Escrever `/nome-da-skill` no pedido usa a skill, como no IDE. |
+| `/internet` | Libera ou bloqueia a internet na conversa. |
+| `/ide` | Abre esta conversa na janela do Nous Code. |
+| `/padrao` | Mostra ou muda (`/padrao modo editar`) o padrão das conversas novas, o mesmo do IDE. |
+| `/sair` (`/exit`, `/quit`) | Sai. |
+
+A conversa só é criada no primeiro pedido, então abrir o `nous` e sair não deixa conversa vazia na lista. A pasta onde você está é o projeto: valem as regras de alcance do serviço, e na pasta do usuário ou na raiz do disco ele recusa até você usar `/alcance usuario` (ou `nous --alcance usuario`).
+
+**Autenticação.** O serviço muda arquivos e roda comandos, por isso uma página qualquer do navegador não pode falar com ele. O terminal prova quem é com um token aleatório de 256 bits que o serviço grava em `NousData\code\cli-token` (só o seu usuário do Windows lê) e que `nous` manda no cabeçalho `X-Nous-Token`. O token certo basta mesmo sem origem permitida; token errado é recusado mesmo vindo de uma origem permitida; o cabeçalho não é liberado pelo CORS, então nenhum site consegue mandá-lo. Quem não manda cabeçalho nenhum (os atalhos do Windows e o monitor) segue como antes.
+
 ## Como funciona
 
-O serviço `servidor.ts` roda em `127.0.0.1:8998` e serve também a página do IDE (`ide/`). Como ele muda arquivos e roda comandos, só aceita como origem o Nous (`localhost:8080`) e a própria janela.
+O serviço `servidor.ts` roda em `127.0.0.1:8998` e serve também a página do IDE (`ide/`). Como ele muda arquivos e roda comandos, só aceita como origem o Nous (`localhost:8080`) e a própria janela, ou o terminal com o token acima.
 
 | Arquivo | O que faz |
 |---|---|
@@ -107,6 +158,7 @@ O serviço `servidor.ts` roda em `127.0.0.1:8998` e serve também a página do I
 | `modelo.ts` | O `/api/chat` do Ollama, o `chat/completions` dos compatíveis com OpenAI e a leitura das chamadas de ferramenta. |
 | `ide.ts` | Arquivos, busca, Git, a janela (modo app do Edge) e o WebSocket do terminal e dos avisos. |
 | `ide/` | A página: `app.js` sem build, com Monaco e xterm servidos de `node_modules`. |
+| `cli.ts`, `cli/` | O comando `nous`: cliente do serviço (`cliente.ts`), argumentos, comandos de barra e Tab, leitura do teclado (`io.ts`), desenho dos eventos (`tela.ts`), o turno com as aprovações (`turno.ts`) e a conversa (`repl.ts`, `principal.ts`). O atalho do Windows é `launchers\nous.cmd`. |
 
 As conversas, os lembretes e as saídas completas ficam em `NousData/code/`.
 

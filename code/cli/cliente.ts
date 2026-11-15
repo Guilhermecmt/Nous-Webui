@@ -43,6 +43,7 @@ export class Cliente {
   private async falha(r: Response): Promise<never> {
     let msg = 'erro ' + r.status;
     try { const d = await r.json() as { erro?: string }; if (d.erro) msg = d.erro; } catch { /* sem corpo */ }
+    msg = msg.replace(/ \(para abrir, mude o Alcance[^)]*\)/,' (para trabalhar aqui, use /alcance usuario na conversa ou nous --alcance usuario)');
     if (r.status === 403) msg = 'o Nous Code recusou este terminal (' + msg + '). Se o serviço foi iniciado com outra pasta de dados, feche-o e rode `nous` de novo.';
     throw new ErroApi(r.status, msg);
   }
