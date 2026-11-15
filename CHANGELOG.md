@@ -2,6 +2,20 @@
 
 ## [Não lançado]
 ### Adicionado
+- **Paletas de cores** (painel **Seu Nous › Aparência** e a lição "Escolha as
+  cores" dos Primeiros passos). São sete: Ouro (a de sempre, padrão), Pitaya,
+  Maracujá, Melancia, Ametista e Sol, Céu e Flamingo e Mata, cada uma com claro e
+  escuro. Claro, escuro ou igual ao Windows fica no mesmo lugar. A troca é na hora
+  e vale para o Nous inteiro: tela principal e painéis, Nous Code (editor e
+  terminal), página de ligar o celular, tela de carregamento e relatórios de
+  pesquisa novos. A escolha fica em `NousData\aparencia.json`. As cores saem de
+  `branding/paletas.json`, e `branding/gerar_paletas.py` gera as folhas de estilo.
+  Todas as paletas novas passam no contraste mínimo de leitura (4,5:1).
+- **Ícone em selo**: a coruja dourada num selo escuro, legível em qualquer barra
+  de tarefas ou papel de parede. O traço engrossa só nos tamanhos pequenos e, de
+  16 a 24 px, a coruja aparece sem a coroa. O selo vale também para a aba do
+  navegador e o ícone do celular. A bolinha de estado da bandeja ficou menor (34%
+  do ícone) e não cobre mais a coruja.
 - **Telegram e WhatsApp** (`mensageiros/`, painel **Seu Nous › Telegram e
   WhatsApp**). Fale com o Nous pelo celular de qualquer lugar: a mensagem entra
   pelo mesmo caminho da conversa normal (memória, agenda, habilidades e e-mail
@@ -102,6 +116,11 @@
   `history/nous_history.py`).
 
 ### Corrigido
+- O ícone da bandeja aparecia como pixels coloridos aleatórios. O `nous.ico`
+  guardava os tamanhos pequenos em PNG, e a bandeja (PowerShell 5.1) não lê PNG
+  nesses tamanhos. Agora eles vão em BMP (`branding/gerar_icone.py`).
+- No tema Ouro escuro, a letra dos botões dourados passou de branca para escura:
+  a branca não passava no contraste mínimo de leitura.
 - "Quinta às 10h" dito numa quinta depois das 10h era recusado como horário que já
   passou, e o modelo pequeno confirmava mesmo assim. Agora vale a próxima quinta.
 - Repetir o mesmo pedido à agenda no mesmo dia não gravava nada: a proteção contra
