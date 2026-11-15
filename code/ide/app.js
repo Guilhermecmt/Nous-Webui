@@ -131,8 +131,9 @@
 
   function abrirProjeto(pasta) {
     // valida e registra como recente (cria uma conversa so' se ainda nao houver)
+    const tarefa = st.tarefaChat;   // pedido do chat: sempre numa conversa nova
     api('GET', '/sessoes?' + qs({ pasta })).then((l) => {
-      const pega = l.length ? Promise.resolve({ id: l[0].id, pasta: l[0].pasta }) :
+      const pega = l.length && !tarefa ? Promise.resolve({ id: l[0].id, pasta: l[0].pasta }) :
         api('POST', '/sessoes', { pasta }).then((d) => ({ id: d.id, pasta: null }));
       return pega.then((s) => api('GET', '/sessao?id=' + s.id));
     }).then((s) => {
@@ -145,6 +146,16 @@
       montar();
       carregarSessao(s);
       restaurarAbas();
+      if (tarefa) {
+        // fica escrito para a pessoa conferir (e mudar permissões/alcance) antes de enviar
+        st.tarefaChat = null;
+        alternarAgente(true);
+        const txt = $('#nc-ag-txt');
+        txt.value = tarefa;
+        txt.dispatchEvent(new Event('input'));
+        setTimeout(() => { txt.focus(); txt.setSelectionRange(txt.value.length, txt.value.length); }, 50);
+        toast('Pedido do chat pronto. Confira as permissões e o alcance e aperte Enter.');
+      }
     }).catch((e) => telaInicio(e.message));
   }
 
@@ -194,6 +205,7 @@
       '<button class="nc-bt" type="button" id="nc-ag-menu" title="Opções da conversa" aria-label="Opções da conversa">⋯</button>' +
       '<button class="nc-bt" type="button" id="nc-ag-nova" title="Nova conversa">' + ic('mais', 'p') + '</button></div>' +
       '<div id="nc-ag-opcoes"><select id="nc-ag-modelo" aria-label="Modelo"></select><select id="nc-ag-perm" aria-label="Permissões" title="O que o agente pode fazer sem perguntar"></select>' +
+      '<select id="nc-ag-alc" aria-label="Alcance" title="Até onde o agente pode ler e mudar arquivos no computador"></select>' +
       '<select id="nc-ag-rac" aria-label="Raciocínio" class="oculto"></select>' +
       '<button class="nc-bt borda" id="nc-ag-plano" type="button" aria-pressed="false">Planejar</button></div>' +
       '<div id="nc-ag-ctx"><div class="barra"><i></i></div><span></span><button type="button" id="nc-ag-compactar" title="Resumir a conversa para liberar contexto">compactar</button></div>' +
@@ -804,6 +816,14 @@
 
   /* ============================================================ agente */
   const PERM = [['leitura', 'Somente leitura'], ['perguntar', 'Pedir antes de mudar'], ['editar', 'Editar sem perguntar'], ['total', 'Acesso total']];
+  const ALCANCE = [['projeto', 'Só o projeto'], ['usuario', 'Minha pasta de usuário'], ['computador', 'Computador inteiro']];
+  /* Liberar mais: a pessoa confirma, e a responsabilidade e' dela (como no Codex e no Claude Code) */
+  const AVISO = {
+    total: 'Acesso total: o agente muda arquivos e roda comandos sem pedir licença. Um modelo local pode errar, e você se responsabiliza pelo que ele fizer. Liberar?',
+    usuario: 'O agente vai poder ler e mudar arquivos em toda a sua pasta de usuário (Documentos, Downloads, Área de Trabalho…). Mudanças fora do projeto continuam pedindo OK, a não ser no Acesso total. Liberar?',
+    computador: 'O agente vai poder ler e mudar arquivos em qualquer lugar do computador que o seu usuário do Windows alcança. Mudanças fora do projeto continuam pedindo OK, a não ser no Acesso total. Você se responsabiliza pelo que ele fizer. Liberar?',
+  };
+  const confirmarRisco = (chave) => (AVISO[chave] ? dialogo(AVISO[chave], null, 'Liberar').then((ok) => !!ok) : Promise.resolve(true));
   const RACIOCINIO = [['auto', 'Raciocínio: automático'], ['desligado', 'Raciocínio: desligado'], ['baixo', 'Raciocínio: baixo'], ['medio', 'Raciocínio: médio'], ['alto', 'Raciocínio: alto']];
   const COMANDOS = [
     ['plano', 'Liga o modo plano: o agente investiga e propõe antes de mudar', '[pedido]'],
@@ -811,6 +831,8 @@
     ['compactar', 'Resume a conversa para liberar contexto', ''],
     ['modelo', 'Troca o modelo desta conversa', '<nome>'],
     ['modo', 'Permissões: leitura, perguntar, editar ou total', '<modo>'],
+    ['alcance', 'Até onde o agente vai: projeto, usuario ou computador', '<alcance>'],
+    ['padrao', 'Permissões e alcance das conversas novas', ''],
     ['internet', 'Libera ou bloqueia a internet nesta conversa', ''],
     ['contexto', 'Mostra o que o modelo está vendo', ''],
     ['mcp', 'Servidores MCP deste projeto: ver e permitir', ''],
@@ -838,7 +860,14 @@
     $('#nc-ag-menu').addEventListener('click', (e) => menuConversa(e.currentTarget));
     $('#nc-ag-conv').addEventListener('change', function () { if (!st.rodandoCtrl) api('GET', '/sessao?id=' + this.value).then(carregarSessao); });
     $('#nc-ag-modelo').addEventListener('change', function () { ajustar({ modelo: this.value }).then((d) => { $('#nc-st-modelo').textContent = d.modelo; }); });
-    $('#nc-ag-perm').addEventListener('change', function () { ajustar({ modo: this.value }); });
+    $('#nc-ag-perm').addEventListener('change', function () {
+      const v = this.value;
+      confirmarRisco(v).then((ok) => (ok ? ajustar({ modo: v }) : pintarOpcoes()));
+    });
+    $('#nc-ag-alc').addEventListener('change', function () {
+      const v = this.value;
+      confirmarRisco(v).then((ok) => (ok ? ajustar({ alcance: v }).catch((e) => { toast(e.message, true); pintarOpcoes(); }) : pintarOpcoes()));
+    });
     $('#nc-ag-rac').addEventListener('change', function () { ajustar({ raciocinio: this.value }); });
     $('#nc-ag-plano').addEventListener('click', () => ajustar({ planejando: !st.sessao.planejando }));
     $('#nc-ag-compactar').addEventListener('click', compactarAgora);
@@ -859,6 +888,12 @@
     $('#nc-ag-modelo').innerHTML = l.map((m) => '<option value="' + esc(m.nome) + '"' + (m.nome === s.modelo ? ' selected' : '') + '>' +
       esc(m.provedor ? m.nome.replace('::', ' › ') : m.nome) + (m.ferramentas === false ? ' (sem ferramentas)' : '') + '</option>').join('');
     $('#nc-ag-perm').innerHTML = PERM.map(([v, t]) => '<option value="' + v + '"' + (v === s.modo ? ' selected' : '') + '>' + t + '</option>').join('');
+    const alc = $('#nc-ag-alc');
+    alc.innerHTML = ALCANCE.map(([v, t]) => '<option value="' + v + '"' + (v === (s.alcance || 'projeto') ? ' selected' : '') + '>' + t + '</option>').join('');
+    alc.disabled = !!s.isolada;   // tarefa separada: so' a copia do projeto
+    alc.title = s.isolada ? 'Numa tarefa separada o agente trabalha só na cópia do projeto' : 'Até onde o agente pode ler e mudar arquivos no computador';
+    alc.classList.toggle('risco', s.alcance && s.alcance !== 'projeto');
+    $('#nc-ag-perm').classList.toggle('risco', s.modo === 'total');
     const pensa = (st.modelos.find((m) => m.nome === s.modelo) || {}).pensa;
     $('#nc-ag-rac').classList.toggle('oculto', !pensa);
     $('#nc-ag-rac').innerHTML = RACIOCINIO.map(([v, t]) => '<option value="' + v + '"' + (v === s.raciocinio ? ' selected' : '') + '>' + t + '</option>').join('');
@@ -981,9 +1016,41 @@
     menu(r.left - 150, r.bottom + 4, [
       ['Renomear', renomearConversa], ['Duplicar a conversa', () => duplicar()], ['Exportar em Markdown', exportarConversa],
       ['Ver o que o modelo está vendo', inspetor], ['Buscar nas conversas', buscarConversas], ['Compactar agora', compactarAgora], '-',
+      ['Padrão das conversas novas…', ajustesPadrao], '-',
       ...(copia ? [['Revisar e aplicar a tarefa separada', revisarCopia], ['Voltar ao projeto', () => voltarAoProjeto(copia.origem)], '-']
         : [['Nova tarefa separada…', novaCopia], ['Tarefas separadas em andamento…', listaCopias], '-']),
       ['Apagar a conversa', apagarConversa]]);
+  }
+
+  /* ---- padrão das conversas novas: permissões e alcance (o alcance também decide que pastas abrem) ---- */
+  function ajustesPadrao() {
+    api('GET', '/ajustes').then((a) => {
+      const opc = (lista, atual) => lista.map(([v, t]) => '<option value="' + v + '"' + (v === atual ? ' selected' : '') + '>' + t + '</option>').join('');
+      const d = document.createElement('div');
+      d.id = 'nc-dialogo';
+      d.innerHTML = '<form class="nc-padrao"><p><b>Padrão das conversas novas</b></p>' +
+        '<label>Permissões<select name="modo">' + opc(PERM, a.modo) + '</select></label>' +
+        '<label>Alcance<select name="alcance">' + opc(ALCANCE, a.alcance) + '</select></label>' +
+        '<p class="nc-nota">O alcance também decide que pastas podem ser abertas: com <b>Minha pasta de usuário</b> dá para abrir ' + esc(a.casa) +
+        ' inteira; com <b>Computador inteiro</b>, qualquer pasta, até o disco C:. Pedidos feitos no chat do Nous abrem na sua pasta de usuário quando o alcance deixa. ' +
+        'Cada conversa ainda pode mudar os dois no topo do agente.</p>' +
+        '<div class="bt"><button type="button" class="nc-bt borda" data-n>Cancelar</button><button type="submit" class="nc-bt ouro">Salvar</button></div></form>';
+      document.body.appendChild(d);
+      const f = $('form', d);
+      const fim = () => d.remove();
+      $('[data-n]', d).addEventListener('click', fim);
+      d.addEventListener('mousedown', (e) => { if (e.target === d) fim(); });
+      d.addEventListener('keydown', (e) => { if (e.key === 'Escape') fim(); });
+      f.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const modo = f.modo.value, alcance = f.alcance.value;
+        fim();
+        if (modo !== a.modo && !(await confirmarRisco(modo))) return;
+        if (alcance !== a.alcance && !(await confirmarRisco(alcance))) return;
+        api('POST', '/ajustes', { modo, alcance }).then(() => toast('Padrão salvo: vale para as próximas conversas.')).catch((er) => toast(er.message, true));
+      });
+      f.modo.focus();
+    }).catch((e) => toast(e.message, true));
   }
 
   /* ---- tarefa separada: o agente trabalha numa cópia do projeto ---- */
@@ -1222,7 +1289,15 @@
       case 'modo': {
         const v = { leitura: 'leitura', perguntar: 'perguntar', editar: 'editar', total: 'total' }[arg.toLowerCase()];
         if (!v) { toast('Use /modo leitura, perguntar, editar ou total.', true); return true; }
-        ajustar({ modo: v }).then(() => toast('Permissões: ' + PERM.find((p) => p[0] === v)[1])); return true;
+        confirmarRisco(v).then((ok) => ok && ajustar({ modo: v }).then(() => toast('Permissões: ' + PERM.find((p) => p[0] === v)[1]))); return true;
+      }
+      case 'alcance': {
+        const v = { projeto: 'projeto', usuario: 'usuario', 'usuário': 'usuario', computador: 'computador', pc: 'computador' }[arg.toLowerCase()];
+        if (!v) { toast('Use /alcance projeto, usuario ou computador.', true); return true; }
+        confirmarRisco(v).then((ok) => ok && ajustar({ alcance: v }).then(() => toast('Alcance: ' + ALCANCE.find((p) => p[0] === v)[1])).catch((e) => toast(e.message, true))); return true;
+      }
+      case 'padrao': case 'padrão': {
+        ajustesPadrao(); return true;
       }
       case 'internet': {
         const novo = st.sessao.internet !== true;
@@ -1504,7 +1579,8 @@
         '<p class="nc-nota">O agente quer buscar ou ler <b>' + esc(e.alvo) + '</b>. Só o endereço ou a busca saem do seu computador; o código não.</p>' +
         '<div class="bt"><button class="nc-bt ouro" type="button" data-s>Permitir nesta conversa</button><button class="nc-bt borda" type="button" data-n>Não permitir</button></div></div>';
     } else {
-      const titulo = e.tipo === 'comando' ? (e.descricao ? esc(e.descricao) : 'Rodar este comando?') : (e.novo ? 'Criar ' : 'Mudar ') + esc(e.arquivo) + '?';
+      const titulo = e.tipo === 'comando' ? (e.descricao ? esc(e.descricao) : 'Rodar este comando?')
+        : (e.novo ? 'Criar ' : 'Mudar ') + esc(e.arquivo) + '?' + (e.fora ? ' <em class="fora">fora do projeto</em>' : '');
       const det = e.tipo === 'comando' ? '<pre>' + esc(e.comando) + '</pre>' + (e.perigo ? '<p class="nc-perigo">Atenção: este comando ' + esc(e.perigo) + '. Pode não ter volta.</p>' : '') + (e.fundo ? '<p class="nc-nota">Vai rodar em segundo plano.</p>' : '')
         : '<pre class="nc-diff">' + diffHtml(e.diff) + '</pre>';
       html = '<div class="nc-pede" data-pede="' + e.id + '"><div class="t">' + titulo + (e.tipo === 'arquivo' ? '<span>+' + e.mais + ' −' + e.menos + '</span>' : '') + '</div>' + det +
@@ -1653,8 +1729,11 @@
     comecou = true;
     st.monaco = window.monaco;
     $('#nc-carregando').remove();
-    const pasta = new URLSearchParams(location.search).get('pasta');
-    if (pasta) abrirProjeto(pasta); else telaInicio();
+    const q = new URLSearchParams(location.search);
+    st.tarefaChat = (q.get('tarefa') || '').trim() || null;   // pedido feito no chat do Nous
+    const pasta = q.get('pasta');
+    if (pasta) abrirProjeto(pasta);
+    else telaInicio(st.tarefaChat ? 'Pedido do chat do Nous: escolha a pasta onde o agente deve trabalhar. (Para ele começar na sua pasta de usuário, mude o Alcance em Agente › ⋯ › Padrão das conversas novas.)' : undefined);
   }
   window.require(['vs/editor/editor.main'], comecar);
   const espera = setInterval(() => { comecar(); if (comecou) clearInterval(espera); }, 50);

@@ -198,8 +198,11 @@ export function avisarTodos(m: object) {
   for (const ws of clientes) if (ws.readyState === ws.OPEN) ws.send(t);
 }
 
-export function abrirJanela(porta: number, pasta?: string) {
-  const url = `http://127.0.0.1:${porta}/` + (pasta ? '?pasta=' + encodeURIComponent(pasta) : '');
+export function abrirJanela(porta: number, pasta?: string, tarefa?: string) {
+  const q = new URLSearchParams();
+  if (pasta) q.set('pasta', pasta);
+  if (tarefa) q.set('tarefa', tarefa);   // pedido vindo do chat: vira o texto de uma conversa nova
+  const url = `http://127.0.0.1:${porta}/` + (q.size ? '?' + q.toString() : '');
   const cands = [
     path.join(process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)', 'Microsoft', 'Edge', 'Application', 'msedge.exe'),
     path.join(process.env.ProgramFiles || 'C:\\Program Files', 'Microsoft', 'Edge', 'Application', 'msedge.exe'),

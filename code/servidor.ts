@@ -143,17 +143,47 @@ function devolverSessoes(t: TA.Tarefa, nota: string) {
   }
 }
 
+/* ------------------------------------------------------------ ajustes gerais */
+/* O padrao das conversas novas (modo de permissao e alcance), escolhido pela
+ * pessoa no IDE. O alcance padrao tambem decide que pastas podem ser abertas. */
+type Ajustes = { modo: Sessao['modo']; alcance: F.Alcance };
+const ARQ_AJUSTES = path.join(DADOS, 'ajustes.json');
+const MODOS: Sessao['modo'][] = ['leitura', 'perguntar', 'editar', 'total'];
+function lerAjustes(): Ajustes {
+  let a: Partial<Ajustes> = {};
+  try { a = JSON.parse(fs.readFileSync(ARQ_AJUSTES, 'utf8')); } catch { /* primeira vez */ }
+  return { modo: MODOS.includes(a.modo as Sessao['modo']) ? a.modo! : 'perguntar', alcance: F.alcanceValido(a.alcance) ? a.alcance : 'projeto' };
+}
+function gravarAjustes(a: Ajustes) {
+  const tmp = ARQ_AJUSTES + '.tmp';
+  fs.writeFileSync(tmp, JSON.stringify(a));
+  fs.renameSync(tmp, ARQ_AJUSTES);
+}
+
 /* ------------------------------------------------------------ pastas */
-function pastaValida(p: string): string {
+/* Alcance "projeto": nada de disco inteiro, Windows, Arquivos de Programas ou a
+ * propria pasta do usuario. "usuario": libera a pasta do usuario inteira.
+ * "computador": qualquer pasta que exista. */
+function pastaValida(p: string, alcance: F.Alcance = lerAjustes().alcance): string {
   const abs = path.resolve(String(p || '').trim().replace(/^"|"$/g, ''));
   if (!fs.existsSync(abs) || !fs.statSync(abs).isDirectory()) throw new Error('essa pasta nao existe: ' + abs);
+  if (alcance === 'computador') return abs;
+  const casa = F.casa().toLowerCase();
   const proibidas = [process.env.SystemRoot || 'C:\\Windows', process.env.ProgramFiles || 'C:\\Program Files',
-    process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)', os.homedir()].map((x) => path.resolve(x).toLowerCase());
+    process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)'].map((x) => path.resolve(x).toLowerCase());
   const baixo = abs.toLowerCase();
-  if (path.parse(abs).root.toLowerCase() === baixo) throw new Error('escolha a pasta de um projeto, nao o disco inteiro');
-  if (proibidas.some((x) => baixo === x || (x !== path.resolve(os.homedir()).toLowerCase() && baixo.startsWith(x + path.sep))))
-    throw new Error('essa pasta e' + "'" + ' do sistema; escolha a pasta de um projeto');
+  const dica = ' (para abrir, mude o Alcance nos ajustes do Nous Code)';
+  if (path.parse(abs).root.toLowerCase() === baixo) throw new Error('escolha a pasta de um projeto, nao o disco inteiro' + dica);
+  if (proibidas.some((x) => baixo === x || baixo.startsWith(x + path.sep))) throw new Error('essa pasta e' + "'" + ' do sistema; escolha a pasta de um projeto' + dica);
+  if (alcance === 'projeto' && baixo === casa) throw new Error('essa e' + "'" + ' a sua pasta de usuario inteira; escolha a pasta de um projeto' + dica);
   return abs;
+}
+
+/* Onde trabalha um pedido que veio do chat sem pasta: a pasta do usuario quando
+ * o alcance deixa, senao o projeto mais recente. */
+function pastaDoChat(): string | undefined {
+  if (lerAjustes().alcance !== 'projeto') return F.casa();
+  return pastasRecentes()[0]?.pasta;
 }
 function lembrarPasta(p: string) {
   let l: string[] = [];
@@ -234,9 +264,22 @@ async function rota(req: http.IncomingMessage, res: http.ServerResponse) {
     }
   }
   if (r === 'POST /abrir-janela') {
+    // tarefa: pedido feito no chat do Nous; o IDE abre uma conversa nova com ele escrito (a pessoa envia)
     const b = await corpo(req);
-    const pasta = b.pasta ? pastaValida(String(b.pasta)) : undefined;
-    return json(req, res, 200, { url: IDE.abrirJanela(PORTA, pasta) });
+    const tarefa = String(b.tarefa || '').trim().slice(0, 4000);
+    const pedida = b.pasta ? String(b.pasta) : tarefa ? pastaDoChat() : undefined;
+    let pasta: string | undefined;
+    try { pasta = pedida ? pastaValida(pedida) : undefined; } catch (e) { if (b.pasta) throw e; }
+    return json(req, res, 200, { url: IDE.abrirJanela(PORTA, pasta, tarefa || undefined), pasta: pasta || null });
+  }
+  if (r === 'GET /ajustes') return json(req, res, 200, { ...lerAjustes(), casa: F.casa() });
+  if (r === 'POST /ajustes') {
+    const b = await corpo(req);
+    const a = lerAjustes();
+    if (MODOS.includes(b.modo as Sessao['modo'])) a.modo = b.modo as Sessao['modo'];
+    if (F.alcanceValido(b.alcance)) a.alcance = b.alcance;
+    gravarAjustes(a);
+    return json(req, res, 200, { ...a, casa: F.casa() });
   }
   if (r === 'GET /modelos') return json(req, res, 200, { padrao: MODELO_PADRAO, modelos: await modelos() });
   if (r === 'GET /pastas') return json(req, res, 200, pastasRecentes());
@@ -250,7 +293,8 @@ async function rota(req: http.IncomingMessage, res: http.ServerResponse) {
     const b = await corpo(req);
     const pasta = pastaValida(String(b.pasta || ''));
     const copia = TA.dePasta(pasta);   // dentro de uma tarefa separada: nao entra nos recentes
-    const s: Sessao = normalizar({ id: novoId(), pasta, modelo: String(b.modelo || MODELO_PADRAO), isolada: !!copia });
+    const aj = lerAjustes();           // conversa nova nasce com o modo e o alcance padrao
+    const s: Sessao = normalizar({ id: novoId(), pasta, modelo: String(b.modelo || MODELO_PADRAO), isolada: !!copia, modo: aj.modo, alcance: aj.alcance });
     abertas.set(s.id, s); salvar(s); if (!copia) lembrarPasta(pasta);
     return json(req, res, 200, { id: s.id });
   }
@@ -262,7 +306,7 @@ async function rota(req: http.IncomingMessage, res: http.ServerResponse) {
     const origem = pastaValida(String(b.pasta || ''));
     if (TA.dePasta(origem)) return json(req, res, 400, { erro: 'esta já é uma cópia separada; crie a tarefa a partir do projeto' });
     const { tarefa, avisos } = await TA.criar(origem, String(b.titulo || ''));
-    const s: Sessao = normalizar({ id: novoId(), pasta: tarefa.pasta, modelo: String(b.modelo || MODELO_PADRAO), titulo: tarefa.titulo, tituloAuto: false, isolada: true });
+    const s: Sessao = normalizar({ id: novoId(), pasta: tarefa.pasta, modelo: String(b.modelo || MODELO_PADRAO), titulo: tarefa.titulo, tituloAuto: false, isolada: true, modo: lerAjustes().modo });
     abertas.set(s.id, s); salvar(s); lembrarPasta(origem);
     return json(req, res, 200, { id: s.id, pasta: tarefa.pasta, tarefa: vistaTarefa(tarefa), avisos });
   }
@@ -286,7 +330,7 @@ async function rota(req: http.IncomingMessage, res: http.ServerResponse) {
   }
   if (r === 'GET /sessao') {
     const s = carregar(q('id'));
-    return json(req, res, 200, { id: s.id, titulo: s.titulo, pasta: s.pasta, modelo: s.modelo, modo: s.modo,
+    return json(req, res, 200, { id: s.id, titulo: s.titulo, pasta: s.pasta, modelo: s.modelo, modo: s.modo, alcance: s.alcance, isolada: !!s.isolada,
       eventos: s.eventos, mudancas: mudancas(s), rodando: rodando.has(s.id), planejando: s.planejando, tarefas: s.tarefas,
       objetivo: s.objetivo, raciocinio: s.raciocinio, internet: s.internet, tokens: s.tokens, limite: NUM_CTX,
       jobs: J.listar(s.id).map((j) => ({ id: j.id, comando: j.comando, descricao: j.descricao, rodando: !j.fim, codigo: j.codigo })),
@@ -380,6 +424,10 @@ async function rota(req: http.IncomingMessage, res: http.ServerResponse) {
     // modo, plano e internet chegam ao modelo no proximo pedido, pelo "runtime context"
     if (b.modelo) s.modelo = String(b.modelo);
     if (['leitura', 'perguntar', 'editar', 'total'].includes(String(b.modo))) s.modo = b.modo as Sessao['modo'];
+    if (F.alcanceValido(b.alcance)) {
+      if (s.isolada && b.alcance !== 'projeto') return json(req, res, 400, { erro: 'uma tarefa separada trabalha só na cópia do projeto' });
+      s.alcance = b.alcance;
+    }
     if (typeof b.planejando === 'boolean') s.planejando = b.planejando;
     if (['auto', 'desligado', 'baixo', 'medio', 'alto'].includes(String(b.raciocinio))) s.raciocinio = b.raciocinio as Sessao['raciocinio'];
     if (b.internet === null || typeof b.internet === 'boolean') s.internet = b.internet as boolean | null;
@@ -397,7 +445,7 @@ async function rota(req: http.IncomingMessage, res: http.ServerResponse) {
       }
     }
     salvar(s);
-    return json(req, res, 200, { ok: true, modelo: s.modelo, modo: s.modo, planejando: s.planejando, raciocinio: s.raciocinio,
+    return json(req, res, 200, { ok: true, modelo: s.modelo, modo: s.modo, alcance: s.alcance, planejando: s.planejando, raciocinio: s.raciocinio,
       internet: s.internet, objetivo: s.objetivo });
   }
   if (r === 'POST /sessao/apagar') {

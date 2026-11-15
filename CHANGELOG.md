@@ -54,6 +54,21 @@
   com o branding aplicado e conferem, nos dois temas, a cor calculada, o contraste
   do texto, Esc, clique fora e o foco. Precisam de `OWUI_VENV` apontando para um
   venv com o open-webui; o monitor é falso e não abre porta do Nous.
+- **Nous Code no computador inteiro, se você quiser.** Além das permissões, cada
+  conversa tem um **Alcance**: Só o projeto (o padrão), Minha pasta de usuário ou
+  Computador inteiro, como no Codex e no Claude Code. Liberar mais pede
+  confirmação, e no Acesso total a responsabilidade é de quem liga. Mudança fora
+  do projeto pede OK, a não ser no Acesso total, e pode ser desfeita como as
+  outras. O padrão das conversas novas fica no menu ⋯ › Padrão das conversas
+  novas (ou `/padrao`) e também decide que pastas o Nous Code abre (a pasta do
+  usuário ou o disco C: inteiro) (`code/ferramentas.ts`, `code/agente.ts`,
+  `code/servidor.ts`, `code/ide/app.js`).
+- **Pedir pelo chat o que é para fazer no computador.** "no computador: organiza
+  meus Downloads", "/pc instala o 7zip" ou "manda pro Nous Code: ..." abrem o Nous
+  Code numa conversa nova com o pedido já escrito. Frases que só parecem pedido
+  ("organiza minha pasta Downloads") ganham um botão "Fazer no computador". O
+  modelo do chat continua sem ferramentas e é instruído a não dizer que fez nada
+  (`utilidades/nous_comandos.py`, `branding/modules/acoes.js`, `codigo.js`).
 
 ### Mudado
 - **O celular recebe só um aviso curto.** O ntfy mandava até 900 caracteres do

@@ -6,15 +6,29 @@
                            editor, pdf, loja, memoria)
      ⟦tema:claro⟧          muda o tema
      ⟦acao:liberar⟧        descarrega os modelos (libera a placa de video)
+     ⟦tarefa:auto:<hex>⟧   leva um pedido ao Nous Code (texto UTF-8 em hexadecimal);
+     ⟦tarefa:botao:<hex>⟧  "auto" abre sozinho, "botao" so' mostra o botao
    Este modulo esconde o paragrafo dos marcadores e poe botoes ao lado (sem
-   reescrever o texto que o Svelte controla). abrir/tema/acao rodam sozinhos
-   so' na resposta NOVA (nunca ao reabrir uma conversa antiga).
+   reescrever o texto que o Svelte controla). abrir/tema/acao/tarefa:auto rodam
+   sozinhos so' na resposta NOVA (nunca ao reabrir uma conversa antiga).
    ===================================================================== */
 (function () {
 	'use strict';
 
 	var MON = window.NousUrl(8990);
-	var RE = /⟦(opcao|abrir|tema|acao):([^⟧]{1,300})⟧/g;
+	var RE = /⟦(opcao|abrir|tema|acao|tarefa):([^⟧]{1,24100})⟧/g;
+
+	/* ⟦tarefa:modo:hex⟧ -> {auto, texto} */
+	function tarefaDe(value) {
+		var i = value.indexOf(':');
+		var hex = value.slice(i + 1).replace(/[^0-9a-f]/gi, '');
+		var texto = '';
+		try {
+			var b = new Uint8Array((hex.match(/../g) || []).map(function (x) { return parseInt(x, 16); }));
+			texto = new TextDecoder('utf-8').decode(b);
+		} catch (e) { texto = ''; }
+		return { auto: value.slice(0, i) === 'auto', texto: texto };
+	}
 	var seen = {};   /* "msgid|marcador" ja' visto (nao roda de novo) */
 	/* Resposta "nova" = a ultima, vista SEM marcador antes (os filtros poem o
 	 * marcador no fim, depois do texto). Conversa antiga aberta pela barra
@@ -81,6 +95,10 @@
 		if (kind === 'abrir' && ABRIR[value]) ABRIR[value]();
 		else if (kind === 'tema' && window.NousUI && window.NousUI.setTheme) window.NousUI.setTheme(value === 'claro' ? 'light' : 'dark');
 		else if (kind === 'acao' && value === 'liberar') fetch(MON + '/unload', { method: 'POST' }).catch(function () {});
+		else if (kind === 'tarefa' && window.NousCode) {
+			var t = tarefaDe(value);
+			if (t.texto) window.NousCode.open(null, t.texto);
+		}
 	}
 
 	function label(kind, value) {
@@ -88,6 +106,7 @@
 		if (kind === 'abrir') return ROTULO[value] || 'Abrir';
 		if (kind === 'tema') return value === 'claro' ? '☀ Tema claro' : '🌙 Tema escuro';
 		if (kind === 'acao') return '⏏ Liberar a placa de video';
+		if (kind === 'tarefa') return '⌨ Fazer no computador (Nous Code)';
 		return value;
 	}
 
@@ -137,7 +156,8 @@
 				});
 				row.appendChild(b);
 				// resposta nova e' a ultima: executa a acao uma vez so'
-				if (kind !== 'opcao' && !seen[key] && fresh[msgId] && msgId === lastId) {
+				var sozinho = kind !== 'opcao' && (kind !== 'tarefa' || value.indexOf('auto:') === 0);
+				if (sozinho && !seen[key] && fresh[msgId] && msgId === lastId) {
 					setTimeout(function () { run(kind, value); }, 300);
 				}
 				seen[key] = 1;
