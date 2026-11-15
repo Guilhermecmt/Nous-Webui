@@ -105,3 +105,139 @@ def pasta_falsa(tmp, modelos=None):
         with open(os.path.join(pasta_man, tag), "w", encoding="utf-8") as f:
             json.dump(man, f)
     return tmp
+
+
+# ---------------------------------------------------------------------------
+# llama-server de mentira (aiohttp no mesmo loop do teste) e a fabrica de processos
+# ---------------------------------------------------------------------------
+import asyncio
+
+from aiohttp import web
+
+AMOSTRAS = os.path.join(AQUI, "amostras")
+
+
+def ler_amostra(nome):
+    with open(os.path.join(AMOSTRAS, nome), encoding="utf-8") as f:
+        return json.load(f)
+
+
+class LlamaFalso:
+    """Responde /health, /v1/chat/completions (reproduz uma amostra em SSE) e /v1/embeddings."""
+
+    def __init__(self, amostra="chat_stream.json", health_503=0, atraso_por_token=0.0):
+        self.amostra = amostra
+        self.health_503 = health_503
+        self.atraso = atraso_por_token
+        self.pedidos = []
+        self.fechou_antes_do_fim = False
+        self.terminou_stream = False
+        self._runner = None
+
+    def _app(self):
+        app = web.Application()
+        app.router.add_get("/health", self._health)
+        app.router.add_post("/v1/chat/completions", self._chat)
+        app.router.add_post("/v1/embeddings", self._emb)
+        return app
+
+    async def subir(self, porta):
+        self._runner = web.AppRunner(self._app())
+        await self._runner.setup()
+        await web.TCPSite(self._runner, "127.0.0.1", porta).start()
+
+    async def parar(self):
+        if self._runner:
+            await self._runner.cleanup()
+            self._runner = None
+
+    async def _health(self, req):
+        if self.health_503 > 0:
+            self.health_503 -= 1
+            return web.json_response({"error": {"code": 503, "message": "Loading model"}}, status=503)
+        return web.json_response({"status": "ok"})
+
+    async def _chat(self, req):
+        corpo = await req.json()
+        self.pedidos.append(("/v1/chat/completions", corpo))
+        eventos = ler_amostra(self.amostra)
+        if not corpo.get("stream"):
+            return web.json_response({"choices": [{"message": {"role": "assistant", "content": "oi"}, "finish_reason": "stop"}]})
+        r = web.StreamResponse(headers={"Content-Type": "text/event-stream"})
+        await r.prepare(req)
+        try:
+            for e in eventos:
+                await r.write(("data: " + json.dumps(e) + "\n\n").encode())
+                if self.atraso:
+                    await asyncio.sleep(self.atraso)
+            await r.write(b"data: [DONE]\n\n")
+            self.terminou_stream = True
+        except (ConnectionResetError, asyncio.CancelledError):
+            self.fechou_antes_do_fim = True
+            raise
+        return r
+
+    async def _emb(self, req):
+        corpo = await req.json()
+        self.pedidos.append(("/v1/embeddings", corpo))
+        ent = corpo.get("input")
+        ent = [ent] if isinstance(ent, str) else ent
+        return web.json_response({"object": "list", "usage": {"prompt_tokens": 3 * len(ent), "total_tokens": 3 * len(ent)},
+                                  "data": [{"index": i, "embedding": [3.0, 4.0 + i]} for i in range(len(ent))]})
+
+
+class ProcessoFalso:
+    _pid = 50000
+
+    def __init__(self, argv, servidor, morrer_ao_carregar=False):
+        ProcessoFalso._pid += 1
+        self.pid = ProcessoFalso._pid
+        self.argv = argv
+        self.servidor = servidor
+        self.returncode = None
+        self.stderr = asyncio.StreamReader()
+        self.encerrado = False
+        if morrer_ao_carregar:
+            self.stderr.feed_data(b"carregando...\nggml_vulkan: Device memory allocation failed\n")
+            self.stderr.feed_eof()
+            asyncio.get_running_loop().call_later(0.2, self._morreu, 1)
+
+    def _morreu(self, codigo):
+        if self.returncode is None:
+            self.returncode = codigo
+
+    async def morrer(self):
+        await self.servidor.parar()
+        self.returncode = 1
+        if not self.stderr.at_eof():
+            self.stderr.feed_eof()
+
+    def terminate(self):
+        self.encerrado = True
+        asyncio.ensure_future(self.morrer())
+
+    kill = terminate
+
+    async def wait(self):
+        while self.returncode is None:
+            await asyncio.sleep(0.01)
+        return self.returncode
+
+
+class FabricaFalsa:
+    """Usada como Gerente(iniciar=FabricaFalsa()): sobe um LlamaFalso na porta do argv."""
+
+    def __init__(self, **opcoes):
+        self.opcoes = opcoes
+        self.morrer_ao_carregar = False
+        self.argvs = []
+        self.processos = []
+
+    async def __call__(self, argv):
+        self.argvs.append(argv)
+        srv = LlamaFalso(**self.opcoes)
+        p = ProcessoFalso(argv, srv, self.morrer_ao_carregar)
+        if not self.morrer_ao_carregar:
+            await srv.subir(int(argv[argv.index("--port") + 1]))
+        self.processos.append(p)
+        return p
