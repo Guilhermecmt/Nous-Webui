@@ -16,7 +16,7 @@
 
 	function injectStyle() {
 		if (document.getElementById('nous-pdf-style')) return;
-		var g = 'rgba(200,150,46,';
+		var g = 'rgba(var(--nous-acc-rgb),';
 		var css =
 			'#nous-pdf-open{width:100%;margin-top:5px;padding:6px;border:1px solid ' + g + '.25);border-radius:8px;' +
 			'cursor:pointer;background:transparent;color:var(--nd-texto-ouro);font-weight:600;font-size:12px}#nous-pdf-open:hover{background:' + g + '.12)}' +
@@ -30,7 +30,7 @@
 			'.nous-pdf-f{display:flex;gap:8px;align-items:center;margin-bottom:6px}.nous-pdf-f label{width:38%;font-size:11px;color:var(--nd-mut);word-wrap:break-word}' +
 			'.nous-pdf-f input,.nous-pdf-f select,.nous-pdf-sel{flex:1;box-sizing:border-box;padding:6px 8px;background:rgba(var(--nd-tom),.07);' +
 			'border:1px solid ' + g + '.28);border-radius:7px;color:var(--nd-txt);font-size:12px;outline:none;color-scheme:var(--nd-esquema)}' +
-			'.nous-pdf-f input[type=checkbox]{flex:0;accent-color:#c8962e}' +
+			'.nous-pdf-f input[type=checkbox]{flex:0;accent-color:var(--nous-acc)}' +
 			'.nous-pdf-btn{padding:6px 12px;border:1px solid ' + g + '.45);border-radius:8px;cursor:pointer;background:' + g + '.18);' +
 			'color:var(--nd-texto-ouro);font-weight:600;font-size:12px;margin:3px 5px 3px 0}.nous-pdf-btn:hover{background:' + g + '.32)}' +
 			'.nous-pdf-btn.ghost{background:transparent}.nous-pdf-btn:disabled{opacity:.4}' +
@@ -143,7 +143,7 @@
 					var n = 0;
 					flds.forEach(function (f, i) {
 						var el = body().querySelector('[data-i="' + i + '"]');
-						if (el && d.values[f.name] && !el.value && !el.disabled) { el.value = d.values[f.name]; el.style.borderColor = '#c8962e'; n++; }
+						if (el && d.values[f.name] && !el.value && !el.disabled) { el.value = d.values[f.name]; el.style.borderColor = 'var(--nous-acc)'; n++; }
 					});
 					m.textContent = n ? ' ' + n + ' campo(s) sugerido(s), em dourado. Confira antes de gerar.' : ' Nada que eu saiba combina com estes campos.';
 				}).catch(function (e) { m.innerHTML = ' <span class="nous-pdf-bad">' + esc(e.message) + '</span>'; });

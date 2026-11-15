@@ -32,19 +32,19 @@
 		st.textContent =
 			'#nous-ini{display:flex;flex-direction:column;align-items:center;gap:7px;margin:14px 16px 2px;' +
 			'font-family:Inter,system-ui,sans-serif;text-align:center;max-width:560px}' +
-			'#nous-ini h2{margin:0;font:600 28px/1.2 Cinzel,Georgia,serif;letter-spacing:.04em;color:#8a6414}' +
-			'.dark #nous-ini h2{color:#e7c069}' +
+			'#nous-ini h2{margin:0;font:600 28px/1.2 Cinzel,Georgia,serif;letter-spacing:.04em;color:var(--nous-acc-txt)}' +
+			'.dark #nous-ini h2{color:var(--nous-acc-txt)}' +
 			'#nous-ini .nous-ini-sub{font-size:14.5px;line-height:1.45;color:#5f5f5f}' +
 			'.dark #nous-ini .nous-ini-sub{color:#a8a8a8}' +
 			'#nous-ini .nous-ini-dica{font-size:12.5px;line-height:1.45;color:#7a7a7a}' +
 			'.dark #nous-ini .nous-ini-dica{color:#8c8c8c}' +
-			'#nous-ini .nous-ini-dica b{font-weight:600;color:#8a6414}.dark #nous-ini .nous-ini-dica b{color:#c8962e}' +
+			'#nous-ini .nous-ini-dica b{font-weight:600;color:var(--nous-acc-txt)}.dark #nous-ini .nous-ini-dica b{color:var(--nous-acc-txt)}' +
 			'#nous-ini-priv{margin-top:4px;display:inline-flex;align-items:center;gap:6px;padding:5px 13px;' +
-			'border:1px solid rgba(200,150,46,.45);border-radius:999px;background:none;cursor:pointer;' +
-			'font:500 12.5px Inter,system-ui,sans-serif;color:#8a6414;transition:background .15s}' +
-			'.dark #nous-ini-priv{color:#c8962e}' +
-			'#nous-ini-priv:hover{background:rgba(200,150,46,.12)}' +
-			'#nous-ini-priv.on{background:rgba(200,150,46,.2);border-color:#c8962e}' +
+			'border:1px solid rgba(var(--nous-acc-rgb),.45);border-radius:999px;background:none;cursor:pointer;' +
+			'font:500 12.5px Inter,system-ui,sans-serif;color:var(--nous-acc-txt);transition:background .15s}' +
+			'.dark #nous-ini-priv{color:var(--nous-acc-txt)}' +
+			'#nous-ini-priv:hover{background:rgba(var(--nous-acc-rgb),.12)}' +
+			'#nous-ini-priv.on{background:rgba(var(--nous-acc-rgb),.2);border-color:var(--nous-acc)}' +
 			'#nous-ini-priv svg{width:14px;height:14px}' +
 			'@media (max-width:640px){#nous-ini h2{font-size:23px}#nous-ini .nous-ini-sub{font-size:13.5px}}';
 		document.head.appendChild(st);

@@ -25,7 +25,7 @@
 
 	function injectStyle() {
 		if (document.getElementById('nous-cp-style')) return;
-		var g = 'rgba(200,150,46,';
+		var g = 'rgba(var(--nous-acc-rgb),';
 		var st = document.createElement('style');
 		st.id = 'nous-cp-style';
 		st.textContent =
@@ -41,7 +41,7 @@
 			'#nous-cp-body{flex:1;overflow:auto;padding:12px 16px 16px;display:flex;flex-direction:column;gap:10px}' +
 			'.nous-cp-chips{display:flex;flex-wrap:wrap;gap:6px}' +
 			'.nous-cp-chip{padding:4px 10px;border:1px solid rgba(var(--nd-tom),.15);border-radius:14px;cursor:pointer;font-size:12px;user-select:none}' +
-			'.nous-cp-chip.on{border-color:#c8962e;background:' + g + '.18);color:var(--nd-texto-ouro)}' +
+			'.nous-cp-chip.on{border-color:var(--nous-acc);background:' + g + '.18);color:var(--nd-texto-ouro)}' +
 			'#nous-cp-q{width:100%;box-sizing:border-box;min-height:62px;padding:8px 10px;background:rgba(var(--nd-tom),.05);' +
 			'border:1px solid ' + g + '.25);border-radius:9px;color:var(--nd-txt);font:inherit;resize:vertical;outline:none}' +
 			'.nous-cp-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:12px}' +
@@ -59,7 +59,7 @@
 			'.nous-cp-tb{width:100%;border-collapse:collapse;font-size:12.5px}' +
 			'.nous-cp-tb th{text-align:left;font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--nd-texto-ouro);padding:6px 8px}' +
 			'.nous-cp-tb td{padding:7px 8px;border-top:1px solid rgba(var(--nd-tom),.07)}' +
-			'.nous-cp-bar{height:6px;border-radius:3px;background:#c8962e;display:inline-block;vertical-align:middle;margin-right:6px}' +
+			'.nous-cp-bar{height:6px;border-radius:3px;background:var(--nous-acc);display:inline-block;vertical-align:middle;margin-right:6px}' +
 			'.nous-cp-dim{color:var(--nd-mut);font-size:12px;line-height:1.6}';
 		document.head.appendChild(st);
 	}
@@ -124,7 +124,7 @@
 				'<textarea id="nous-cp-q" placeholder="A pergunta que todos vao responder. Ex.: Explique juros compostos para uma crianca de 10 anos."></textarea>' +
 				'<div class="nous-cp-row"><button class="nous-cp-btn" id="nous-cp-go" type="button">Comparar</button>' +
 				'<label style="display:flex;gap:6px;align-items:center;cursor:pointer"><input type="checkbox" id="nous-cp-cego"' +
-				(cego ? ' checked' : '') + ' style="accent-color:#c8962e">As cegas (os nomes so\' aparecem depois do voto)</label>' +
+				(cego ? ' checked' : '') + ' style="accent-color:var(--nous-acc)">As cegas (os nomes so\' aparecem depois do voto)</label>' +
 				'<span class="nous-cp-dim" id="nous-cp-msg"></span></div>';
 			box.querySelectorAll('.nous-cp-chip').forEach(function (c) {
 				c.addEventListener('click', function () {

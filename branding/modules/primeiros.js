@@ -91,7 +91,7 @@
 		if (document.getElementById('nous-pp-style')) return;
 		var st = document.createElement('style');
 		st.id = 'nous-pp-style';
-		var g = 'rgba(200,150,46,';
+		var g = 'rgba(var(--nous-acc-rgb),';
 		st.textContent =
 			/* botao "?" : no trilho da esquerda (tela larga) ou abaixo da coruja (estreita) */
 			'#nous-pp-aj{position:fixed;z-index:38;left:7px;bottom:58px;width:30px;height:30px;border-radius:50%;padding:0;cursor:pointer;' +
@@ -142,14 +142,14 @@
 			'#nous-pp-cartoes{width:100%;max-width:660px;margin:12px auto 0;padding:0 8px;box-sizing:border-box;font-family:Inter,system-ui,sans-serif;text-align:center}' +
 			'#nous-pp-cartoes .tit{display:flex;justify-content:center;align-items:baseline;gap:10px;font-size:12.5px;color:#7a7a7a;margin-bottom:8px}' +
 			'.dark #nous-pp-cartoes .tit{color:#8c8c8c}' +
-			'#nous-pp-cartoes .tit button{border:0;background:none;padding:2px 4px;cursor:pointer;font:12px Inter,system-ui,sans-serif;color:#8a6414;text-decoration:underline;text-underline-offset:2px}' +
+			'#nous-pp-cartoes .tit button{border:0;background:none;padding:2px 4px;cursor:pointer;font:12px Inter,system-ui,sans-serif;color:var(--nous-acc-txt);text-decoration:underline;text-underline-offset:2px}' +
 			'.dark #nous-pp-cartoes .tit button{color:var(--nd-texto-ouro)}' +
 			'#nous-pp-cartoes .grade{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}' +
 			'@media (max-width:480px){#nous-pp-cartoes .grade{grid-template-columns:1fr}}' +
 			'.nous-pp-card{display:flex;gap:10px;align-items:flex-start;text-align:left;padding:10px 12px;border-radius:12px;cursor:pointer;color:inherit;' +
 			'border:1px solid ' + g + '.45);background:' + g + '.06);font:inherit;transition:background .15s}' +
-			'.nous-pp-card:hover{background:' + g + '.16)}.nous-pp-card.on{background:' + g + '.22);border-color:#c8962e}' +
-			'.nous-pp-card .ic{font-size:20px;line-height:1.2}.nous-pp-card b{display:block;font-size:13.5px;color:#8a6414}' +
+			'.nous-pp-card:hover{background:' + g + '.16)}.nous-pp-card.on{background:' + g + '.22);border-color:var(--nous-acc)}' +
+			'.nous-pp-card .ic{font-size:20px;line-height:1.2}.nous-pp-card b{display:block;font-size:13.5px;color:var(--nous-acc-txt)}' +
 			'.dark .nous-pp-card b{color:var(--nd-texto-ouro)}.nous-pp-card span.d{display:block;font-size:12px;color:#6b6b6b}.dark .nous-pp-card span.d{color:#9a9a9a}' +
 			'#nous-pp-cartoes.escolheu .grade,#nous-pp-cartoes.escolheu .tit{display:none}' +
 			'body.nous-pp-cartoes #nous-ini .nous-ini-dica,body.nous-pp-cartoes .nous-pp-sug{display:none!important}' +

@@ -19,13 +19,13 @@
 
 	function injectStyle() {
 		if (document.getElementById('nous-cel-style')) return;
-		var g = 'rgba(200,150,46,';
+		var g = 'rgba(var(--nous-acc-rgb),';
 		var st = document.createElement('style');
 		st.id = 'nous-cel-style';
 		st.textContent =
 			'.nous-cel-cod{font:700 26px ui-monospace,Consolas,monospace;letter-spacing:.14em;color:var(--nd-texto-ouro)}' +
 			'#nous-cel-open{width:100%;margin-top:5px;padding:6px;border:1px solid ' + g + '.25);border-radius:8px;cursor:pointer;' +
-			'background:transparent;color:#e7c069;font-weight:600;font-size:12px}#nous-cel-open:hover{background:' + g + '.12)}';
+			'background:transparent;color:var(--nous-acc-txt);font-weight:600;font-size:12px}#nous-cel-open:hover{background:' + g + '.12)}';
 		document.head.appendChild(st);
 	}
 

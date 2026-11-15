@@ -25,19 +25,19 @@
 	/* ---------------------------------------------------------- estilo */
 	function injectStyle() {
 		if (document.getElementById('nous-ed-style')) return;
-		var g = 'rgba(200,150,46,';
+		var g = 'rgba(var(--nous-acc-rgb),';
 		var css =
 			'#nous-editor-open{width:100%;margin-top:5px;padding:6px;border:1px solid ' + g + '.25);border-radius:8px;' +
-			'cursor:pointer;background:transparent;color:#e7c069;font-weight:600;font-size:12px}' +
+			'cursor:pointer;background:transparent;color:var(--nous-acc-txt);font-weight:600;font-size:12px}' +
 			'#nous-editor-open:hover{background:' + g + '.12)}' +
 			'#nous-ed-ov{position:fixed;inset:0;z-index:10003;background:rgba(8,8,10,.92);display:flex;flex-direction:column;' +
 			'font-family:Inter,system-ui,sans-serif;font-size:12px;color:#eee}' +
 			'#nous-ed-ov.nous-hidden{display:none}' +
 			'#nous-ed-top{display:flex;align-items:center;gap:6px;padding:10px 14px;border-bottom:1px solid ' + g + '.2);flex-wrap:wrap}' +
-			'#nous-ed-top .t{font-weight:700;font-size:14px;color:#e7c069;margin-right:10px}' +
+			'#nous-ed-top .t{font-weight:700;font-size:14px;color:var(--nous-acc-txt);margin-right:10px}' +
 			'#nous-ed-top .sp{flex:1}' +
 			'.nous-ed-b{padding:6px 10px;border:1px solid ' + g + '.35);border-radius:8px;background:rgba(255,255,255,.04);' +
-			'color:#e7c069;cursor:pointer;font-weight:600;font-size:12px;white-space:nowrap}' +
+			'color:var(--nous-acc-txt);cursor:pointer;font-weight:600;font-size:12px;white-space:nowrap}' +
 			'.nous-ed-b:hover:not(:disabled){background:' + g + '.2)}.nous-ed-b:disabled{opacity:.35;cursor:default}' +
 			'.nous-ed-b.on{background:' + g + '.3)}.nous-ed-b.main{background:' + g + '.22)}' +
 			'#nous-ed-mid{flex:1;display:flex;min-height:0}' +
@@ -50,16 +50,16 @@
 			'#nous-ed-drop{position:absolute;inset:16px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;' +
 			'border:2px dashed ' + g + '.35);border-radius:16px;font-size:14px;opacity:.85;text-align:center;line-height:1.6}' +
 			'#nous-ed-side{width:250px;border-left:1px solid ' + g + '.2);padding:12px 14px;overflow-y:auto}' +
-			'#nous-ed-side h4{margin:14px 0 6px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#c8962e}' +
+			'#nous-ed-side h4{margin:14px 0 6px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--nous-acc-txt)}' +
 			'#nous-ed-side h4:first-child{margin-top:0}' +
 			'#nous-ed-side label{display:block;font-size:11px;opacity:.75;margin-top:6px}' +
-			'#nous-ed-side input[type=range]{width:100%;accent-color:#c8962e}' +
+			'#nous-ed-side input[type=range]{width:100%;accent-color:var(--nous-acc)}' +
 			'#nous-ed-side select,#nous-ed-side input[type=number]{width:100%;box-sizing:border-box;padding:5px 7px;margin-top:3px;' +
 			'background:rgba(255,255,255,.07);border:1px solid ' + g + '.28);border-radius:7px;color:#eee;font-size:12px;color-scheme:dark}' +
 			'.nous-ed-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px}' +
 			'#nous-ed-msg{font-size:11px;min-height:16px;margin-top:8px;opacity:.85}' +
 			'#nous-ed-chip{position:fixed;z-index:9990;padding:4px 9px;border-radius:8px;border:1px solid ' + g + '.6);' +
-			'background:rgba(18,18,22,.9);color:#e7c069;font:600 11px Inter,system-ui,sans-serif;cursor:pointer;display:none}' +
+			'background:rgba(18,18,22,.9);color:var(--nous-acc-txt);font:600 11px Inter,system-ui,sans-serif;cursor:pointer;display:none}' +
 			'@media (max-width:760px){#nous-ed-mid{flex-direction:column}#nous-ed-side{width:auto;border-left:0;' +
 			'border-top:1px solid ' + g + '.2);max-height:40vh}}';
 		var st = document.createElement('style');
@@ -90,7 +90,7 @@
 			'<div id="nous-ed-side">' +
 			'<h4>Diga o que fazer</h4>' +
 			'<input id="nous-ed-say" placeholder="ex.: tira o fundo e deixa mais claro" ' +
-			'style="width:100%;box-sizing:border-box;padding:6px 8px;background:rgba(255,255,255,.07);border:1px solid rgba(200,150,46,.28);' +
+			'style="width:100%;box-sizing:border-box;padding:6px 8px;background:rgba(255,255,255,.07);border:1px solid rgba(var(--nous-acc-rgb),.28);' +
 			'border-radius:7px;color:#eee;font-size:12px;outline:none">' +
 			'<button class="nous-ed-b" data-a="say" style="width:100%;margin-top:5px">Fazer</button>' +
 			'<h4>Recortar e girar</h4>' +
@@ -297,7 +297,8 @@
 			vctx.rect(0, 0, base.width, base.height);
 			vctx.rect(crop.x, crop.y + crop.h, crop.w, -crop.h);
 			vctx.fill('evenodd');
-			vctx.strokeStyle = '#e7c069';
+			/* canvas nao entende var(): le' a cor da paleta na hora */
+			vctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--nous-acc-txt').trim() || '#ffffff';
 			vctx.lineWidth = lw;
 			vctx.strokeRect(crop.x, crop.y, crop.w, crop.h);
 			vctx.restore();

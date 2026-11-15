@@ -38,7 +38,7 @@
 			'## Pauta\n\n1. [Item]\n\n## Decisoes\n\n- [Decisao]\n\n## Proximos passos\n\n- [Tarefa] — [responsavel], ate [data]']
 	};
 
-	var g = 'rgba(200,150,46,';
+	var g = 'rgba(var(--nous-acc-rgb),';
 
 	function injectStyle() {
 		if (document.getElementById('nous-dc-style')) return;
@@ -143,11 +143,11 @@
 			'#nous-dc-askrow{display:flex;gap:6px;flex-wrap:wrap}' +
 			'#nous-dc-ask,#nous-dc-model{box-sizing:border-box;padding:7px 10px;background:rgba(var(--nd-tom),.07);border:1px solid ' + g + '.28);' +
 			'border-radius:8px;color:var(--nd-txt);font-size:12px;outline:none;color-scheme:var(--nd-esquema)}#nous-dc-ask{flex:1 1 220px;min-width:0}' +
-			'#nous-dc-ask:focus{border-color:#c8962e}#nous-dc-model{max-width:150px}' +
+			'#nous-dc-ask:focus{border-color:var(--nous-acc)}#nous-dc-model{max-width:150px}' +
 			'#nous-dc-hint{font-size:11px;color:var(--nd-mut);margin-top:5px}' +
 			'#nous-dc-view h1,#nous-dc-view h2,#nous-dc-view h3{color:var(--nd-texto-ouro);margin:.6em 0 .3em}#nous-dc-view p{margin:.5em 0}' +
 			'#nous-dc-view h1{font-family:Cinzel,Georgia,serif;letter-spacing:.03em}' +
-			'#nous-dc-view blockquote{border-left:3px solid #c8962e;margin:.5em 0;padding-left:10px;opacity:.85}' +
+			'#nous-dc-view blockquote{border-left:3px solid var(--nous-acc);margin:.5em 0;padding-left:10px;opacity:.85}' +
 			'#nous-dc-view a{color:var(--nd-azul)}#nous-dc-view code{background:rgba(var(--nd-tom),.08);padding:1px 4px;border-radius:4px}' +
 			'.nous-dc-pop{position:absolute;z-index:4;background:var(--nd-bg);border:1px solid ' + g + '.4);border-radius:10px;' +
 			'padding:6px;box-shadow:0 8px 24px var(--nd-sombra);min-width:200px;max-width:340px;max-height:50vh;overflow-y:auto}' +

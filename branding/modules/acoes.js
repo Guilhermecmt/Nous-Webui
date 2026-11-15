@@ -58,14 +58,14 @@
 
 	function injectStyle() {
 		if (document.getElementById('nous-act-style')) return;
-		var g = 'rgba(200,150,46,';
+		var g = 'rgba(var(--nous-acc-rgb),';
 		var st = document.createElement('style');
 		st.id = 'nous-act-style';
 		st.textContent =
 			'.nous-act-row{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 4px}' +
 			'.nous-act-btn{padding:6px 12px;border:1px solid ' + g + '.5);border-radius:99px;cursor:pointer;' +
-			'background:' + g + '.12);color:#c8962e;font:600 12px Inter,system-ui,sans-serif;text-align:left;max-width:100%}' +
-			'.dark .nous-act-btn{color:#e7c069}.nous-act-btn:hover{background:' + g + '.26)}' +
+			'background:' + g + '.12);color:var(--nous-acc-txt);font:600 12px Inter,system-ui,sans-serif;text-align:left;max-width:100%}' +
+			'.dark .nous-act-btn{color:var(--nous-acc-txt)}.nous-act-btn:hover{background:' + g + '.26)}' +
 			'.nous-act-btn:disabled{opacity:.45;cursor:default}';
 		document.head.appendChild(st);
 	}

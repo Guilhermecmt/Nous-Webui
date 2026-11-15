@@ -26,14 +26,14 @@
 
 	function injectStyle() {
 		if (document.getElementById('nous-msg-style')) return;
-		var g = 'rgba(200,150,46,';
+		var g = 'rgba(var(--nous-acc-rgb),';
 		var st = document.createElement('style');
 		st.id = 'nous-msg-style';
 		st.textContent =
 			'.nous-msg-ol{margin:0 0 10px 18px;padding:0}.nous-msg-ol li{margin:0 0 4px}' +
 			'.nous-msg-chk{display:flex;gap:8px;align-items:flex-start;margin:8px 0}.nous-msg-chk input{margin-top:3px}' +
 			'#nous-msg-open{width:100%;margin-top:5px;padding:6px;border:1px solid ' + g + '.25);border-radius:8px;cursor:pointer;' +
-			'background:transparent;color:#e7c069;font-weight:600;font-size:12px}#nous-msg-open:hover{background:' + g + '.12)}';
+			'background:transparent;color:var(--nous-acc-txt);font-weight:600;font-size:12px}#nous-msg-open:hover{background:' + g + '.12)}';
 		document.head.appendChild(st);
 	}
 

@@ -17,7 +17,7 @@
 (function () {
 	'use strict';
 
-	var g = 'rgba(200,150,46,';
+	var g = 'rgba(var(--nous-acc-rgb),';
 
 	function injectStyle() {
 		if (document.getElementById('nous-base-style')) return;
@@ -26,13 +26,16 @@
 		st.textContent =
 			/* cores: as da paleta escolhida (--nous-*, nous-paletas.css; ver NousPaleta no
 			 * nous-loader.js). --nd-texto-ouro e' a cor da paleta que se le' em cima do
-			 * fundo. --nd-tom e' a cor do texto, para os tons translucidos. So' o que nao
-			 * depende da paleta (azul de informacao, campo, veu, sombra) muda no .dark. */
+			 * fundo. --nd-tom e' a cor do texto, para os tons translucidos.
+			 * No claro, o texto miudo (apagado, ouro, perigo, ok) e' um tom mais forte que o
+			 * da paleta: aqui ele fica em cima de fundo tingido (etiquetas, botoes). */
 			':root{--nd-bg:var(--nous-bg);--nd-alto:var(--nous-alto);--nd-linha:var(--nous-linha);' +
-			'--nd-ouro:var(--nous-acc);--nd-texto-ouro:var(--nous-acc-txt);--nd-txt:var(--nous-txt);' +
-			'--nd-mut:var(--nous-mut);--nd-perigo:var(--nous-perigo);--nd-ok:var(--nous-ok);--nd-azul:#35589c;--nd-campo:#fff;' +
+			'--nd-ouro:var(--nous-acc);--nd-texto-ouro:color-mix(in srgb,var(--nous-acc-txt) 80%,var(--nous-txt));--nd-txt:var(--nous-txt);' +
+			'--nd-mut:color-mix(in srgb,var(--nous-mut) 78%,var(--nous-txt));--nd-perigo:color-mix(in srgb,var(--nous-perigo) 82%,#000);' +
+			'--nd-ok:color-mix(in srgb,var(--nous-ok) 85%,#000);--nd-azul:#35589c;--nd-campo:#fff;' +
 			'--nd-tom:var(--nous-txt-rgb);--nd-esquema:light;--nd-veu:rgba(40,30,10,.38);--nd-sombra:rgba(60,45,15,.28)}' +
-			'.dark{--nd-azul:#9db8ee;--nd-campo:rgba(0,0,0,.3);--nd-esquema:dark;--nd-veu:rgba(0,0,0,.55);--nd-sombra:rgba(0,0,0,.55)}' +
+			'.dark{--nd-texto-ouro:var(--nous-acc-txt);--nd-mut:var(--nous-mut);--nd-perigo:var(--nous-perigo);--nd-ok:var(--nous-ok);' +
+			'--nd-azul:#9db8ee;--nd-campo:rgba(0,0,0,.3);--nd-esquema:dark;--nd-veu:rgba(0,0,0,.55);--nd-sombra:rgba(0,0,0,.55)}' +
 
 			'#nous-toasts{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);z-index:10050;display:flex;' +
 			'flex-direction:column;gap:8px;align-items:center;pointer-events:none;max-width:92vw}' +

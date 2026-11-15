@@ -15,7 +15,7 @@
 
 	function injectStyle() {
 		if (document.getElementById('nous-rp-style')) return;
-		var g = 'rgba(200,150,46,';
+		var g = 'rgba(var(--nous-acc-rgb),';
 		var css =
 			'#nous-reports-open{width:100%;margin-top:5px;padding:6px;border:1px solid ' + g + '.25);' +
 			'border-radius:8px;cursor:pointer;background:transparent;color:var(--nd-texto-ouro);font-weight:600;font-size:12px}' +

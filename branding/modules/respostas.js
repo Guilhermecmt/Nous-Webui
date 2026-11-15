@@ -24,8 +24,8 @@
 			'.nous-rw{display:inline-flex;flex-wrap:wrap;gap:2px;align-self:center;margin-left:4px;min-width:0;transition:opacity .15s}' +
 			'.nous-rw.nous-rw-hover{opacity:0}[id^="message-"]:hover .nous-rw.nous-rw-hover{opacity:1}' +
 			'.nous-rw button{padding:3px 7px;border:none;border-radius:8px;background:none;cursor:pointer;' +
-			'font:500 11.5px Inter,system-ui,sans-serif;color:#8a6414;white-space:nowrap}' +
-			'.dark .nous-rw button{color:#c8962e}.nous-rw button:hover{background:rgba(200,150,46,.14)}' +
+			'font:500 11.5px Inter,system-ui,sans-serif;color:var(--nous-acc-txt);white-space:nowrap}' +
+			'.dark .nous-rw button{color:var(--nous-acc-txt)}.nous-rw button:hover{background:rgba(var(--nous-acc-rgb),.14)}' +
 			/* celular: so' o icone (o texto fica no title); sem isto a fileira alargava a pagina */
 			'@media (max-width:640px){.nous-rw .nous-rw-t{display:none}.nous-rw button{padding:3px 6px;font-size:14px}}';
 		document.head.appendChild(st);

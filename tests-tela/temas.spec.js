@@ -38,10 +38,25 @@ async function conferir(page, p, tema) {
   expect(c.filter((x) => x.razao < MINIMO)).toEqual([]);
 }
 
-for (const tema of TEMAS) {
+/* Alem da Ouro, uma paleta clara de botao claro (Ceu) e uma escura tingida
+ * (Maracuja): os paineis seguem a paleta e o contraste continua >= 4,5. */
+const PALETAS = [
+  { id: 'ouro' },
+  { id: 'ceu', fundo: { claro: 'rgb(246, 249, 253)', escuro: 'rgb(15, 21, 32)' } },
+  { id: 'maracuja', fundo: { claro: 'rgb(255, 250, 241)', escuro: 'rgb(23, 17, 26)' } },
+];
+const COMBINACOES = [];
+for (const pal of PALETAS) {
+  for (const t of TEMAS) {
+    COMBINACOES.push(pal.id === 'ouro' ? Object.assign({ paleta: 'ouro' }, t)
+      : Object.assign({}, t, { paleta: pal.id, nome: t.nome + '-' + pal.id, fundo: pal.fundo[t.nome] }));
+  }
+}
+
+for (const tema of COMBINACOES) {
   for (const p of DIALOGOS) {
     test(p.nome + ' no tema ' + tema.nome + ': cor, Esc e foco', async ({ page }) => {
-      await entrar(page, tema, {});
+      await entrar(page, tema, { paleta: tema.paleta });
       await page.locator('#nous-pn [data-abre="' + p.botao + '"]').click();
       await conferir(page, p, tema);
       await expect(page.locator(p.caixa)).toHaveAttribute('role', 'dialog');
@@ -60,7 +75,7 @@ for (const tema of TEMAS) {
 
   for (const p of PAINEIS) {
     test(p.nome + ' no tema ' + tema.nome + ': cor', async ({ page }) => {
-      await entrar(page, tema, {});
+      await entrar(page, tema, { paleta: tema.paleta });
       if (p.botao) await page.locator('#nous-pn [data-abre="' + p.botao + '"]').click();
       else await page.evaluate(p.abre);
       await conferir(page, p, tema);
@@ -68,7 +83,7 @@ for (const tema of TEMAS) {
   }
 
   test('dica do passeio no tema ' + tema.nome + ': cor', async ({ page }) => {
-    await entrar(page, tema, {});
+    await entrar(page, tema, { paleta: tema.paleta });
     await expect(page.locator('#chat-input')).toBeAttached();
     const rodou = await page.evaluate(() => window.NousTour.run('home'));
     expect(rodou).toBe(true);
@@ -76,7 +91,7 @@ for (const tema of TEMAS) {
   });
 
   test('assistente de primeiro uso no tema ' + tema.nome + ': cor', async ({ page }) => {
-    await entrar(page, tema, { instalados: [] }, undefined, true);
+    await entrar(page, tema, { instalados: [], paleta: tema.paleta }, undefined, true);
     await expect(page.locator('#nous-wiz-box')).toBeVisible({ timeout: 20000 });
     await conferir(page, { nome: 'assistente', caixa: '#nous-wiz-box', espera: 'button' }, tema);
   });

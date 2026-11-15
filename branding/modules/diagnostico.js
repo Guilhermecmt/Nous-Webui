@@ -14,7 +14,7 @@
 
 	function injectStyle() {
 		if (document.getElementById('nous-dg-style')) return;
-		var g = 'rgba(200,150,46,';
+		var g = 'rgba(var(--nous-acc-rgb),';
 		var st = document.createElement('style');
 		st.id = 'nous-dg-style';
 		st.textContent =
@@ -31,7 +31,7 @@
 			'.nous-dg-btn{padding:6px 12px;border:1px solid ' + g + '.45);border-radius:8px;cursor:pointer;background:' + g + '.18);' +
 			'color:var(--nd-texto-ouro);font-weight:600;font-size:12px;margin:4px 6px 0 0}' +
 			'.nous-dg-lbl{display:flex;gap:7px;align-items:center;font-size:12px;margin:5px 0;cursor:pointer}' +
-			'.nous-dg-lbl input{accent-color:#c8962e}';
+			'.nous-dg-lbl input{accent-color:var(--nous-acc)}';
 		document.head.appendChild(st);
 	}
 

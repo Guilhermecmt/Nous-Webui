@@ -32,7 +32,7 @@
 
 	function injectStyle() {
 		if (document.getElementById('nous-sk-style')) return;
-		var g = 'rgba(200,150,46,';
+		var g = 'rgba(var(--nous-acc-rgb),';
 		var css =
 			'#nous-skills-open{width:100%;margin-top:5px;padding:6px;border:1px solid ' + g + '.25);' +
 			'border-radius:8px;cursor:pointer;background:transparent;color:var(--nd-texto-ouro);font-weight:600;font-size:12px}' +
@@ -188,7 +188,7 @@
 		b.innerHTML = '<div class="nous-sk-hint">Cole o link de um <b>SKILL.md</b> no GitHub (arquivo ou pasta). ' +
 			'O Nous baixa e mostra o conteudo para voce revisar antes de salvar.</div>' +
 			'<div class="nous-sk-row"><input id="nous-sk-u" placeholder="https://github.com/.../SKILL.md" ' +
-			'style="box-sizing:border-box;padding:7px 9px;background:rgba(var(--nd-tom),.07);border:1px solid rgba(200,150,46,.28);' +
+			'style="box-sizing:border-box;padding:7px 9px;background:rgba(var(--nd-tom),.07);border:1px solid rgba(var(--nous-acc-rgb),.28);' +
 			'border-radius:8px;color:var(--nd-txt);font-size:12px;outline:none">' +
 			'<button class="nous-sk-btn" id="nous-sk-get" type="button">Baixar</button></div>' +
 			'<button class="nous-sk-btn ghost" id="nous-sk-back" type="button">Voltar</button>' +

@@ -56,7 +56,7 @@
 	/* ---------------------------------------------------------- estilo */
 	function injectStyle() {
 		if (document.getElementById('nous-em-style')) return;
-		var g = 'rgba(200,150,46,';
+		var g = 'rgba(var(--nous-acc-rgb),';
 		var css =
 			'#nous-em{width:600px;max-width:95vw;height:84vh;display:flex;flex-direction:column;font-family:Inter,system-ui,sans-serif;' +
 			'font-size:13px;color:var(--nd-txt);background:var(--nd-bg);border:1px solid ' + g + '.4);border-radius:16px;' +
@@ -66,8 +66,8 @@
 			'#nous-em-acc{background:rgba(var(--nd-tom),.07);border:1px solid ' + g + '.3);border-radius:7px;color:var(--nd-txt);font-size:11px;padding:3px 6px;color-scheme:var(--nd-esquema)}' +
 			'#nous-em-tabs{display:flex;gap:2px;padding:0 12px;border-bottom:1px solid ' + g + '.15);flex-wrap:wrap}' +
 			'.nous-em-tab{background:none;border:none;border-bottom:2px solid transparent;color:var(--nd-mut);padding:8px 9px;cursor:pointer;font-size:12px;font-weight:600}' +
-			'.nous-em-tab.on{color:var(--nd-texto-ouro);border-bottom-color:#c8962e}' +
-			'.nous-em-badge{display:inline-block;min-width:16px;padding:0 4px;margin-left:4px;border-radius:8px;background:#c8962e;color:#111;font-size:10px}' +
+			'.nous-em-tab.on{color:var(--nd-texto-ouro);border-bottom-color:var(--nous-acc)}' +
+			'.nous-em-badge{display:inline-block;min-width:16px;padding:0 4px;margin-left:4px;border-radius:8px;background:var(--nous-acc);color:var(--nous-on-acc);font-size:10px}' +
 			'#nous-em-body{flex:1;overflow-y:auto;padding:12px 16px 16px}' +
 			'.nous-em-row{padding:8px 9px;border-radius:9px;background:rgba(var(--nd-tom),.04);margin-bottom:5px;cursor:pointer}' +
 			'.nous-em-row:hover{background:' + g + '.08)}.nous-em-row.unread .nous-em-subj{font-weight:700}' +
@@ -281,7 +281,7 @@
 					(x.status !== 'enviado' ? '<div style="margin-top:5px"><button class="nous-em-btn" data-send="' + x.id + '" type="button">Enviar</button>' +
 						'<button class="nous-em-btn ghost" data-edit="' + x.id + '" type="button">Editar</button>' +
 						'<input type="datetime-local" data-when="' + x.id + '" value="' + localInput(Date.now() / 1000 + 3600) + '" ' +
-						'style="background:rgba(var(--nd-tom),.07);border:1px solid rgba(200,150,46,.28);border-radius:7px;color:var(--nd-txt);font-size:11px;padding:4px;color-scheme:var(--nd-esquema)">' +
+						'style="background:rgba(var(--nd-tom),.07);border:1px solid rgba(var(--nous-acc-rgb),.28);border-radius:7px;color:var(--nd-txt);font-size:11px;padding:4px;color-scheme:var(--nd-esquema)">' +
 						'<button class="nous-em-btn ghost" data-sched="' + x.id + '" type="button">Agendar</button>' +
 						'<button class="nous-em-btn danger" data-del="' + x.id + '" type="button">Apagar</button></div>' : '') + '</div>';
 			});
