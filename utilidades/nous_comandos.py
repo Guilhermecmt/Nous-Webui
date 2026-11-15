@@ -1,13 +1,15 @@
 """
 title: Nous Comandos
 author: Nous
-version: 0.1.0
+version: 0.2.0
 required_open_webui_version: 0.5.0
 description: >
   Controlar o Nous pelo chat: "abre minha agenda", "mostra meus e-mails",
   "abre o editor de fotos", "tema claro", "libera a memoria da placa de video".
   O filtro reconhece o pedido (sem IA, por palavras) e poe um marcador na
   resposta; o loader do Nous abre o painel ou aplica a acao na hora.
+  Pedidos para fazer algo no computador ("no computador: organiza meus
+  Downloads", "/pc ...") vao para o Nous Code, ja' escritos.
 """
 import re
 import time
@@ -38,6 +40,42 @@ _OPEN = re.compile(
 _TEMA = re.compile(r"\b(?:tema|modo|fundo)\s+(claro|escuro|branco|preto)\b|\b(?:deixa|muda|coloca|p[oõ]e)\b.{0,20}\b(claro|escuro)\b", re.I)
 _LIBERAR = re.compile(r"\b(?:libera|liberar|descarrega|descarregar|para|parar|fecha|fechar)\b.{0,25}"
                       r"\b(?:mem[oó]ria da placa|vram|placa de v[ií]deo|gpu|modelos? carregad|os modelos)\b", re.I)
+
+# Pedido para FAZER algo no computador: o chat nao tem ferramentas (os modelos
+# pequenos nao usam direito), entao o pedido vai para o Nous Code, que tem
+# terminal e arquivos com as permissoes que a pessoa escolheu.
+#  - explicito ("no computador: ...", "/pc ...", "manda pro Nous Code ..."): abre sozinho;
+#  - so' parece ("organiza minha pasta Downloads"): vira um botao, sem abrir nada.
+_TAREFA_EXPLICITA = re.compile(
+    r"^\s*(?:/(?:pc|computador)\b|"
+    r"(?:nous,?\s+)?(?:no|pelo)\s+(?:meu\s+)?(?:computador|pc)\s*[:,\-]|"
+    r"(?:manda|mande|passa|passe|pede|pe[cç]a|envia|envie|leva|leve)\s+(?:isso\s+|isto\s+)?(?:pr[oa]|para\s+o|ao)\s+nous\s+code\s*[:,\-]?|"
+    r"nous\s+code\s*[:,\-])\s*(?P<resto>.*)$", re.I | re.S)
+_ACAO = (r"organiz[ae]r?|arrum[ae]r?|limp[ae]r?|apag[ae]r?|exclu[ia]r?|delet[ae]r?|mov[ae]r?|mova|copi[ae]r?|renomei[ae]|renomear|"
+         r"compact[ae]r?|descompact[ae]r?|extrai[ar]?|instal[ae]r?|desinstal[ae]r?|rod[ae]r?|execut[ae]r?|cri[ae]r?|"
+         r"separ[ae]r?|junt[ae]r?|convert[ae]r?|procur[ae]r? (?:no|em) (?:meu )?(?:computador|pc|disco)")
+_ALVO = (r"pastas?|arquivos?|downloads|documentos|[aá]rea de trabalho|desktop|imagens|fotos|v[ií]deos|m[uú]sicas|"
+         r"disco|hd|ssd|programas?|aplicativos?|apps?|computador|pc|\b[a-z]:\\|\.(?:zip|rar|7z|exe|msi|pdf|docx?|xlsx?|csv|txt|py|ps1|bat)\b")
+_TAREFA_PARECE = re.compile(rf"^\s*(?:por favor,?\s*)?(?:voc[eê] (?:pode|consegue)\s+|d[aá] (?:pra|para) )?(?:{_ACAO})\b.{{0,160}}?(?:{_ALVO})", re.I | re.S)
+
+
+def detectar_tarefa(msg):
+    """("auto"|"botao", texto do pedido) para o Nous Code, ou None."""
+    msg = (msg or "").strip()
+    if not msg or len(msg) > 4000:
+        return None
+    m = _TAREFA_EXPLICITA.match(msg)
+    if m:
+        resto = (m.group("resto") or "").strip()
+        return ("auto", resto) if len(resto) >= 3 else None
+    if _TAREFA_PARECE.search(msg):
+        return "botao", msg
+    return None
+
+
+def marcador_tarefa(modo, texto):
+    # em hexadecimal: o Markdown nao mexe (nem _ nem * nem quebras de linha)
+    return f"⟦tarefa:{modo}:{texto.encode('utf-8').hex()}⟧"
 
 
 def _text(m):
@@ -84,12 +122,27 @@ class Filter:
         uid = (__user__ or {}).get("id")
         messages = body.get("messages", [])
         last = next((m for m in reversed(messages) if m.get("role") == "user"), None)
-        hit = detectar(_text(last) if last else "")
-        if not uid or not hit:
+        pedido = _text(last) if last else ""
+        hit = detectar(pedido)
+        tarefa = None if hit else detectar_tarefa(pedido)
+        if not uid or not (hit or tarefa):
             return body
-        self._pending[uid] = (time.time(), hit[0])
-        text = (f"[Nous Comandos] O usuario pediu para {hit[1]}. O Nous faz isso sozinho assim que "
-                "voce responder. Responda SO' uma frase curta confirmando (ex.: \"Pronto, abrindo.\").")
+        if hit:
+            self._pending[uid] = (time.time(), hit[0])
+            text = (f"[Nous Comandos] O usuario pediu para {hit[1]}. O Nous faz isso sozinho assim que "
+                    "voce responder. Responda SO' uma frase curta confirmando (ex.: \"Pronto, abrindo.\").")
+        elif tarefa[0] == "auto":
+            self._pending[uid] = (time.time(), marcador_tarefa(*tarefa))
+            text = ("[Nous Comandos] O usuario pediu para fazer algo no computador. Quem faz e' o Nous Code "
+                    "(o agente com terminal e arquivos), que o Nous abre agora com o pedido ja' escrito. "
+                    "Voce NAO executa nada e NAO diz que fez. Responda SO' uma frase curta, por exemplo: "
+                    "\"Abrindo o Nous Code com o seu pedido: confira as permissoes e aperte Enter.\"")
+        else:
+            self._pending[uid] = (time.time(), marcador_tarefa(*tarefa))
+            text = ("[Nous Comandos] Este pedido parece ser para mexer no computador (arquivos, pastas, programas). "
+                    "Voce, no chat, nao tem acesso ao computador: nao diga que fez nada nem invente o resultado. "
+                    "Responda normalmente, ajudando no que der por texto, e termine dizendo em uma frase que o botao "
+                    "abaixo leva o pedido ao Nous Code, que consegue fazer isso no computador.")
         if messages and messages[0].get("role") == "system":
             base = (messages[0].get("content") or "").rstrip()
             messages[0]["content"] = (base + "\n\n" + text) if base else text

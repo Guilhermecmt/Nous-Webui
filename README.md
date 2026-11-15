@@ -246,7 +246,7 @@ Reports are kept in the panel, download as PDF or Word, and the conversation can
 - **Updates with notice.** Checking for a new version is a trip to the internet, at most once a day, and can be turned off from the tray icon. Nothing is downloaded without your click.
 - **No login, by choice.** Since nobody outside can reach Nous, your Windows password is what protects the data. To require a login anyway, create an empty file `NousData\.exigir_login`.
 - **Nothing leaves unless you ask.** Web search, NVIDIA cloud and email are optional, and your personal memory is never sent to cloud models.
-- **An agent under control.** Nous Code only touches the chosen project folder. Changes and commands ask for approval, internet access asks once per conversation, and everything it changes can be undone.
+- **An agent under control, as far as you allow.** By default Nous Code only touches the chosen project folder. You can open up your user folder or the whole computer (like Codex or Claude Code); in Full access you take responsibility. Changes and commands ask for approval (outside the project, always, except in Full access), internet access asks once per conversation, and everything it changes can be undone. Requests typed in the chat ("no computador: ...", "/pc ...") open Nous Code with the request already written.
 
 ## Troubleshooting
 

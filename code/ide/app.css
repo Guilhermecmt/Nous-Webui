@@ -224,6 +224,11 @@ input, textarea, select { font: inherit; color: var(--txt); }
 #nc-dialogo input { width: 100%; background: var(--noite); border: 1px solid var(--linha2); border-radius: 6px; padding: 7px 10px; outline: 0; }
 #nc-dialogo input:focus { border-color: var(--ouro); }
 #nc-dialogo .bt { display: flex; justify-content: flex-end; gap: 8px; margin-top: 13px; }
+.nc-padrao label { display: flex; align-items: center; justify-content: space-between; gap: 13px; margin: 0 0 10px; font-size: 13px; }
+.nc-padrao select { min-width: 210px; background: var(--noite); color: var(--txt); border: 1px solid var(--linha2); border-radius: 6px; padding: 5px 8px; }
+.nc-padrao .nc-nota { font-size: 12px; color: var(--mut); line-height: 1.5; }
+#nc-ag-opcoes select.risco { color: var(--vermelho); }
+.nc-pede .t em.fora { font-style: normal; font-weight: 500; font-size: 11px; color: var(--vermelho); border: 1px solid currentColor; border-radius: 99px; padding: 0 7px; margin-left: 6px; }
 
 #nc-toast { position: fixed; left: 50%; bottom: 40px; transform: translateX(-50%); z-index: 80; padding: 8px 15px; border-radius: 8px; background: var(--alto2); border: 1px solid var(--linha2); box-shadow: 0 8px 21px rgba(0, 0, 0, .4); }
 #nc-toast.erro { border-color: #c0573f; color: #e9a898; }

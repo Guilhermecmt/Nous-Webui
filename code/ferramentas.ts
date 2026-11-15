@@ -1,5 +1,6 @@
 // As ferramentas do agente: esquemas que o modelo ve e a implementacao das de
-// arquivo (ler, escrever, editar, procurar). Tudo preso na pasta do projeto:
+// arquivo (ler, escrever, editar, procurar). Presas na pasta do projeto, a nao
+// ser que a conversa tenha alcance maior (ver Alcance, mais abaixo); fora dele:
 // caminho que sai dela e' recusado (so' a leitura alcanca tambem os arquivos
 // de saida completa que o proprio Nous Code guarda).
 //
@@ -14,6 +15,7 @@
 
 import { semelhanca } from './reparo.ts';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 
@@ -54,16 +56,16 @@ const SELETORES: Record<string, Prop> = {
 
 export const ESQUEMAS = [
   ferr('read', 'Read a UTF-8 text file and return line-numbered content.', {
-    file_path: S('Path to read, relative to the project folder.'),
+    file_path: S('Path to read, relative to the project folder (an absolute path works where the current file policy allows it).'),
     offset: N('1-based first line to return. Defaults to 1.'),
     limit: N(`Maximum number of lines to return. Defaults to ${READ_LIMIT}.`),
   }, ['file_path']),
   ferr('write', 'Create or fully replace a UTF-8 text file.', {
-    file_path: S('Path to write, relative to the project folder. Provide `file_path` before `content` in the arguments.'),
+    file_path: S('Path to write, relative to the project folder (an absolute path works where the current file policy allows it). Provide `file_path` before `content` in the arguments.'),
     content: S('Full UTF-8 text content to write.'),
   }, ['file_path', 'content']),
   ferr('edit', 'Edit an existing UTF-8 text file by replacing literal text.', {
-    file_path: S('Path to edit, relative to the project folder. Provide `file_path` before `old_string` and `new_string` in the arguments.'),
+    file_path: S('Path to edit, relative to the project folder (an absolute path works where the current file policy allows it). Provide `file_path` before `old_string` and `new_string` in the arguments.'),
     old_string: S('Literal text to replace.'),
     new_string: S('Literal replacement text. Use an empty string to delete the match.'),
     replace_all: B('Replace all matches. Defaults to false; when false, old_string must appear exactly once.'),
@@ -243,15 +245,30 @@ export function configurar(dirSpill: string, outros: string[] = []) {
 
 const dentro = (base: string, abs: string) => { const r = path.relative(base, abs); return !r.startsWith('..') && !path.isAbsolute(r); };
 
+/* Ate' onde as ferramentas de arquivo alcancam (a pessoa escolhe, como no Codex):
+ *   projeto     so' a pasta do projeto (o padrao)
+ *   usuario     tambem qualquer pasta dentro de C:\Users\<voce>
+ *   computador  qualquer caminho do computador (o que o Windows deixar o usuario mexer) */
+export type Alcance = 'projeto' | 'usuario' | 'computador';
+export const ALCANCES: Alcance[] = ['projeto', 'usuario', 'computador'];
+export const alcanceValido = (v: unknown): v is Alcance => ALCANCES.includes(v as Alcance);
+export const casa = () => path.resolve(process.env.USERPROFILE || os.homedir());
+
+/* O caminho absoluto fica fora da pasta do projeto? (fora pede OK no modo "editar") */
+export const foraDoProjeto = (raiz: string, abs: string) => !dentro(raiz, abs);
+
 /* Caminho do modelo -> absoluto dentro do projeto (ou, para leitura, dentro
- * das pastas de saida completa do Nous Code). */
-export function resolver(raiz: string, p: unknown, leitura = false): string {
+ * das pastas de saida completa do Nous Code; ou onde o alcance deixar). */
+export function resolver(raiz: string, p: unknown, leitura = false, alcance: Alcance = 'projeto'): string {
   let rel = String(p ?? '.').trim().replace(/^["']|["']$/g, '') || '.';
   if (!(path.isAbsolute(rel) && !/^[\\/]/.test(rel))) rel = rel.replace(/^[\\/]+/, '');
+  if (alcance !== 'projeto' && /^~(?=$|[\\/])/.test(rel)) rel = casa() + rel.slice(1);
   const abs = path.resolve(raiz, rel);
   if (dentro(raiz, abs)) return abs;
   if (leitura && extrasLeitura.some((b) => dentro(b, abs))) return abs;
-  throw new Error('path is outside the project folder: ' + String(p));
+  if (alcance === 'computador') return abs;
+  if (alcance === 'usuario' && dentro(casa(), abs)) return abs;
+  throw new Error((alcance === 'usuario' ? 'path is outside the user folder (' + casa() + '): ' : 'path is outside the project folder: ') + String(p));
 }
 export function relativo(raiz: string, abs: string): string {
   if (!dentro(raiz, abs)) return abs;
@@ -294,10 +311,10 @@ export function paraModelo(t: string, sessao = '', nome = 'resultado'): string {
 
 /* ------------------------------------------------------------ read */
 /* Formato do dsh: <path>/<type>/<content> com "N: texto" e um rodape. */
-export function ler(raiz: string, a: Record<string, unknown>): string {
+export function ler(raiz: string, a: Record<string, unknown>, alcance: Alcance = 'projeto'): string {
   const fp = txt(a.file_path);
   if (!fp || !fp.trim()) throw new Error('file_path must be a non-empty string');
-  const abs = resolver(raiz, fp, true);
+  const abs = resolver(raiz, fp, true, alcance);
   const mostra = relativo(raiz, abs);
   const offset = a.offset === undefined || a.offset === null || a.offset === '' ? 1 : Number(a.offset);
   const limit = a.limit === undefined || a.limit === null || a.limit === '' ? READ_LIMIT : Number(a.limit);
@@ -328,8 +345,8 @@ export function ler(raiz: string, a: Record<string, unknown>): string {
 }
 
 /* ------------------------------------------------------------ list_files (nosso) */
-export function listar(raiz: string, a: Record<string, unknown>): string {
-  const base = resolver(raiz, a.path);
+export function listar(raiz: string, a: Record<string, unknown>, alcance: Alcance = 'projeto'): string {
+  const base = resolver(raiz, a.path, false, alcance);
   const prof = Math.max(1, Math.min(4, Number(a.depth) || 2));
   const linhas: string[] = [];
   let total = 0;
@@ -402,11 +419,11 @@ function arquivosDe(base: string, gitignore?: (rel: string) => boolean, raiz = b
   return out;
 }
 
-export function glob(raiz: string, a: Record<string, unknown>, sessao = ''): string {
+export function glob(raiz: string, a: Record<string, unknown>, sessao = '', alcance: Alcance = 'projeto'): string {
   const pad = String(a.pattern ?? '').trim();
   if (!pad) throw new Error('pattern must be a non-empty string');
   if (a.path !== undefined && a.path !== null && !String(a.path).trim()) throw new Error('path must be a non-empty string when given');
-  const base = resolver(raiz, a.path ?? '.', true);
+  const base = resolver(raiz, a.path ?? '.', true, alcance);
   const re = globParaRegex(pad.includes('/') ? pad.replace(/^\.\//, '') : '**/' + pad);
   const achados = arquivosDe(base).filter((x) => re.test(path.relative(base, x.abs).split(path.sep).join('/')))
     .sort((x, y) => y.mt - x.mt).map((x) => relativo(raiz, x.abs));
@@ -441,14 +458,14 @@ function lerGitignore(raiz: string): ((rel: string) => boolean) | undefined {
   } : undefined;
 }
 
-export function buscar(raiz: string, a: Record<string, unknown>, sessao = ''): string {
+export function buscar(raiz: string, a: Record<string, unknown>, sessao = '', alcance: Alcance = 'projeto'): string {
   const pad = String(a.pattern ?? '');
   if (!pad) throw new Error('pattern must be a non-empty string');
   if (a.path !== undefined && a.path !== null && !String(a.path).trim()) throw new Error('path must be a non-empty string when given');
   const inc = a.include === undefined || a.include === null || a.include === '' ? '' : String(a.include).trim();
   if (inc.startsWith('!')) throw new Error('include must be a positive glob filter; negated patterns ("!…") are not supported');
   if (inc && /,/.test(inc) && !/\{.*,.*\}/.test(inc)) throw new Error('include must be one glob, not a comma-separated list (use {a,b} alternation instead)');
-  const base = resolver(raiz, a.path ?? '.', true);
+  const base = resolver(raiz, a.path ?? '.', true, alcance);
   let re: RegExp;
   const flags = /[A-Z]/.test(pad.replace(/\\[A-Za-z]/g, '')) ? '' : 'i';  // smart case
   try { re = new RegExp(pad, flags); } catch (e) { throw new Error('grep pattern rejected: ' + (e instanceof Error ? e.message : String(e))); }

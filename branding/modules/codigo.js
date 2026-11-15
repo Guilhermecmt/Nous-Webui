@@ -11,10 +11,18 @@
 	var API = window.NousUrl(8998);
 	var UI = window.NousUI || {};
 
-	function open(pasta) {
+	/* tarefa: pedido feito no chat; o Nous Code abre uma conversa nova com ele escrito */
+	function open(pasta, tarefa) {
+		if (window.NousUrl.noCelular) {   /* pelo celular nao existe: ele roda comandos no computador */
+			if (UI.aviso) UI.aviso('O Nous Code só abre no próprio computador, não pelo celular.', 'erro');
+			return;
+		}
+		var corpo = {};
+		if (pasta) corpo.pasta = pasta;
+		if (tarefa) corpo.tarefa = tarefa;
 		fetch(API + '/abrir-janela', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify(pasta ? { pasta: pasta } : {}) })
-			.then(function (r) { if (!r.ok) throw new Error(); if (UI.toast) UI.toast('Abrindo o Nous Code numa janela própria…'); })
+			body: JSON.stringify(corpo) })
+			.then(function (r) { if (!r.ok) throw new Error(); if (UI.toast) UI.toast(tarefa ? 'Abrindo o Nous Code com o seu pedido…' : 'Abrindo o Nous Code numa janela própria…'); })
 			.catch(function () {
 				var msg = 'O Nous Code não está rodando. Ele precisa do Node.js 22.18 ou mais novo: instale com ' +
 					'"winget install OpenJS.NodeJS.LTS" e abra o Nous de novo pelo atalho.';

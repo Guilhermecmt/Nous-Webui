@@ -244,7 +244,7 @@ Os relatórios ficam em **Ferramentas › Pesquisas**, baixam em PDF ou Word e p
 - **Atualização com aviso.** Procurar versão nova é uma ida à internet, no máximo uma vez por dia, e dá para desligar no ícone da bandeja. Nada é baixado sem o seu clique.
 - **Sem login, com escolha.** Como ninguém de fora acessa o Nous, quem protege os dados é a senha do Windows. Para exigir login mesmo assim, crie um arquivo vazio `NousData\.exigir_login`.
 - **Nada sai sem você pedir.** A busca na web, a Nuvem NVIDIA e o e-mail são opcionais. A memória pessoal nunca vai para modelos de nuvem.
-- **Agente sob controle.** O Nous Code só mexe na pasta do projeto escolhido. Mudanças e comandos pedem aprovação, a internet pede permissão por conversa, e tudo o que ele muda pode ser desfeito.
+- **Agente sob controle, no alcance que você escolher.** Por padrão o Nous Code só mexe na pasta do projeto escolhido. Você pode liberar a sua pasta de usuário ou o computador inteiro (como no Codex ou no Claude Code), e no Acesso total a responsabilidade é sua. Mudanças e comandos pedem aprovação (fora do projeto, sempre, a não ser no Acesso total), a internet pede permissão por conversa, e tudo o que ele muda pode ser desfeito. Pedidos feitos no chat ("no computador: organiza meus Downloads", "/pc ...") abrem o Nous Code com o pedido já escrito.
 
 ## Problemas comuns
 

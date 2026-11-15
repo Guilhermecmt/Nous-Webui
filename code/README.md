@@ -12,6 +12,8 @@ Um IDE com agente de IA local, aberto numa janela própria. O agente roda no Oll
 | Agente | Ctrl+L pergunta sobre a seleção. Ele lê, procura, navega pelo código (LSP), edita e roda comandos. Editar e rodar esperam o seu OK com o diff na frente, e "Desfazer" volta os arquivos ao que eram antes da conversa. |
 | Planejar | **Modo plano** (`/plano` ou o botão Planejar): o agente só investiga e chama `exit_plan_mode`. Você aprova ou pede para continuar planejando, com comentário. |
 | Permissões | Somente leitura, Pedir antes de mudar, Editar sem perguntar e Acesso total. A política vale no servidor: o que é negado volta ao modelo como `POLICY_DENIED`. |
+| Alcance | Só o projeto (padrão), Minha pasta de usuário ou Computador inteiro: até onde as ferramentas de arquivo e o `workdir` dos comandos vão. Mudança fora do projeto pede OK em "Pedir antes" e em "Editar sem perguntar"; só o Acesso total não pede. Liberar mais pede confirmação. O padrão das conversas novas (modo e alcance) fica em `NousData\code\ajustes.json` (menu ⋯ › Padrão das conversas novas, ou `/padrao`), e o alcance padrão também decide que pastas podem ser abertas. Tarefa separada fica sempre na cópia. |
+| Pedido do chat | O filtro Nous Comandos manda ao Nous Code os pedidos de fazer algo no computador: "no computador: ...", "/pc ..." e "manda pro Nous Code: ..." abrem sozinhos; frases que só parecem pedido ("organiza minha pasta Downloads") viram um botão. O IDE abre uma conversa nova com o pedido escrito, na pasta do usuário quando o alcance padrão deixa, senão no projeto mais recente; a pessoa confere e envia. |
 | Objetivo | `/objetivo` ou `create_goal`: depois de cada resposta o agente ganha uma nova rodada (`<goal_round>`) até marcar o objetivo como concluído ou bloqueado. São até 20 rodadas, com Pausar e Retomar no painel. |
 | Lembretes | "Me lembre amanhã às 9h de rodar os testes": o agente cria o lembrete (`schedule_create`). Na hora marcada, a conversa roda sozinha; o que precisa de aprovação é recusado, porque não há ninguém na tela. |
 | MCP | Servidores MCP no formato do `.mcp.json` do Claude Code. As ferramentas entram como `mcp__servidor__ferramenta`. |
@@ -92,7 +94,7 @@ O serviço `servidor.ts` roda em `127.0.0.1:8998` e serve também a página do I
 |---|---|
 | `servidor.ts` | HTTP: conversas do agente, cada uma respondida em NDJSON, um evento por linha; lembretes vencidos; permissões do MCP. |
 | `agente.ts` | O laço modelo → ferramenta → modelo, o prompt, o contexto de execução, o objetivo, a compactação, a trava de repetição e o desfazer. |
-| `ferramentas.ts` | Esquemas e implementação das ferramentas de arquivo, todas presas na pasta do projeto; apelidos; saída grande em arquivo. |
+| `ferramentas.ts` | Esquemas e implementação das ferramentas de arquivo, presas no alcance da conversa (projeto, pasta do usuário ou computador); apelidos; saída grande em arquivo. |
 | `jobs.ts` | Comandos como jobs, com a saída inteira num arquivo e aviso quando terminam. |
 | `web.ts` | `web_search` (DuckDuckGo, sem chave) e `web_fetch` (HTML para texto). |
 | `contexto.ts` | Instruções em cadeia e catálogo de skills. |

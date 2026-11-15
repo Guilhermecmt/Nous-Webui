@@ -43,6 +43,7 @@ export type Objetivo = {
 
 export type Sessao = {
   id: string; titulo: string; pasta: string; modelo: string; modo: Modo;
+  alcance: F.Alcance;             // ate' onde as ferramentas de arquivo e o workdir dos comandos vao
   criado: number; atualizado: number;
   mensagens: Mensagem[];          // o que o modelo ve
   eventos: Evento[];              // o que o painel mostra
@@ -90,6 +91,8 @@ export function normalizar(s: Partial<Sessao> & { id: string; pasta: string }): 
     originais: {}, sempre: [], planejando: false, tarefas: [], objetivo: null, lidos: {}, pastasInstr: [], internet: null,
     raciocinio: 'auto', tokens: 0, sistema: '', versaoPrompt: 0, tituloAuto: true, turnos: 0, ultimoContexto: '', ultimaHora: 0,
     catalogo: '', instrEnviadas: false, planoInformado: null, mcpAvisado: '', ...s, modo,
+    // tarefa separada trabalha numa copia: nunca sai dela
+    alcance: !s.isolada && F.alcanceValido(s.alcance) ? s.alcance : 'projeto',
   } as Sessao;
   // objetivo da versao 0.2 ({texto, estado, notas})
   const o = n.objetivo as unknown as Record<string, unknown> | null;
@@ -167,11 +170,18 @@ When ready, call exit_plan_mode with the complete plan markdown, starting with a
  * instrucoes dos servidores MCP. Vai como mensagem quando muda. */
 export function contextoExecucao(s: Sessao, mcpInstr = ''): string {
   const pasta = JSON.stringify(s.pasta);
+  const onde = {
+    projeto: `under the project folder: ${pasta}`,
+    usuario: `under the project folder ${pasta} and anywhere under the user's folder ${JSON.stringify(F.casa())} (outside the project use absolute Windows paths, or ~ for the user's folder)`,
+    computador: `anywhere on this computer the Windows user can access (outside the project folder ${pasta} use absolute Windows paths, or ~ for the user's folder ${JSON.stringify(F.casa())})`,
+  }[s.alcance];
+  const tambem = s.alcance === 'projeto' ? '' : ` Read tools reach the same places (${s.alcance === 'usuario' ? "the user's folder" : 'the whole computer'}).`;
+  const tipo = s.alcance === 'projeto' ? 'workspace-write' : s.alcance === 'usuario' ? 'user-folder-write' : 'full-access';
   const politica = {
-    leitura: 'Current Nous Code file policy: read-only. Tools that change files, run commands or call MCP tools that are not read-only are refused in this conversation. Explain what you would change instead.',
-    perguntar: `Current Nous Code file policy: workspace-write. File tools may modify files under the project folder: ${pasta}. Approval policy: ask. Each file change, command and MCP tool call waits for the user's approval; a rejected action stays rejected, so stop and explain instead of working around it.`,
-    editar: `Current Nous Code file policy: workspace-write. File tools may modify files under the project folder: ${pasta}. Approval policy: file changes are applied without asking; commands and MCP tool calls wait for the user's approval.`,
-    total: `Current Nous Code file policy: workspace-write. File tools may modify files under the project folder: ${pasta}. Approval prompts are disabled in this session: changes, commands and MCP tool calls run without asking.`,
+    leitura: 'Current Nous Code file policy: read-only. Tools that change files, run commands or call MCP tools that are not read-only are refused in this conversation. Explain what you would change instead.' + tambem,
+    perguntar: `Current Nous Code file policy: ${tipo}. File tools may modify files ${onde}.${tambem} Approval policy: ask. Each file change, command and MCP tool call waits for the user's approval; a rejected action stays rejected, so stop and explain instead of working around it.`,
+    editar: `Current Nous Code file policy: ${tipo}. File tools may modify files ${onde}.${tambem} Approval policy: file changes inside the project folder are applied without asking; file changes outside it, commands and MCP tool calls wait for the user's approval.`,
+    total: `Current Nous Code file policy: ${tipo}. File tools may modify files ${onde}.${tambem} Approval prompts are disabled in this session: changes, commands and MCP tool calls run without asking. The user chose this and takes responsibility for it; still verify every path before deleting, moving or overwriting anything.`,
   }[s.modo];
   const net = s.internet === true ? 'Internet tools (web_search, web_fetch) are allowed in this conversation.'
     : s.internet === false ? 'Internet tools are not allowed in this conversation: do not call web_search or web_fetch.'
@@ -363,11 +373,11 @@ export function anexarArquivos(s: Sessao, pedido: string): string {
   const vistos = new Set<string>();
   for (const m of pedido.matchAll(/(?:^|\s)@(?:"([^"]+)"|([\w./\\-]+[\w]))/g)) {
     try {
-      const abs = F.resolver(s.pasta, m[1] || m[2]);
+      const abs = F.resolver(s.pasta, m[1] || m[2], false, s.alcance);
       const rel = F.relativo(s.pasta, abs);
       if (vistos.has(rel) || !fs.existsSync(abs) || fs.statSync(abs).isDirectory()) continue;
       vistos.add(rel);
-      const t = F.ler(s.pasta, { file_path: rel });
+      const t = F.ler(s.pasta, { file_path: rel }, s.alcance);
       anexos.push(t);
       notarLeitura(s, rel, fs.statSync(abs).mtimeMs, 1, t);
     } catch { /* nao e' arquivo do projeto */ }
@@ -742,24 +752,27 @@ async function executar(s: Sessao, c: Chamada, ctx: Ctx, tt: Turno): Promise<Res
     }
     switch (c.nome) {
       case 'list_files': {
-        const t = F.listar(s.pasta, a);
+        const t = F.listar(s.pasta, a, s.alcance);
         return { ok: true, resumo: (t.split('\n').length - 1) + ' itens', saida: t };
       }
       case 'read': {
-        const t = F.ler(s.pasta, a);
-        const abs = F.resolver(s.pasta, a.file_path, true);
+        const t = F.ler(s.pasta, a, s.alcance);
+        const abs = F.resolver(s.pasta, a.file_path, true, s.alcance);
         const rel = F.relativo(s.pasta, abs);
-        if (!rel.includes(':') && !rel.startsWith('/')) { notarLeitura(s, rel, fs.statSync(abs).mtimeMs, Number(a.offset) || 1, t); instrSubpasta(s, abs, tt); }
+        // fora do projeto so' conta como lido quando o alcance deixa mudar ali (nao os arquivos de saida do Nous Code)
+        let mudavel = !F.foraDoProjeto(s.pasta, abs);
+        if (!mudavel) { try { F.resolver(s.pasta, abs, false, s.alcance); mudavel = true; } catch { /* so' leitura */ } }
+        if (mudavel) { notarLeitura(s, rel, fs.statSync(abs).mtimeMs, Number(a.offset) || 1, t); instrSubpasta(s, abs, tt); }
         const m = /\((?:Showing|Output capped\. Showing) lines (\d+)-(\d+)(?: of (\d+))?|total (\d+) lines/.exec(t);
         return { ok: true, resumo: m ? (m[4] ? m[4] + ' linhas' : `linhas ${m[1]}-${m[2]}` + (m[3] ? ' de ' + m[3] : '')) : 'lido', saida: t };
       }
       case 'glob': {
-        const t = F.glob(s.pasta, a, s.id);
+        const t = F.glob(s.pasta, a, s.id, s.alcance);
         const n = t === 'No files found' ? 0 : t.split('\n\n')[0].split('\n').length;
         return { ok: true, resumo: n ? n + ' arquivos' : 'nenhum arquivo', saida: t };
       }
       case 'grep': {
-        const t = F.buscar(s.pasta, a, s.id);
+        const t = F.buscar(s.pasta, a, s.id, s.alcance);
         const m = /^Found (?:(\d+) of )?(\d+)/.exec(t);
         return { ok: true, resumo: m ? m[2] + ' resultados' : 'nada encontrado', saida: t };
       }
@@ -767,8 +780,9 @@ async function executar(s: Sessao, c: Chamada, ctx: Ctx, tt: Turno): Promise<Res
       case 'write': {
         const fp = String(a.file_path ?? '');
         if (!fp.trim()) throw new Error('file_path must be a non-empty string');
-        const abs = F.resolver(s.pasta, fp);
+        const abs = F.resolver(s.pasta, fp, false, s.alcance);
         const rel = F.relativo(s.pasta, abs);
+        const fora = F.foraDoProjeto(s.pasta, abs);
         if (tt.escopo && !tt.escopo.some((e) => rel === e.rel || (e.pasta && (e.rel === '.' || rel.startsWith(e.rel + '/'))))) {
           return negado(`this subagent may only change: ${tt.escopo.map((e) => e.rel + (e.pasta && e.rel !== '.' ? '/' : '')).join(', ')}. "${rel}" is outside that scope; do not retry it — mention it in your report so the delegating agent can handle it.`);
         }
@@ -792,8 +806,9 @@ async function executar(s: Sessao, c: Chamada, ctx: Ctx, tt: Turno): Promise<Res
           : a.content as string;
         if (atual !== null && novo === atual) return { ok: true, resumo: 'nada mudou', saida: `The file ${rel} already had this content; nothing changed.` };
         const d = F.diff(atual || '', novo);
-        if (s.modo === 'perguntar') {
-          const r = await ctx.aprovar({ t: 'pede', id: c.id, tipo: 'arquivo', arquivo: rel, novo: atual === null, diff: d.texto, mais: d.mais, menos: d.menos });
+        // "editar" muda sem perguntar so' dentro do projeto; fora dele pede OK (como no Codex)
+        if (s.modo === 'perguntar' || (s.modo === 'editar' && fora)) {
+          const r = await ctx.aprovar({ t: 'pede', id: c.id, tipo: 'arquivo', arquivo: rel, novo: atual === null, diff: d.texto, mais: d.mais, menos: d.menos, fora });
           if (r.semCanal) return semCanal(c.nome);
           if (!r.ok) return negado(`the user rejected tool "${c.nome}" for ${rel}. Ask what they want instead, or try another approach.`);
         }
@@ -818,7 +833,7 @@ async function executar(s: Sessao, c: Chamada, ctx: Ctx, tt: Turno): Promise<Res
           if (!Number.isFinite(ms) || ms <= 0) throw new Error(`invalid timeoutMs: expected a positive number, got ${JSON.stringify(a.timeoutMs)}`);
           ms = Math.min(600_000, Math.max(1000, ms));
         }
-        const cwd = a.workdir ? F.resolver(s.pasta, a.workdir) : s.pasta;
+        const cwd = a.workdir ? F.resolver(s.pasta, a.workdir, false, s.alcance) : s.pasta;
         const fundo = a.run_in_background === true || a.run_in_background === 'true';
         const perigo = comandoPerigoso(cmd);
         if ((s.modo !== 'total' || perigo) && !s.sempre.includes(cmd)) {
@@ -1023,7 +1038,7 @@ async function executar(s: Sessao, c: Chamada, ctx: Ctx, tt: Turno): Promise<Res
         const arquivos = fs_.map((f) => {
           const p = String(f.path ?? '').trim();
           if (!p) throw new Error('present requires a non-empty file path');
-          const abs = F.resolver(s.pasta, p);
+          const abs = F.resolver(s.pasta, p, true, s.alcance);
           if (!fs.existsSync(abs)) throw new Error(`Cannot present ${p}: file not found. Check the path, create the file if needed, and retry.`);
           if (!fs.statSync(abs).isFile()) throw new Error(`Cannot present ${p}: not a regular file`);
           return { caminho: F.relativo(s.pasta, abs), abs, descricao: f.description ? String(f.description) : '' };
@@ -1123,8 +1138,8 @@ You are a delegated subagent: your permission scope was fixed when you were star
           ctx.emitir({ t: 'sub', id: pai, resumo: 'Mudou ' + arqDe(c.args) + ' (' + x.resumo + ')' });
         }
       } else {
-        saida = c.nome === 'list_files' ? F.listar(s.pasta, c.args) : c.nome === 'read' ? F.ler(s.pasta, c.args)
-          : c.nome === 'glob' ? F.glob(s.pasta, c.args, s.id) : c.nome === 'grep' ? F.buscar(s.pasta, c.args, s.id)
+        saida = c.nome === 'list_files' ? F.listar(s.pasta, c.args, s.alcance) : c.nome === 'read' ? F.ler(s.pasta, c.args, s.alcance)
+          : c.nome === 'glob' ? F.glob(s.pasta, c.args, s.id, s.alcance) : c.nome === 'grep' ? F.buscar(s.pasta, c.args, s.id, s.alcance)
             : await L.consultar(s.pasta, F.resolver(s.pasta, c.args.file_path), String(c.args.operation) as L.Operacao, Number(c.args.line), Number(c.args.character));
       }
     } catch (e) { saida = 'Error: ' + (e instanceof Error ? e.message : String(e)); }
@@ -1141,7 +1156,8 @@ export function desfazer(s: Sessao, arquivo?: string): string[] {
   const feitos: string[] = [];
   for (const rel of Object.keys(s.originais)) {
     if (arquivo && rel !== arquivo) continue;
-    const abs = F.resolver(s.pasta, rel);
+    // o caminho ja' foi validado quando o agente mudou o arquivo (o alcance pode ter diminuido depois)
+    const abs = F.resolver(s.pasta, rel, false, 'computador');
     const orig = s.originais[rel];
     if (orig === null) { try { fs.unlinkSync(abs); } catch { /* ja nao existe */ } }
     else F.gravar(abs, orig);
@@ -1156,7 +1172,7 @@ export function desfazer(s: Sessao, arquivo?: string): string[] {
 /* Arquivos mudados na sessao, com +/- em relacao ao original. */
 export function mudancas(s: Sessao): { arquivo: string; novo: boolean; mais: number; menos: number }[] {
   return Object.keys(s.originais).map((rel) => {
-    const atual = F.conteudoAtual(F.resolver(s.pasta, rel)) || '';
+    const atual = F.conteudoAtual(F.resolver(s.pasta, rel, false, 'computador')) || '';
     const d = F.diff(s.originais[rel] || '', atual);
     return { arquivo: rel, novo: s.originais[rel] === null, mais: d.mais, menos: d.menos };
   });
