@@ -133,7 +133,9 @@
     // valida e registra como recente (cria uma conversa so' se ainda nao houver)
     const tarefa = st.tarefaChat;   // pedido do chat: sempre numa conversa nova
     api('GET', '/sessoes?' + qs({ pasta })).then((l) => {
-      const pega = l.length && !tarefa ? Promise.resolve({ id: l[0].id, pasta: l[0].pasta }) :
+      const quer = !tarefa && st.sessaoPedida ? l.find((x) => x.id === st.sessaoPedida) : null;   // aberta pelo terminal (nous /ide)
+      st.sessaoPedida = null;
+      const pega = quer ? Promise.resolve({ id: quer.id, pasta: quer.pasta }) : l.length && !tarefa ? Promise.resolve({ id: l[0].id, pasta: l[0].pasta }) :
         api('POST', '/sessoes', { pasta }).then((d) => ({ id: d.id, pasta: null }));
       return pega.then((s) => api('GET', '/sessao?id=' + s.id));
     }).then((s) => {
@@ -1730,6 +1732,7 @@
     st.monaco = window.monaco;
     $('#nc-carregando').remove();
     const q = new URLSearchParams(location.search);
+    st.sessaoPedida = /^[a-z0-9]{6,40}$/.test(q.get('sessao') || '') ? q.get('sessao') : null;
     st.tarefaChat = (q.get('tarefa') || '').trim() || null;   // pedido feito no chat do Nous
     const pasta = q.get('pasta');
     if (pasta) abrirProjeto(pasta);
