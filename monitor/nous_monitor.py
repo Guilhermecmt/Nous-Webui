@@ -1806,6 +1806,12 @@ def build_app():
         nous_update.add_routes(app, h_pull, _EXTRA_PULLABLE, _data_dir)
     except Exception as e:
         print(f"[Nous][update] rotas de atualizacao indisponiveis: {e}", file=sys.stderr)
+    # Paleta de cores escolhida (Aparencia): rotas em aparencia.py
+    try:
+        import aparencia
+        aparencia.add_routes(app, _data_dir)
+    except Exception as e:
+        print(f"[Nous][aparencia] rotas da paleta indisponiveis: {e}", file=sys.stderr)
     # Usar no celular (v2.11): ligar/desligar o portao, QR, aparelhos (celular/controle.py)
     try:
         sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "celular"))
