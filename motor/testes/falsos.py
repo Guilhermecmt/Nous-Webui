@@ -125,8 +125,10 @@ def ler_amostra(nome):
 class LlamaFalso:
     """Responde /health, /v1/chat/completions (reproduz uma amostra em SSE) e /v1/embeddings."""
 
-    def __init__(self, amostra="chat_stream.json", health_503=0, atraso_por_token=0.0):
+    def __init__(self, amostra="chat_stream.json", health_503=0, atraso_por_token=0.0, limite_tokens=None):
         self.amostra = amostra
+        self.limite = limite_tokens  # embedding com mais palavras que isto: erro "too large", como o real
+        self.vocab = {}
         self.health_503 = health_503
         self.atraso = atraso_por_token
         self.pedidos = []
@@ -139,7 +141,19 @@ class LlamaFalso:
         app.router.add_get("/health", self._health)
         app.router.add_post("/v1/chat/completions", self._chat)
         app.router.add_post("/v1/embeddings", self._emb)
+        app.router.add_post("/tokenize", self._tok)
+        app.router.add_post("/detokenize", self._detok)
         return app
+
+    async def _tok(self, req):
+        corpo = await req.json()
+        ids = [self.vocab.setdefault(w, len(self.vocab)) for w in corpo.get("content", "").split()]
+        return web.json_response({"tokens": ids})
+
+    async def _detok(self, req):
+        corpo = await req.json()
+        inv = {v: k for k, v in self.vocab.items()}
+        return web.json_response({"content": " ".join(inv[i] for i in corpo.get("tokens", []))})
 
     async def subir(self, porta):
         self._runner = web.AppRunner(self._app())
@@ -181,6 +195,11 @@ class LlamaFalso:
         self.pedidos.append(("/v1/embeddings", corpo))
         ent = corpo.get("input")
         ent = [ent] if isinstance(ent, str) else ent
+        if self.limite and any(len(t.split()) > self.limite for t in ent):
+            n = max(len(t.split()) for t in ent)
+            return web.json_response({"error": {"code": 500, "message": "input (%d tokens) is too large to process. "
+                                                "increase the physical batch size (current batch size: %d)" % (n, self.limite),
+                                                "type": "server_error"}}, status=500)
         return web.json_response({"object": "list", "usage": {"prompt_tokens": 3 * len(ent), "total_tokens": 3 * len(ent)},
                                   "data": [{"index": i, "embedding": [3.0, 4.0 + i]} for i in range(len(ent))]})
 

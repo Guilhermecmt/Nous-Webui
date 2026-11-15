@@ -114,6 +114,18 @@ class TestServidorLlama(Base):
         self.assertEqual(await r.json(), {"embedding": [3.0, 4.0]})
         self.assertEqual(len(self.fab.argvs), 1)
 
+    async def test_embed_texto_longo_e_cortado_como_no_ollama(self):
+        self.fab.opcoes["limite_tokens"] = 10
+        longo = " ".join("palavra%d" % i for i in range(30))
+        r = await self.cli.post("/api/embed", json={"model": "granite-embedding:278m", "input": [longo, "curto"]})
+        self.assertEqual(r.status, 200, await r.text())
+        self.assertEqual(len((await r.json())["embeddings"]), 2)
+        r = await self.cli.post("/api/embeddings", json={"model": "granite-embedding:278m", "prompt": longo})
+        self.assertEqual(r.status, 200)
+        enviados = [c["input"] for rota, c in self.fab.processos[0].servidor.pedidos if rota == "/v1/embeddings"]
+        self.assertTrue(all(len(t.split()) <= 10 for lista in enviados[1::2] for t in lista))
+        self.assertTrue(enviados[1][0].startswith("palavra0 palavra1"))
+
     async def test_embed_em_modelo_de_conversa(self):
         r = await self.cli.post("/api/embed", json={"model": "qwen3:4b", "input": "a"})
         self.assertEqual(r.status, 400)

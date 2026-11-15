@@ -18,6 +18,7 @@ Ambiente lido pelo main():
 import asyncio
 import json
 import os
+import re
 import sys
 
 import aiohttp
@@ -247,16 +248,41 @@ async def generate(req):
     return await _conversar(req, "generate")
 
 
+_GRANDE = re.compile(r"too large to process.*?batch size: (\d+)", re.S)
+
+
+async def _cortar(sessao, url, textos, limite):
+    """Corta cada texto no limite de tokens do modelo, como o Ollama faz (truncate: true)."""
+    saida = []
+    for t in textos:
+        async with sessao.post(url + "/tokenize", json={"content": t, "add_special": False}) as r:
+            ids = (await r.json()).get("tokens") or []
+        if len(ids) <= limite:
+            saida.append(t)
+            continue
+        async with sessao.post(url + "/detokenize", json={"tokens": ids[:limite]}) as r:
+            saida.append((await r.json()).get("content") or "")
+    return saida
+
+
 async def _embeddings(req, corpo, entradas):
     m = _modelo(req, corpo)
     if not m.gguf.get("embedding"):
         raise Recusa(400, "o modelo %s nao gera embedding; use um modelo de embedding" % m.nome)
     g = req.app[K_GERENTE]
+    sessao = req.app[K_SESSAO]
     async with g.usando(m, _ctx(corpo), corpo.get("keep_alive")) as url:
-        async with req.app[K_SESSAO].post(url + "/v1/embeddings", json={"input": entradas, "model": m.nome}) as up:
-            if up.status != 200:
-                raise Recusa(up.status if 400 <= up.status < 600 else 500, await _erro_upstream(up))
-            return m, await up.json()
+        for tentativa in (1, 2):
+            async with sessao.post(url + "/v1/embeddings", json={"input": entradas, "model": m.nome}) as up:
+                if up.status == 200:
+                    return m, await up.json()
+                msg = await _erro_upstream(up)
+                grande = _GRANDE.search(msg or "")
+                if tentativa == 1 and grande and corpo.get("truncate", True) is not False:
+                    # 2 tokens de folga para os especiais ([CLS]/[SEP]) que o servidor poe de volta
+                    entradas = await _cortar(sessao, url, entradas, max(int(grande.group(1)) - 2, 1))
+                    continue
+                raise Recusa(up.status if 400 <= up.status < 600 else 500, msg)
 
 
 async def embed(req):
