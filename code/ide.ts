@@ -198,11 +198,18 @@ export function avisarTodos(m: object) {
   for (const ws of clientes) if (ws.readyState === ws.OPEN) ws.send(t);
 }
 
-export function abrirJanela(porta: number, pasta?: string, tarefa?: string) {
+/* O endereco da janela: pasta do projeto, pedido do chat (conversa nova) ou a
+ * conversa que o terminal (`nous`) quer mostrar. */
+export function urlJanela(porta: number, pasta?: string, tarefa?: string, sessao?: string) {
   const q = new URLSearchParams();
   if (pasta) q.set('pasta', pasta);
   if (tarefa) q.set('tarefa', tarefa);   // pedido vindo do chat: vira o texto de uma conversa nova
-  const url = `http://127.0.0.1:${porta}/` + (q.size ? '?' + q.toString() : '');
+  if (sessao && pasta) q.set('sessao', sessao);
+  return `http://127.0.0.1:${porta}/` + (q.size ? '?' + q.toString() : '');
+}
+
+export function abrirJanela(porta: number, pasta?: string, tarefa?: string, sessao?: string) {
+  const url = urlJanela(porta, pasta, tarefa, sessao);
   const cands = [
     path.join(process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)', 'Microsoft', 'Edge', 'Application', 'msedge.exe'),
     path.join(process.env.ProgramFiles || 'C:\\Program Files', 'Microsoft', 'Edge', 'Application', 'msedge.exe'),

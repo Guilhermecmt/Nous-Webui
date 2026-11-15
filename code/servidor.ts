@@ -45,7 +45,8 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { spawn } from 'node:child_process';
+import crypto from 'node:crypto';
+import { spawn, spawnSync } from 'node:child_process';
 import { modelos, NUM_CTX } from './modelo.ts';
 import { turno, desfazer, mudancas, normalizar, aoCarregar, compactar, exportar, novoObjetivo,
   type Sessao, type Evento, type Resposta, type Ctx } from './agente.ts';
@@ -60,7 +61,7 @@ import * as IDE from './ide.ts';
 
 const PORTA = Number(process.env.NOUS_CODE_PORT || 8998);
 const VERSAO = '0.3.0';
-const DADOS = path.join(process.env.DATA_DIR || path.join(os.homedir(), 'NousData'), 'code');
+const DADOS = path.join(process.env.DATA_DIR || process.env.NOUS_DATA_DIR || path.join(os.homedir(), 'NousData'), 'code');
 const DIR_SESSOES = path.join(DADOS, 'sessoes');
 const ARQ_PASTAS = path.join(DADOS, 'pastas.json');
 const ORIGENS = new Set(['http://localhost:8080', 'http://127.0.0.1:8080',
@@ -214,9 +215,36 @@ if ($d.ShowDialog($f) -eq 'OK') { [Console]::OutputEncoding=[Text.Encoding]::UTF
 }
 
 /* ------------------------------------------------------------ http */
+/* O terminal (`nous`) nao e' uma pagina: prova que e' da pessoa com o token de
+ * <NousData>/code/cli-token (so' ela le). Um navegador nao consegue mandar esse
+ * cabecalho para outro site (o CORS so' libera Content-Type), entao o token
+ * abre a porta para o terminal sem abri-la para paginas. Token errado e'
+ * recusado mesmo vindo de uma origem permitida. */
+const ARQ_TOKEN = path.join(DADOS, 'cli-token');
+function garantirToken(arq = ARQ_TOKEN): string {
+  try {
+    const t = fs.readFileSync(arq, 'utf8').trim();
+    if (/^[0-9a-f]{64}$/.test(t)) return t;
+  } catch { /* primeira vez */ }
+  const t = crypto.randomBytes(32).toString('hex');
+  fs.mkdirSync(path.dirname(arq), { recursive: true });
+  fs.writeFileSync(arq, t + '\n', { mode: 0o600 });
+  // no Windows o modo nao vale: tira as permissoes herdadas e deixa so' a pessoa
+  if (process.platform === 'win32' && process.env.USERNAME) {
+    try { spawnSync('icacls', [arq, '/inheritance:r', '/grant:r', process.env.USERNAME + ':F'], { windowsHide: true, stdio: 'ignore', timeout: 5000 }); } catch { /* fica com o ACL da pasta do usuario */ }
+  }
+  return t;
+}
+const TOKEN = garantirToken();
+function tokenIgual(dado: string): boolean {
+  const a = Buffer.from(dado), b = Buffer.from(TOKEN);
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
 function origemOk(req: http.IncomingMessage): boolean {
   const host = (req.headers.host || '').replace(/:\d+$/, '').replace(/^\[|\]$/g, '');
   if (!['localhost', '127.0.0.1', '::1'].includes(host)) return false;  // DNS rebinding
+  const t = req.headers['x-nous-token'];
+  if (t !== undefined) return typeof t === 'string' && tokenIgual(t);
   const o = req.headers.origin;
   return !o || ORIGENS.has(o);
 }
@@ -270,7 +298,8 @@ async function rota(req: http.IncomingMessage, res: http.ServerResponse) {
     const pedida = b.pasta ? String(b.pasta) : tarefa ? pastaDoChat() : undefined;
     let pasta: string | undefined;
     try { pasta = pedida ? pastaValida(pedida) : undefined; } catch (e) { if (b.pasta) throw e; }
-    return json(req, res, 200, { url: IDE.abrirJanela(PORTA, pasta, tarefa || undefined), pasta: pasta || null });
+    const sessao = /^[a-z0-9]{6,40}$/.test(String(b.sessao || '')) ? String(b.sessao) : undefined;
+    return json(req, res, 200, { url: IDE.abrirJanela(PORTA, pasta, tarefa || undefined, sessao), pasta: pasta || null });
   }
   if (r === 'GET /ajustes') return json(req, res, 200, { ...lerAjustes(), casa: F.casa() });
   if (r === 'POST /ajustes') {
@@ -291,10 +320,11 @@ async function rota(req: http.IncomingMessage, res: http.ServerResponse) {
   if (r === 'GET /sessoes') return json(req, res, 200, listarSessoes(q('pasta') || undefined));
   if (r === 'POST /sessoes') {
     const b = await corpo(req);
-    const pasta = pastaValida(String(b.pasta || ''));
-    const copia = TA.dePasta(pasta);   // dentro de uma tarefa separada: nao entra nos recentes
     const aj = lerAjustes();           // conversa nova nasce com o modo e o alcance padrao
-    const s: Sessao = normalizar({ id: novoId(), pasta, modelo: String(b.modelo || MODELO_PADRAO), isolada: !!copia, modo: aj.modo, alcance: aj.alcance });
+    const alcance = F.alcanceValido(b.alcance) ? b.alcance : aj.alcance;   // o terminal (nous --alcance) pede o seu
+    const pasta = pastaValida(String(b.pasta || ''), alcance);
+    const copia = TA.dePasta(pasta);   // dentro de uma tarefa separada: nao entra nos recentes
+    const s: Sessao = normalizar({ id: novoId(), pasta, modelo: String(b.modelo || MODELO_PADRAO), isolada: !!copia, modo: aj.modo, alcance });
     abertas.set(s.id, s); salvar(s); if (!copia) lembrarPasta(pasta);
     return json(req, res, 200, { id: s.id });
   }
