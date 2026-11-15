@@ -100,6 +100,21 @@ if ($py) {
         } else { Write-Host "  (testes dos mensageiros pulados: faltam aiohttp/qrcode no Python)" -ForegroundColor DarkGray }
     }
 
+    # Historico e habilidades: Ollama de mentira, sem rede.
+    foreach ($par in @(@("history/testes", "Historico"), @("skills/testes", "Habilidades"))) {
+        if (Test-Path (Join-Path $root $par[0])) {
+            & $py.Source -c "import aiohttp, pydantic, requests" 2>$null
+            if ($LASTEXITCODE -eq 0) {
+                Write-Host "== $($par[1])" -ForegroundColor Cyan
+                $old = $ErrorActionPreference; $ErrorActionPreference = "Continue"
+                $out = & $py.Source -W ignore -m unittest discover -s $par[0] -t $par[0] 2>&1 | Out-String
+                $ok = $LASTEXITCODE -eq 0
+                $ErrorActionPreference = $old
+                if (-not $ok) { Write-Host $out; Bad "$($par[0]): testes falharam" }
+            } else { Write-Host "  ($($par[0]) pulado: faltam aiohttp/pydantic/requests no Python)" -ForegroundColor DarkGray }
+        }
+    }
+
     # Usar no celular: portao com Open WebUI e servicos de mentira (sem rede, sem Ollama).
     if (Test-Path (Join-Path $root "celular/testes")) {
         & $py.Source -c "import aiohttp" 2>$null

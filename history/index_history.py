@@ -10,6 +10,10 @@ esse indice para recuperar contexto de conversas anteriores.
 Incremental: usa marca d'agua de tempo (com 1h de sobreposicao) para
 so' reprocessar conversas novas. Deduplicacao por msg_id. Idempotente.
 
+Privacidade: o que a pessoa apagou sai do indice a cada ciclo (purge_deleted), mesmo
+com o Ollama fora do ar. Confere com a tabela chat_message, que o Open WebUI 0.12.3
+limpa ao apagar conversa, mensagem, pasta ou usuario (arquivar nao apaga).
+
 USO:
     python history/index_history.py --data-dir <DATA_DIR> [--once]
     (sem --once roda em modo watch: 60 s por ciclo)
@@ -106,7 +110,7 @@ def _clean_text(s: str) -> str:
 def _pair_messages(msgs):
     """
     Agrupa linhas (id, user_id, role, content, output, created_at) em pares dialogo.
-    Retorna lista de dicts com msg_id, user_id, user_msg, asst_msg, created_at.
+    Retorna lista de dicts com msg_id, asst_id, user_id, user_msg, asst_msg, created_at.
     """
     pairs = []
     i = 0
@@ -114,8 +118,9 @@ def _pair_messages(msgs):
         msg_id, user_id, role, content, output, created_at = msgs[i]
         if role == "user":
             user_text = _extract_text(content)
-            asst_text = ""
+            asst_text, asst_id = "", None
             if i + 1 < len(msgs) and msgs[i + 1][2] == "assistant":
+                asst_id = msgs[i + 1][0]
                 raw_asst = msgs[i + 1][3] or msgs[i + 1][4]  # content ou output
                 asst_text = _clean_text(_extract_text(raw_asst))
                 i += 2
@@ -124,6 +129,7 @@ def _pair_messages(msgs):
             if len(user_text) >= MIN_TEXT_LEN:
                 pairs.append({
                     "msg_id":     msg_id,
+                    "asst_id":    asst_id,
                     "user_id":    user_id or "default",
                     "user_msg":   user_text,
                     "asst_msg":   asst_text,
@@ -158,6 +164,7 @@ def _embed(text):
 def open_hist(db_path):
     cx = sqlite3.connect(db_path, timeout=30)
     cx.execute("PRAGMA journal_mode=WAL")
+    cx.execute("PRAGMA secure_delete=ON")  # o que foi apagado nao fica legivel no arquivo
     cx.execute("""
         CREATE TABLE IF NOT EXISTS sync_state (
             key TEXT PRIMARY KEY, value INTEGER DEFAULT 0
@@ -177,6 +184,10 @@ def open_hist(db_path):
             created_at INTEGER NOT NULL,
             embedding  BLOB
         )""")
+    try:  # o par tem duas mensagens: apagar so' a resposta tambem precisa valer
+        cx.execute("ALTER TABLE dialogues ADD COLUMN asst_id TEXT")
+    except sqlite3.OperationalError:
+        pass
     cx.execute("CREATE INDEX IF NOT EXISTS idx_hist_user ON dialogues(user_id)")
     cx.execute("CREATE INDEX IF NOT EXISTS idx_hist_chat ON dialogues(chat_id)")
     cx.execute("CREATE INDEX IF NOT EXISTS idx_hist_ts   ON dialogues(created_at)")
@@ -232,6 +243,84 @@ def check_reindex_needed(hist_cx, log=print):
     hist_cx.commit()
 
 
+def _chat_messages(src, chat_id):
+    return src.execute(
+        """SELECT id, user_id, role, content, output, created_at
+           FROM chat_message
+           WHERE chat_id=? AND role IN ('user','assistant')
+           ORDER BY created_at ASC""",
+        (chat_id,),
+    ).fetchall()
+
+
+def _open_webui(webui_db):
+    # Somente-leitura: evita lock com o servidor
+    try:
+        return sqlite3.connect(f"file:{webui_db}?mode=ro", uri=True, timeout=10)
+    except Exception:
+        return sqlite3.connect(webui_db, timeout=10)
+
+
+def _fill_asst_ids(hist_cx, src):
+    """Indice antigo nao guardava o id da resposta. Refaz os pares (sem modelo): resposta
+    que nao bate mais com a do Open WebUI foi apagada. Devolve esses dialogos."""
+    por_chat = {}
+    for id_, msg_id, chat_id, asst in hist_cx.execute(
+            "SELECT id, msg_id, chat_id, asst_msg FROM dialogues "
+            "WHERE asst_id IS NULL AND asst_msg <> ''").fetchall():
+        por_chat.setdefault(chat_id, []).append((id_, msg_id, asst))
+    stale = []
+    for chat_id, itens in por_chat.items():
+        pares = {p["msg_id"]: p for p in _pair_messages(_chat_messages(src, chat_id))}
+        for id_, msg_id, asst in itens:
+            p = pares.get(msg_id)
+            if p and p["asst_id"] and p["asst_msg"] == asst:
+                hist_cx.execute("UPDATE dialogues SET asst_id=? WHERE id=?", (p["asst_id"], id_))
+            else:
+                stale.append(id_)
+    return stale
+
+
+def purge_deleted(hist_cx, webui_db, log=print):
+    """Tira do indice o que nao existe mais no Open WebUI. Basta faltar a pergunta OU a
+    resposta para o dialogo sair inteiro. Retorna quantos saíram."""
+    if not os.path.isfile(webui_db):
+        return 0
+    src = _open_webui(webui_db)
+    try:
+        tables = {r[0] for r in src.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
+        if "chat_message" not in tables:
+            return 0  # banco ainda sem a tabela: ausencia aqui nao quer dizer "apagado"
+        live = {r[0] for r in src.execute("SELECT id FROM chat_message").fetchall()}
+        stale = set(_fill_asst_ids(hist_cx, src))
+    finally:
+        src.close()
+    for id_, msg_id, asst_id in hist_cx.execute("SELECT id, msg_id, asst_id FROM dialogues").fetchall():
+        if msg_id not in live or (asst_id and asst_id not in live):
+            stale.add(id_)
+    for id_ in stale:
+        hist_cx.execute("DELETE FROM dialogues WHERE id=?", (id_,))
+        hist_cx.execute("DELETE FROM dialogues_fts WHERE rowid=?", (id_,))
+    if stale:
+        # o FTS guarda os termos em segmentos: sem isto eles ficam ate' uma fusao qualquer
+        hist_cx.execute("INSERT INTO dialogues_fts(dialogues_fts) VALUES('optimize')")
+    hist_cx.commit()
+    if stale:
+        hist_cx.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+        log(f"  [-] {len(stale)} dialogo(s) apagado(s) do historico")
+    return len(stale)
+
+
+def cycle(hist_cx, webui_db, log=print):
+    """Um ciclo do modo watch. Apagar nao depende do Ollama; indexar, sim."""
+    try:
+        purge_deleted(hist_cx, webui_db, log)
+    except Exception as e:
+        print("Erro ao limpar o historico:", e)
+    if embed_ready():
+        index_once(hist_cx, webui_db, log)
+
+
 def index_once(hist_cx, webui_db, log=print):
     """Le novas conversas do webui.db e indexa pares de dialogo. Retorna (added)."""
     if not os.path.isfile(webui_db):
@@ -245,14 +334,10 @@ def index_once(hist_cx, webui_db, log=print):
     stored_ts = row[0] if row else 0
     last_ts   = stored_ts - OVERLAP_SECS
 
-    # Abre webui.db em modo somente-leitura (evita lock com o servidor)
     try:
-        src = sqlite3.connect(f"file:{webui_db}?mode=ro", uri=True, timeout=10)
+        src = _open_webui(webui_db)
     except Exception:
-        try:
-            src = sqlite3.connect(webui_db, timeout=10)
-        except Exception:
-            return 0
+        return 0
 
     added = 0
     seen_max_ts = stored_ts   # maior created_at JA' visto; sobe mesmo sem indexar
@@ -273,13 +358,7 @@ def index_once(hist_cx, webui_db, log=print):
             return 0
 
         for chat_id in affected:
-            msgs = src.execute(
-                """SELECT id, user_id, role, content, output, created_at
-                   FROM chat_message
-                   WHERE chat_id=? AND role IN ('user','assistant')
-                   ORDER BY created_at ASC""",
-                (chat_id,),
-            ).fetchall()
+            msgs = _chat_messages(src, chat_id)
 
             # Avanca a marca d'agua por TODA mensagem vista (mesmo curta/sem par),
             # senao conversas curtas seriam re-varridas a cada ciclo, para sempre.
@@ -305,9 +384,9 @@ def index_once(hist_cx, webui_db, log=print):
                 try:
                     cur = hist_cx.execute(
                         """INSERT INTO dialogues
-                           (msg_id, chat_id, user_id, user_msg, asst_msg, created_at, embedding)
-                           VALUES (?,?,?,?,?,?,?)""",
-                        (pair["msg_id"], chat_id, pair["user_id"],
+                           (msg_id, asst_id, chat_id, user_id, user_msg, asst_msg, created_at, embedding)
+                           VALUES (?,?,?,?,?,?,?,?)""",
+                        (pair["msg_id"], pair["asst_id"], chat_id, pair["user_id"],
                          pair["user_msg"], pair["asst_msg"],
                          pair["created_at"], blob),
                     )
@@ -364,6 +443,7 @@ def main():
     if a.once:
         cx = open_hist(hist_db)
         try:
+            purge_deleted(cx, webui_db, log=print)
             n = index_once(cx, webui_db, log=print)
             print(f"Indexacao concluida: {n} dialogo(s) adicionado(s).")
         finally:
@@ -380,8 +460,7 @@ def main():
     try:
         while True:
             try:
-                if embed_ready():
-                    index_once(cx, webui_db, log=lambda *_: None)
+                cycle(cx, webui_db, log=lambda *_: None)
             except Exception as e:
                 print("Erro na indexacao do historico:", e)
             time.sleep(WATCH_SECONDS)

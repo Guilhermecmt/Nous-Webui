@@ -43,8 +43,16 @@ def _write(items):
     os.replace(tmp, p)
 
 
+def _ler_com_trava():
+    """Leitura solta no meio do os.replace falha no Windows e _read devolve lista vazia:
+    um rascunho que existe vira "nao encontrado", e o arquivo aberto ainda pode derrubar
+    quem esta' gravando."""
+    with _lock:
+        return _read()
+
+
 def list_drafts(include_done=False):
-    items = _read()
+    items = _ler_com_trava()
     cutoff = time.time() - 7 * 86400  # enviados ficam visiveis por uma semana
     if not include_done:
         items = [d for d in items if d["status"] != "enviado" or d.get("sent_at", 0) > cutoff]
@@ -114,9 +122,9 @@ def delete(did):
 
 
 def get(did):
-    return next((d for d in _read() if d["id"] == did), None)
+    return next((d for d in _ler_com_trava() if d["id"] == did), None)
 
 
 def due(now=None):
     now = now or time.time()
-    return [d for d in _read() if d["status"] == "agendado" and d.get("send_at") and d["send_at"] <= now]
+    return [d for d in _ler_com_trava() if d["status"] == "agendado" and d.get("send_at") and d["send_at"] <= now]
