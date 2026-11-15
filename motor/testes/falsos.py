@@ -277,3 +277,69 @@ class OllamaFalso:
                 await r.write((json.dumps({"i": i, "done": i == 2}) + "\n").encode())
             return r
         return web.json_response({"erro": "rota falsa"}, status=404)
+
+
+class RegistryFalso:
+    """registry.ollama.ai de mentira: manifesto + blobs, com redirecionamento e Range."""
+
+    def __init__(self, blobs=None, corromper=None):
+        self.blobs = blobs or {}
+        self.corromper = corromper or set()
+        self.manifestos = {}
+        self.gets = []
+        self.ranges = []
+        self._runner = None
+        self.url = None
+
+    def publicar(self, nome, tag, camadas, config=b'{"model_family":"x","model_type":"1B","file_type":"Q4_0"}'):
+        def dig(b):
+            return "sha256:" + hashlib.sha256(b).hexdigest()
+        self.blobs[dig(config)] = config
+        layers = []
+        for tipo, dados in camadas:
+            self.blobs[dig(dados)] = dados
+            layers.append({"mediaType": "application/vnd.ollama.image." + tipo, "digest": dig(dados), "size": len(dados)})
+        man = {"schemaVersion": 2, "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+               "config": {"mediaType": "application/vnd.docker.container.image.v1+json", "digest": dig(config), "size": len(config)},
+               "layers": layers}
+        self.manifestos[(nome, tag)] = json.dumps(man).encode()
+        return man
+
+    async def subir(self):
+        app = web.Application()
+        app.router.add_get("/v2/{ns}/{modelo}/manifests/{tag}", self._man)
+        app.router.add_get("/v2/{ns}/{modelo}/blobs/{dig}", self._redir)
+        app.router.add_get("/cdn/{dig}", self._blob)
+        self._runner = web.AppRunner(app)
+        await self._runner.setup()
+        site = web.TCPSite(self._runner, "127.0.0.1", 0)
+        await site.start()
+        self.url = "http://127.0.0.1:%d" % site._server.sockets[0].getsockname()[1]
+        return self.url
+
+    async def parar(self):
+        if self._runner:
+            await self._runner.cleanup()
+
+    async def _man(self, req):
+        m = req.match_info
+        corpo = self.manifestos.get((m["ns"] + "/" + m["modelo"], m["tag"]))
+        if corpo is None:
+            return web.json_response({"errors": [{"code": "MANIFEST_UNKNOWN"}]}, status=404)
+        return web.Response(body=corpo, content_type="application/vnd.docker.distribution.manifest.v2+json")
+
+    async def _redir(self, req):
+        raise web.HTTPTemporaryRedirect("/cdn/" + req.match_info["dig"])
+
+    async def _blob(self, req):
+        d = req.match_info["dig"]
+        self.gets.append(d)
+        dados = self.blobs[d]
+        if d in self.corromper:
+            dados = b"X" + dados[1:]
+        rng = req.headers.get("Range")
+        self.ranges.append(rng)
+        if rng:
+            ini = int(rng.split("=")[1].split("-")[0])
+            return web.Response(body=dados[ini:], status=206)
+        return web.Response(body=dados)
