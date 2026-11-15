@@ -27,11 +27,22 @@ export function politicaImprimir(modo?: string): (e: Evento) => RespostaPedido {
   };
 }
 
-async function lerEntrada(): Promise<string> {
-  if (process.stdin.isTTY) return '';
-  const partes: Buffer[] = [];
-  for await (const p of process.stdin) partes.push(p as Buffer);
-  return Buffer.concat(partes).toString('utf8').trim();
+/* O texto que veio por um pipe. Com o pedido ja' nos argumentos, so' espera um instante pelo primeiro byte:
+ * quem nao esta mandando nada (um terminal sem TTY, um agendador) nao trava o nous. Sem pedido, espera o fim. */
+function lerEntrada(temPedido: boolean): Promise<string> {
+  if (process.stdin.isTTY) return Promise.resolve('');
+  return new Promise((ok) => {
+    const partes: Buffer[] = [];
+    let timer: NodeJS.Timeout | null = temPedido ? setTimeout(() => fim(), 400) : null;
+    const fim = () => {
+      if (timer) clearTimeout(timer);
+      process.stdin.off('data', aoDado); process.stdin.off('end', fim); process.stdin.off('error', fim);
+      process.stdin.pause();
+      ok(Buffer.concat(partes).toString('utf8').trim());
+    };
+    const aoDado = (d: Buffer) => { if (timer) { clearTimeout(timer); timer = null; } partes.push(d); };
+    process.stdin.on('data', aoDado); process.stdin.on('end', fim); process.stdin.on('error', fim);
+  });
 }
 
 /* Um pedido, a resposta final no stdout, a atividade no stderr. */
@@ -63,7 +74,7 @@ export async function principal(argv: string[]): Promise<number> {
   if (!fs.existsSync(pasta) || !fs.statSync(pasta).isDirectory()) { process.stderr.write('nous: a pasta não existe: ' + pasta + '\n'); return 2; }
 
   // com texto vindo de um pipe, ou com -p, e' um pedido so'
-  const entrada = await lerEntrada();
+  const entrada = await lerEntrada(!!o.pedido);
   const naoInterativo = o.imprimir || !process.stdin.isTTY;
   const pedido = [o.pedido, entrada].filter(Boolean).join('\n\n');
   if (naoInterativo && !pedido) { process.stderr.write('nous: nenhum pedido. Use nous -p "pedido" ou mande o texto pela entrada padrão.\n'); return 2; }
