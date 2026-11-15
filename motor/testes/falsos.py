@@ -174,7 +174,6 @@ class LlamaFalso:
             self.terminou_stream = True
         except (ConnectionResetError, asyncio.CancelledError):
             self.fechou_antes_do_fim = True
-            raise
         return r
 
     async def _emb(self, req):
@@ -241,3 +240,40 @@ class FabricaFalsa:
             await srv.subir(int(argv[argv.index("--port") + 1]))
         self.processos.append(p)
         return p
+
+
+class OllamaFalso:
+    """Ollama de mentira para o modo repasse: ecoa o pedido e manda um stream NDJSON."""
+
+    def __init__(self):
+        self.pedidos = []
+        self._runner = None
+        self.url = None
+
+    async def subir(self):
+        app = web.Application()
+        app.router.add_route("*", "/{caminho:.*}", self._tudo)
+        self._runner = web.AppRunner(app)
+        await self._runner.setup()
+        site = web.TCPSite(self._runner, "127.0.0.1", 0)
+        await site.start()
+        porta = site._server.sockets[0].getsockname()[1]
+        self.url = "http://127.0.0.1:%d" % porta
+        return self.url
+
+    async def parar(self):
+        if self._runner:
+            await self._runner.cleanup()
+
+    async def _tudo(self, req):
+        corpo = await req.read()
+        self.pedidos.append((req.method, req.path, corpo))
+        if req.path == "/api/tags":
+            return web.json_response({"models": [{"name": "do-ollama:1b"}]})
+        if req.path in ("/api/chat", "/api/pull"):
+            r = web.StreamResponse(headers={"Content-Type": "application/x-ndjson"})
+            await r.prepare(req)
+            for i in range(3):
+                await r.write((json.dumps({"i": i, "done": i == 2}) + "\n").encode())
+            return r
+        return web.json_response({"erro": "rota falsa"}, status=404)

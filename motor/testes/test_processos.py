@@ -50,7 +50,9 @@ class TestProcessos(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(url, "http://127.0.0.1:" + a[a.index("--port") + 1])
         await g.garantir(self.emb, None)
         self.assertIn("--embeddings", self.fab.argvs[1])
-        self.assertEqual(self.fab.argvs[1][self.fab.argvs[1].index("-c") + 1], "512")
+        e = self.fab.argvs[1]
+        self.assertEqual(e[e.index("-c") + 1], "512")
+        self.assertEqual(e[e.index("-ub") + 1], "512")
 
     async def test_projetor_vai_no_argv(self):
         g = self.gerente()

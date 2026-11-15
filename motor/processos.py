@@ -91,7 +91,8 @@ class Gerente:
         a = [self.binario, "-m", m.blob, "--host", "127.0.0.1", "--port", str(porta), "-c", str(ctx),
              "-ngl", "999", "--jinja", "--reasoning-format", "deepseek", "-np", "1", "--no-webui"]
         if m.gguf.get("embedding"):
-            a.append("--embeddings")
+            # lote do tamanho do contexto: um texto longo cabe numa passada so'
+            a += ["--embeddings", "-b", str(ctx), "-ub", str(ctx)]
         if m.projetor:
             a += ["--mmproj", m.projetor]
         return a
