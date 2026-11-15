@@ -63,3 +63,8 @@ desktop.ini
 
 # Nous Code (so' para checar tipos)
 node_modules/
+
+# --- Motor de IA: llama-server baixado pelo instalador ---
+motor/bin/
+motor/bin.tmp/
+/bin/

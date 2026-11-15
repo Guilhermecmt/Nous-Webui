@@ -50,7 +50,9 @@ if ($modo -eq "ollama" -or -not (Test-Path $llamaExe)) {
 
 $apiUp = $false
 try { Invoke-RestMethod "$motorUrl/api/version" -TimeoutSec 3 | Out-Null; $apiUp = $true } catch {}
-Check "Motor de IA respondendo" $apiUp "$motorUrl nao responde"
+# O motor sobe junto com o Nous: parado logo depois da instalacao nao e' falha.
+if ($modo) { Check "Motor de IA respondendo" $apiUp "$motorUrl nao responde" }
+elseif ($apiUp) { Check "Motor de IA respondendo" $true "" }
 
 # Pela API, nunca por "ollama list": com o servico parado o CLI abre o app do
 # Ollama, que herda o pipe de saida, e o script fica esperando para sempre.

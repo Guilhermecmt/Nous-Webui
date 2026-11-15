@@ -85,6 +85,14 @@ Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" |
     Where-Object { $_.CommandLine -like "*bandeja.ps1*" } |
     ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
 Remove-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" -Name "Nous" -ErrorAction SilentlyContinue
+# Tira o comando "nous" (pasta <app>\bin) do PATH do usuario.
+try {
+    $binDir = Join-Path $REPO "bin"
+    $pathUser = [Environment]::GetEnvironmentVariable("Path", "User")
+    if ($pathUser -and (($pathUser -split ';') -contains $binDir)) {
+        [Environment]::SetEnvironmentVariable("Path", ((($pathUser -split ';') | Where-Object { $_ -and $_ -ne $binDir }) -join ';'), "User")
+    }
+} catch {}
 $stop = Join-Path $PSScriptRoot "..\launchers\stop-nous.ps1"
 if (Test-Path $stop) { & $stop | Out-Null }
 foreach ($p in 8080, 8990, 8991, 8992, 8993, 8994, 8995, 8996, 8997, 8998, 8999) {
