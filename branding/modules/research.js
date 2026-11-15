@@ -11,32 +11,30 @@
 	var UI = window.NousUI || {};
 	var esc = UI.esc || function (s) { return String(s || ''); };
 	var ov = null;
+	var dlg = UI.dialogo({ id: 'nous-rp', titulo: '🔎 Relatorios de pesquisa' });
 
 	function injectStyle() {
 		if (document.getElementById('nous-rp-style')) return;
 		var g = 'rgba(200,150,46,';
 		var css =
 			'#nous-reports-open{width:100%;margin-top:5px;padding:6px;border:1px solid ' + g + '.25);' +
-			'border-radius:8px;cursor:pointer;background:transparent;color:#e7c069;font-weight:600;font-size:12px}' +
+			'border-radius:8px;cursor:pointer;background:transparent;color:var(--nd-texto-ouro);font-weight:600;font-size:12px}' +
 			'#nous-reports-open:hover{background:' + g + '.12)}' +
-			'#nous-rp-ov{position:fixed;inset:0;z-index:10001;background:rgba(0,0,0,.55);display:flex;' +
-			'align-items:center;justify-content:center;backdrop-filter:blur(3px)}#nous-rp-ov.nous-hidden{display:none}' +
 			'#nous-rp{width:600px;max-width:95vw;max-height:80vh;display:flex;flex-direction:column;font-family:Inter,system-ui,sans-serif;' +
-			'font-size:13px;color:#eee;background:rgba(18,18,22,.97);border:1px solid ' + g + '.4);border-radius:16px;' +
-			'box-shadow:0 16px 48px rgba(0,0,0,.55);overflow:hidden}' +
+			'font-size:13px;color:var(--nd-txt);background:var(--nd-bg);border:1px solid ' + g + '.4);border-radius:16px;' +
+			'box-shadow:0 16px 48px var(--nd-sombra);overflow:hidden}' +
 			'#nous-rp-head{display:flex;align-items:center;padding:14px 16px 10px;border-bottom:1px solid ' + g + '.15)}' +
-			'#nous-rp-head span{flex:1;font:600 15px Cinzel,Georgia,serif;letter-spacing:.05em;color:#e7c069}' +
+			'#nous-rp-head span{flex:1;font:600 15px Cinzel,Georgia,serif;letter-spacing:.05em;color:var(--nd-texto-ouro)}' +
 			'.nous-rp-acts{display:flex;flex-wrap:wrap;gap:4px;justify-content:flex-end;align-self:center;max-width:52%}' +
-			'#nous-rp-close{background:none;border:none;color:#888;cursor:pointer;font-size:19px}' +
 			'#nous-rp-body{overflow-y:auto;padding:12px 16px 16px}' +
 			'.nous-rp-item{display:flex;gap:8px;align-items:flex-start;padding:9px 10px;border-radius:10px;' +
-			'background:rgba(255,255,255,.04);margin-bottom:6px}' +
-			'.nous-rp-item a{flex:1;color:#eee;text-decoration:none}.nous-rp-item a:hover b{color:#e7c069}' +
-			'.nous-rp-sub{font-size:11px;opacity:.6;margin-top:3px}' +
-			'.nous-rp-del{background:none;border:none;color:#888;cursor:pointer}.nous-rp-del:hover{color:#f08080}' +
+			'background:rgba(var(--nd-tom),.04);margin-bottom:6px}' +
+			'.nous-rp-item a{flex:1;color:var(--nd-txt);text-decoration:none}.nous-rp-item a:hover b{color:var(--nd-texto-ouro)}' +
+			'.nous-rp-sub{font-size:11px;color:var(--nd-mut);margin-top:3px}' +
+			'.nous-rp-del{background:none;border:none;color:var(--nd-mut);cursor:pointer}.nous-rp-del:hover{color:var(--nd-perigo)}' +
 			'.nous-rp-exp{align-self:center;padding:3px 8px;border:1px solid ' + g + '.35);border-radius:7px;background:transparent;' +
-			'color:#e7c069;font-size:11px;font-weight:600;cursor:pointer}.nous-rp-exp:hover{background:' + g + '.16)}' +
-			'.nous-rp-empty{opacity:.6;text-align:center;padding:18px 8px;font-size:12px;line-height:1.6}';
+			'color:var(--nd-texto-ouro);font-size:11px;font-weight:600;cursor:pointer}.nous-rp-exp:hover{background:' + g + '.16)}' +
+			'.nous-rp-empty{color:var(--nd-mut);text-align:center;padding:18px 8px;font-size:12px;line-height:1.6}';
 		var st = document.createElement('style');
 		st.id = 'nous-rp-style';
 		st.textContent = css;
@@ -55,16 +53,7 @@
 	}
 
 	function open() {
-		if (!ov || !document.body.contains(ov)) {
-			ov = document.createElement('div');
-			ov.id = 'nous-rp-ov';
-			ov.innerHTML = '<div id="nous-rp"><div id="nous-rp-head"><span>🔎 Relatorios de pesquisa</span>' +
-				'<button id="nous-rp-close" type="button" aria-label="Fechar">&#x2715;</button></div><div id="nous-rp-body"></div></div>';
-			document.body.appendChild(ov);
-			ov.addEventListener('click', function (e) { if (e.target === ov) ov.classList.add('nous-hidden'); });
-			ov.querySelector('#nous-rp-close').addEventListener('click', function () { ov.classList.add('nous-hidden'); });
-		}
-		ov.classList.remove('nous-hidden');
+		ov = dlg.abrir();
 		render();
 	}
 
@@ -107,14 +96,14 @@
 						}).then(function (res) {
 							if (fmt === 'doc') {
 								if (!window.NousDocs) throw new Error('os Documentos nao carregaram');
-								ov.classList.add('nous-hidden');
+								dlg.fechar();
 								window.NousDocs.novo(q.slice(0, 100), res);
 								return;
 							}
 							if (fmt === 'chat') {
 								var box = document.getElementById('chat-input');
 								if (!box) throw new Error('abra uma conversa primeiro');
-								ov.classList.add('nous-hidden');
+								dlg.fechar();
 								var m = 'Quero conversar sobre esta pesquisa que o Nous fez:\n\n' + res + '\n\nMinha pergunta: ';
 								box.focus();
 								if (box.tagName === 'TEXTAREA') {

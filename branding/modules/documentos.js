@@ -12,32 +12,30 @@
 	var UI = window.NousUI || {};
 	var esc = UI.esc || function (s) { return String(s || ''); };
 	var ov = null, pdfB64 = null, pdfName = 'documento', info = null;
+	var dlg = UI.dialogo({ id: 'nous-pdf', titulo: '📄 Formularios PDF' });
 
 	function injectStyle() {
 		if (document.getElementById('nous-pdf-style')) return;
 		var g = 'rgba(200,150,46,';
 		var css =
 			'#nous-pdf-open{width:100%;margin-top:5px;padding:6px;border:1px solid ' + g + '.25);border-radius:8px;' +
-			'cursor:pointer;background:transparent;color:#e7c069;font-weight:600;font-size:12px}#nous-pdf-open:hover{background:' + g + '.12)}' +
-			'#nous-pdf-ov{position:fixed;inset:0;z-index:10001;background:rgba(0,0,0,.55);display:flex;align-items:center;' +
-			'justify-content:center;backdrop-filter:blur(3px)}#nous-pdf-ov.nous-hidden{display:none}' +
+			'cursor:pointer;background:transparent;color:var(--nd-texto-ouro);font-weight:600;font-size:12px}#nous-pdf-open:hover{background:' + g + '.12)}' +
 			'#nous-pdf{width:560px;max-width:95vw;max-height:86vh;display:flex;flex-direction:column;font-family:Inter,system-ui,sans-serif;' +
-			'font-size:13px;color:#eee;background:rgba(18,18,22,.97);border:1px solid ' + g + '.4);border-radius:16px;' +
-			'box-shadow:0 16px 48px rgba(0,0,0,.55);overflow:hidden}' +
+			'font-size:13px;color:var(--nd-txt);background:var(--nd-bg);border:1px solid ' + g + '.4);border-radius:16px;' +
+			'box-shadow:0 16px 48px var(--nd-sombra);overflow:hidden}' +
 			'#nous-pdf-head{display:flex;align-items:center;padding:14px 16px 10px;border-bottom:1px solid ' + g + '.15)}' +
-			'#nous-pdf-head span{flex:1;font-weight:700;font-size:15px;color:#e7c069}' +
-			'#nous-pdf-close{background:none;border:none;color:#888;cursor:pointer;font-size:19px}' +
+			'#nous-pdf-head span{flex:1;font-weight:700;font-size:15px;color:var(--nd-texto-ouro)}' +
 			'#nous-pdf-body{overflow-y:auto;padding:12px 16px 16px}' +
-			'.nous-pdf-h{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#c8962e;margin:14px 0 6px}' +
-			'.nous-pdf-f{display:flex;gap:8px;align-items:center;margin-bottom:6px}.nous-pdf-f label{width:38%;font-size:11px;opacity:.75;word-wrap:break-word}' +
-			'.nous-pdf-f input,.nous-pdf-f select,.nous-pdf-sel{flex:1;box-sizing:border-box;padding:6px 8px;background:rgba(255,255,255,.07);' +
-			'border:1px solid ' + g + '.28);border-radius:7px;color:#eee;font-size:12px;outline:none;color-scheme:dark}' +
+			'.nous-pdf-h{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--nd-texto-ouro);margin:14px 0 6px}' +
+			'.nous-pdf-f{display:flex;gap:8px;align-items:center;margin-bottom:6px}.nous-pdf-f label{width:38%;font-size:11px;color:var(--nd-mut);word-wrap:break-word}' +
+			'.nous-pdf-f input,.nous-pdf-f select,.nous-pdf-sel{flex:1;box-sizing:border-box;padding:6px 8px;background:rgba(var(--nd-tom),.07);' +
+			'border:1px solid ' + g + '.28);border-radius:7px;color:var(--nd-txt);font-size:12px;outline:none;color-scheme:var(--nd-esquema)}' +
 			'.nous-pdf-f input[type=checkbox]{flex:0;accent-color:#c8962e}' +
 			'.nous-pdf-btn{padding:6px 12px;border:1px solid ' + g + '.45);border-radius:8px;cursor:pointer;background:' + g + '.18);' +
-			'color:#e7c069;font-weight:600;font-size:12px;margin:3px 5px 3px 0}.nous-pdf-btn:hover{background:' + g + '.32)}' +
+			'color:var(--nd-texto-ouro);font-weight:600;font-size:12px;margin:3px 5px 3px 0}.nous-pdf-btn:hover{background:' + g + '.32)}' +
 			'.nous-pdf-btn.ghost{background:transparent}.nous-pdf-btn:disabled{opacity:.4}' +
-			'.nous-pdf-hint{font-size:11px;opacity:.6;line-height:1.5;margin:4px 0 8px}.nous-pdf-msg{font-size:11px}.nous-pdf-bad{color:#f08080}' +
-			'#nous-pdf-pad{width:100%;height:140px;background:#fff;border-radius:8px;touch-action:none;cursor:crosshair;display:block}' +
+			'.nous-pdf-hint{font-size:11px;color:var(--nd-mut);line-height:1.5;margin:4px 0 8px}.nous-pdf-msg{font-size:11px}.nous-pdf-bad{color:var(--nd-perigo)}' +
+			'#nous-pdf-pad{width:100%;height:140px;background:#fff;border:1px solid ' + g + '.45);box-sizing:border-box;border-radius:8px;touch-action:none;cursor:crosshair;display:block}' +
 			'#nous-pdf-sigimg{max-height:70px;background:#fff;border-radius:6px;padding:4px}';
 		var st = document.createElement('style');
 		st.id = 'nous-pdf-style';
@@ -57,16 +55,7 @@
 	}
 
 	function open() {
-		if (!ov || !document.body.contains(ov)) {
-			ov = document.createElement('div');
-			ov.id = 'nous-pdf-ov';
-			ov.innerHTML = '<div id="nous-pdf"><div id="nous-pdf-head"><span>📄 Formularios PDF</span>' +
-				'<button id="nous-pdf-close" type="button" aria-label="Fechar">&#x2715;</button></div><div id="nous-pdf-body"></div></div>';
-			document.body.appendChild(ov);
-			ov.addEventListener('click', function (e) { if (e.target === ov) ov.classList.add('nous-hidden'); });
-			ov.querySelector('#nous-pdf-close').addEventListener('click', function () { ov.classList.add('nous-hidden'); });
-		}
-		ov.classList.remove('nous-hidden');
+		ov = dlg.abrir();
 		renderStart();
 	}
 	function body() { return ov.querySelector('#nous-pdf-body'); }
@@ -185,7 +174,7 @@
 				document.body.appendChild(a);
 				a.click();
 				setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
-				m.innerHTML = ' <span style="color:#5fd693">✓ Baixado.</span>';
+				m.innerHTML = ' <span style="color:var(--nd-ok)">✓ Baixado.</span>';
 			}).catch(function (e) { m.innerHTML = ' <span class="nous-pdf-bad">' + esc(e.message) + '</span>'; });
 	}
 
