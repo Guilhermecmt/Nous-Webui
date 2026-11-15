@@ -52,7 +52,7 @@ import contacts as ct  # noqa: E402
 import drafts  # noqa: E402
 
 PORT = 8995
-OLLAMA_URL = os.environ.get("OLLAMA_BASE_URL", "http://127.0.0.1:11434").rstrip("/")
+OLLAMA_URL = os.environ.get("OLLAMA_BASE_URL", "http://127.0.0.1:8989").rstrip("/")
 # Mesmo num_ctx do chat (monitor/register_model_ctx.py): com outro valor o
 # Ollama recarrega o modelo (no 0.30 o padrao chega a 256k = estoura a VRAM).
 NUM_CTX = int(os.environ.get("NOUS_NUM_CTX", "16384"))

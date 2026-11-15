@@ -101,7 +101,7 @@ if ($py) {
     }
 
     # Historico e habilidades: Ollama de mentira, sem rede.
-    foreach ($par in @(@("history/testes", "Historico"), @("skills/testes", "Habilidades"))) {
+    foreach ($par in @(@("history/testes", "Historico"), @("skills/testes", "Habilidades"), @("motor/testes", "Motor proprio (llama-server de mentira)"), @("monitor/testes", "Monitor e Loja"))) {
         if (Test-Path (Join-Path $root $par[0])) {
             & $py.Source -c "import aiohttp, pydantic, requests" 2>$null
             if ($LASTEXITCODE -eq 0) {
@@ -128,9 +128,9 @@ if ($py) {
         } else { Write-Host "  (testes do celular pulados: falta aiohttp no Python)" -ForegroundColor DarkGray }
     }
 
-    # Paletas e icone (branding/testes: so' biblioteca padrao + Pillow) e a escolha da
-    # paleta no monitor (monitor/testes: aiohttp).
-    foreach ($par in @(@("branding/testes", "Paletas e icone", "PIL"), @("monitor/testes", "Aparencia (monitor)", "aiohttp"))) {
+    # Paletas e icone (branding/testes: so' biblioteca padrao + Pillow). A escolha da
+    # paleta no monitor (monitor/testes/test_aparencia.py) roda junto com "Monitor e Loja".
+    foreach ($par in @(@("branding/testes", "Paletas e icone", "PIL"))) {
         if (Test-Path (Join-Path $root $par[0])) {
             & $py.Source -c "import $($par[2])" 2>$null
             if ($LASTEXITCODE -eq 0) {

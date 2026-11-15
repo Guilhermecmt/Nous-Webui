@@ -257,7 +257,7 @@ class Nous:
     def __init__(self, data_dir):
         self.dd = str(data_dir)
         self.owui = os.environ.get("NOUS_OWUI_URL", "http://127.0.0.1:8080").rstrip("/")
-        self.ollama = os.environ.get("OLLAMA_BASE_URL", "http://127.0.0.1:11434").rstrip("/")
+        self.ollama = os.environ.get("OLLAMA_BASE_URL", "http://127.0.0.1:8989").rstrip("/")
 
     def _cab(self, user_id):
         return {"Authorization": "Bearer " + token_de(self.dd, user_id)}

@@ -7,7 +7,7 @@ import re
 import requests
 from .search import search_web
 
-OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434").rstrip("/")
+OLLAMA_URL = os.environ.get("OLLAMA_URL") or os.environ.get("OLLAMA_BASE_URL", "http://127.0.0.1:8989").rstrip("/")
 NOUS_MODEL = os.environ.get("NOUS_MODEL", "gemma4:12b")
 # Mesmo num_ctx do chat (monitor/register_model_ctx.py): com outro valor o
 # Ollama recarrega o modelo (no 0.30 o padrao chega a 256k e estoura a VRAM).

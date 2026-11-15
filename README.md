@@ -27,7 +27,7 @@ No cloud, no subscription, no account to create.
 
 ## Overview
 
-**Nous** (Greek *νοῦς*, "mind") turns [Open WebUI](https://github.com/open-webui/open-webui) and [Ollama](https://ollama.com) into a finished product for non-technical people. It installs in two clicks, picks the right model for your hardware and runs everything in the background, without terminal windows.
+**Nous** (Greek *νοῦς*, "mind") turns [Open WebUI](https://github.com/open-webui/open-webui) and [llama.cpp](https://github.com/ggml-org/llama.cpp) into a finished product for non-technical people. It installs in two clicks, picks the right model for your hardware and runs everything in the background, without terminal windows.
 
 - **Private by default.** The model runs on your machine, the server only accepts connections from the PC itself, and chats, memories and files stay on your disk.
 - **Ready to use.** No account, API key or configuration. On first launch, a wizard recommends and downloads the best model for your graphics card.
@@ -118,7 +118,8 @@ Without a dedicated GPU, Nous runs on the CPU and answers simply take longer. Th
 
 The installer:
 - checks your hardware;
-- installs Ollama, Python 3.11, the interface and a portable Node.js for Nous Code, without touching what is already on the machine;
+- downloads its own AI engine (llama.cpp's `llama-server`, ~40 MB; Ollama is no longer needed) and installs Python 3.11, the interface and a portable Node.js for Nous Code, without touching what is already on the machine;
+- adds the `nous` command to your terminal (Nous Code in any folder, like `claude` or `codex`);
 - applies the Nous identity;
 - creates shortcuts on the desktop and in the Start menu.
 
@@ -240,7 +241,7 @@ Reports are kept in the panel, download as PDF or Word, and the conversation can
 
 ## Privacy and security
 
-- **Everything local.** Models run on your machine's Ollama. Chats, memories, documents and indexes live in `%USERPROFILE%\NousData`.
+- **Everything local.** Models run on your machine, through Nous's own engine (`nous-motor` + `llama-server`; Ollama optional). Chats, memories, documents and indexes live in `%USERPROFILE%\NousData`.
 - **This PC only.** The Nous server and every service listen only on `127.0.0.1`, so other devices on the network cannot reach them. The server and the services reject pages from other websites.
 - **Phone only if you turn it on.** The phone gateway exists only while it is on, answers only the home network (a Private network in Windows) and only devices paired by QR code. Whoever gets in uses all of Nous, since there is no login. Nous Code never goes through it.
 - **Updates with notice.** Checking for a new version is a trip to the internet, at most once a day, and can be turned off from the tray icon. Nothing is downloaded without your click.
@@ -313,8 +314,9 @@ Nous is a product layer over Open WebUI 0.12.3 (pinned in the installer). It com
 | 8997 | Skills | `skills/` |
 | 8998 | Nous Code (IDE and agent, Node) | `code/` |
 | 8999 | Phone gateway (only while on; home network) | `celular/` |
+| 8989 | AI engine (`nous-motor`): the Ollama API on top of `llama-server` | `motor/` |
 | 8188 | ComfyUI (optional) | `images/` |
-| 11434 | Ollama | |
+| 11434 | Ollama (optional: `-ComOllama` or `motor: ollama`) | |
 
 The launcher (`launchers/start-nous.ps1`) starts everything hidden and registers filters and settings on every start. Every step is idempotent: running it again breaks nothing.
 
@@ -370,7 +372,8 @@ Next steps are in the [ROADMAP](docs/ROADMAP.md). Issues and pull requests are w
 
 **Foundation:**
 - [Open WebUI](https://github.com/open-webui/open-webui)
-- [Ollama](https://ollama.com)
+- [llama.cpp](https://github.com/ggml-org/llama.cpp) (MIT): `llama-server`, the engine behind `nous-motor`
+- [Ollama](https://ollama.com) (optional engine; Nous reads its model folder and registry)
 - [Monaco Editor](https://github.com/microsoft/monaco-editor) (MIT)
 - [xterm.js](https://github.com/xtermjs/xterm.js) (MIT)
 - [node-pty](https://github.com/microsoft/node-pty) (MIT)

@@ -143,7 +143,7 @@ async def h_fetch(request):
 # Textos do usuario -> guia de estilo -> habilidade "Meu jeito de escrever", que o
 # filtro Nous Skills aplica sozinho quando ele pede para escrever algo.
 
-OLLAMA_URL = os.environ.get("OLLAMA_BASE_URL", "http://127.0.0.1:11434").rstrip("/")
+OLLAMA_URL = os.environ.get("OLLAMA_BASE_URL", "http://127.0.0.1:8989").rstrip("/")
 NUM_CTX = int(os.environ.get("NOUS_NUM_CTX", "16384"))
 _EMBED = ("embed", "nomic", "minilm", "bge-", "e5-", "gte-")
 STYLE_ID = "meu-jeito-de-escrever"

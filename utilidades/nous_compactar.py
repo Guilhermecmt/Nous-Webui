@@ -54,14 +54,14 @@ class Filter:
         ENABLED: bool = Field(default=True, description="Liga/desliga a compactacao de conversas longas.")
         LIMITE: float = Field(default=0.60, description="Fracao do contexto a partir da qual o inicio vira resumo.")
         MANTER: int = Field(default=6, description="Quantas mensagens recentes vao inteiras.")
-        OLLAMA_URL: str = Field(default="", description="URL do Ollama. Vazio = OLLAMA_BASE_URL ou 127.0.0.1:11434.")
+        OLLAMA_URL: str = Field(default="", description="URL do Ollama. Vazio = OLLAMA_BASE_URL ou 127.0.0.1:8989 (nous-motor).")
 
     def __init__(self):
         self.valves = self.Valves()
         self._cache = {}  # hash do trecho resumido -> (quando, resumo)
 
     def _ollama(self):
-        return (self.valves.OLLAMA_URL or os.environ.get("OLLAMA_BASE_URL", "http://127.0.0.1:11434")).rstrip("/")
+        return (self.valves.OLLAMA_URL or os.environ.get("OLLAMA_BASE_URL", "http://127.0.0.1:8989")).rstrip("/")
 
     def _model(self, chat_model):
         try:

@@ -108,7 +108,7 @@ class Filter:
         MAX_CONTEXT_CHARS: int = Field(default=4000, description="Limite total de texto injetado.")
         RRF_K: int = Field(default=60, description="Constante do Reciprocal Rank Fusion.")
         EMBED_MODEL: str = Field(default="granite-embedding:278m", description="Modelo de embeddings (Ollama). Igual ao do indexador (NOUS_EMBED_MODEL).")
-        OLLAMA_URL: str = Field(default="", description="URL do Ollama. Vazio = OLLAMA_BASE_URL ou 127.0.0.1:11434.")
+        OLLAMA_URL: str = Field(default="", description="URL do Ollama. Vazio = OLLAMA_BASE_URL ou 127.0.0.1:8989 (nous-motor).")
 
     def __init__(self):
         self.valves = self.Valves()
@@ -117,7 +117,7 @@ class Filter:
     # ------- infra -------
     def _ollama(self):
         return (self.valves.OLLAMA_URL
-                or os.environ.get("OLLAMA_BASE_URL", "http://127.0.0.1:11434")).rstrip("/")
+                or os.environ.get("OLLAMA_BASE_URL", "http://127.0.0.1:8989")).rstrip("/")
 
     def _sync_folder_config(self):
         """Se o usuario apontou uma pasta pelo valve, grava no config p/ o indexador."""

@@ -100,7 +100,7 @@ def padrao_modelo(cx, pasta_dados):
         if not modelo:
             return
         import requests
-        base = os.environ.get("OLLAMA_BASE_URL", "http://127.0.0.1:11434").rstrip("/")
+        base = os.environ.get("OLLAMA_BASE_URL", "http://127.0.0.1:8989").rstrip("/")
         tags = [m.get("name") for m in requests.get(base + "/api/tags", timeout=5).json().get("models", [])]
     except Exception:
         return

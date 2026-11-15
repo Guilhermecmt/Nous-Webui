@@ -20,7 +20,7 @@ param(
     [string]$DataDir,
     [string]$PortaNous = "8080",
     [string]$PortaMonitor = "8990",
-    [string]$OllamaUrl = "http://127.0.0.1:11434",
+    [string]$OllamaUrl = "http://127.0.0.1:8989",   # nous-motor (fala a API do Ollama)
     [string]$ChaveRun = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run",
     [string]$Instancia = "",          # separa o mutex (testes)
     [switch]$Teste,                   # monta o menu, escreve o texto dele e sai

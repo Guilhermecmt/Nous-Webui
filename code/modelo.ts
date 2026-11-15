@@ -12,7 +12,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { repararJson, repararNome } from './reparo.ts';
 
-export const OLLAMA = process.env.OLLAMA_BASE_URL || 'http://127.0.0.1:11434';
+export const OLLAMA = process.env.OLLAMA_BASE_URL || 'http://127.0.0.1:8989';
 
 /* Provedores compativeis com OpenAI. O modelo deles aparece como
  * "<provedor>::<id>" (ex.: "lmstudio::qwen2.5-coder-14b-instruct"). O LM Studio

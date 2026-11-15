@@ -55,7 +55,7 @@ from pathlib import Path
 import aiohttp
 from aiohttp import web
 
-OLLAMA = os.environ.get("NOUS_OLLAMA_URL") or "http://127.0.0.1:11434"   # NOUS_OLLAMA_URL: so' para testes (Ollama de mentira)
+OLLAMA = (os.environ.get("NOUS_OLLAMA_URL") or os.environ.get("OLLAMA_BASE_URL") or "http://127.0.0.1:8989").rstrip("/")   # NOUS_OLLAMA_URL: so' para testes (Ollama de mentira)
 PORT = int(os.environ.get("NOUS_MONITOR_PORT") or 8990)
 GB = 1073741824
 CATALOG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "catalog.json")
@@ -346,7 +346,8 @@ def _ram_bandwidth(mts, dimms):
 
 def _speed(model, hw):
     """{tps, onde}: tokens/s estimados e onde o modelo roda (gpu|misto|cpu)."""
-    size = model["download_gb"] * 1.1  # pesos + buffers do runtime
+    # pesos + buffers do runtime; modelo de poucos MB arredonda para 0.0 GB
+    size = max(model["download_gb"], 0.05) * 1.1
     ram_bw = hw.get("ram_bw") or 50
     gpu_bw = hw.get("gpu_bw") or 0
     if hw["tier"] == "cpu" or not gpu_bw:

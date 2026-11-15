@@ -191,7 +191,7 @@ def set_pinned(mem_id, user_id, pinned):
 
 # ---- faxina: o modelo PROPOE juntar repetidas/contraditorias; o usuario aprova ----
 
-OLLAMA_URL = os.environ.get("OLLAMA_BASE_URL", "http://127.0.0.1:11434").rstrip("/")
+OLLAMA_URL = os.environ.get("OLLAMA_BASE_URL", "http://127.0.0.1:8989").rstrip("/")
 NUM_CTX = int(os.environ.get("NOUS_NUM_CTX", "16384"))
 _EMBED = ("embed", "nomic", "minilm", "bge-", "e5-", "gte-")
 EMBED_MODEL = os.environ.get("NOUS_EMBED_MODEL", "granite-embedding:278m")

@@ -282,7 +282,7 @@ class Filter:
         REVIEW: bool = Field(default=True, description="Gera propostas de habilidade a partir de correcoes; nada e' salvo sem aprovacao.")
         REVIEW_IDLE_S: float = Field(default=15, description="Segundos sem nenhum turno antes de chamar o modelo para revisar.")
         EMBED_MODEL: str = Field(default="granite-embedding:278m", description="Modelo de embeddings (Ollama).")
-        OLLAMA_URL: str = Field(default="", description="URL do Ollama. Vazio = OLLAMA_BASE_URL ou 127.0.0.1:11434.")
+        OLLAMA_URL: str = Field(default="", description="URL do Ollama. Vazio = OLLAMA_BASE_URL ou 127.0.0.1:8989 (nous-motor).")
 
     def __init__(self):
         self.valves = self.Valves()
@@ -296,7 +296,7 @@ class Filter:
 
     def _ollama(self):
         return (self.valves.OLLAMA_URL
-                or os.environ.get("OLLAMA_BASE_URL", "http://127.0.0.1:11434")).rstrip("/")
+                or os.environ.get("OLLAMA_BASE_URL", "http://127.0.0.1:8989")).rstrip("/")
 
     def _embed(self, text):
         if requests is None or np is None:

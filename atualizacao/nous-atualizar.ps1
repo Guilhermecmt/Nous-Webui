@@ -26,7 +26,7 @@ param(
     [string]$DataDir,                # padrao: %USERPROFILE%\NousData
     [string]$Venv,                   # padrao: %USERPROFILE%\open-webui
     [string]$ApiUrl = "https://api.github.com/repos/Guilhermecmt/Nous-Webui/releases/latest",
-    [string]$OllamaUrl = "http://127.0.0.1:11434",
+    [string]$OllamaUrl = "http://127.0.0.1:8989",   # nous-motor (fala a API do Ollama)
     [string]$RegistroUrl = "https://registry.ollama.ai",
     [string]$PortaNous = "8080",
     [int]$EsperaSubirSeg = 180,      # quanto esperar o Nous responder depois de atualizar, antes de voltar atras
@@ -46,7 +46,9 @@ $estadoPath = Join-Path $DataDir "atualizacao-estado.json"
 $trabalho   = Join-Path $DataDir "atualizacao"
 $logPath    = Join-Path $trabalho "atualizacao.log"
 $HOSTS_OK   = '^https://(github\.com|api\.github\.com|objects\.githubusercontent\.com|release-assets\.githubusercontent\.com)/'
-$EXCLUI_DIRS  = @("bkp", "node_modules", "__pycache__", ".git")
+# runtime (Node portatil) e bin (motor\bin = llama-server, <app>\bin = comando nous) nao
+# vem no pacote: sem excluir, o /MIR do Copy-App apagava tudo isso a cada atualizacao.
+$EXCLUI_DIRS  = @("bkp", "node_modules", "__pycache__", ".git", "runtime", "bin")
 $EXCLUI_ARQ   = @("*.sqlite", "*.log", ".webui_secret_key", "*.local", "*.pyc")
 
 New-Item -ItemType Directory -Force -Path $trabalho | Out-Null
@@ -391,6 +393,17 @@ function Invoke-Aplicar {
             # e' compativel com ele; so' a volta que falhou (2) desfaz o app.
             if ($codOwui -eq 1) { Log "Open WebUI continua na versao anterior; o resto da atualizacao segue" }
             elseif ($codOwui -eq 2) { & $reverter "Nao consegui atualizar o Open WebUI (o backup dos seus dados esta em bkp)."; return 1 }
+        }
+        # Motor de IA: baixa o llama-server da versao fixada no pacote (se mudou ou falta).
+        # Falhou? O nous-motor segue no modo Ollama, como antes.
+        $libLlama = Join-Path $AppDir "launchers\llama-nous.ps1"
+        if (Test-Path -LiteralPath $libLlama) {
+            . $libLlama
+            if ((Get-LlamaPin $AppDir) -and -not (Test-LlamaAtual $AppDir)) {
+                Set-Estado @{ mensagem = "Baixando o motor de IA (llama.cpp, ~40 MB)..." }
+                if (Install-LlamaServer -AppDir $AppDir) { Log "llama-server $((Get-LlamaPin $AppDir).tag) instalado" }
+                else { Log "llama-server nao instalado: $script:LlamaErro (o motor usa o Ollama)" }
+            }
         }
         $lockNovo = Get-FileHash -LiteralPath (Join-Path $AppDir "code\package-lock.json") -ErrorAction SilentlyContinue
         $node = Get-Command npm.cmd -ErrorAction SilentlyContinue

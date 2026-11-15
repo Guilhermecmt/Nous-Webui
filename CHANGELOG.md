@@ -16,6 +16,46 @@
   16 a 24 px, a coruja aparece sem a coroa. O selo vale também para a aba do
   navegador e o ícone do celular. A bolinha de estado da bandeja ficou menor (34%
   do ícone) e não cobre mais a coruja.
+- **Motor de IA próprio: o Ollama deixou de ser obrigatório** (`motor/`). O
+  serviço novo `nous-motor` (porta 8989) responde a mesma API do Ollama, e todo
+  o Nous fala com ele. Por dentro, ele sobe um `llama-server` (llama.cpp, build
+  Vulkan: AMD, NVIDIA e Intel) por modelo e derruba quando o tempo na memória
+  acaba. Os modelos que você já tem continuam onde estão, com os mesmos nomes,
+  e conversas, memórias e índices não mudam: os vetores saem iguais aos do
+  Ollama (cosseno ≥ 0,9997 medido em granite-embedding, bge-m3 e
+  nomic-embed-text). A Loja baixa e apaga modelos sem o Ollama, do mesmo
+  catálogo, com retomada e conferência do SHA256. Até 2 modelos de conversa
+  ficam carregados ao mesmo tempo (o dos filtros e o da conversa), e um modelo
+  com pedido em andamento nunca é derrubado. Um modelo maior que a VRAM livre
+  divide entre placa e CPU, e, se faltar memória, os modelos parados saem e o
+  carregamento tenta de novo. "Parar" corta a geração na placa na hora; se o
+  motor cair, os `llama-server` caem junto (Job do Windows), sem VRAM presa.
+  Na RX 9070 XT o qwen3:4b gerou ~155 tokens/s. O Ollama continua como
+  alternativa: `-ComOllama` no instalador, ou `{"motor": "ollama"}` em
+  `NousData\motor\ajustes.json`. Se o motor não subir, o Nous volta sozinho
+  para o Ollama.
+- **Instalação mais simples.** O instalador baixa só o `llama-server` (~40 MB,
+  versão e SHA256 fixados em `motor/LLAMA_VERSAO.json`) no lugar do Ollama
+  (~1,3 GB). O modelo escolhido é baixado pelo próprio Nous, e o comando
+  `nous` entra no PATH do usuário. O atualizador baixa o `llama-server` novo
+  quando a versão fixada muda.
+- **`nous` no terminal** (`code/cli.ts`, `code/cli/`, `launchers/nous.cmd`).
+  Digite `nous` em qualquer pasta e o Nous Code abre uma conversa ali, como o
+  `claude` e o `codex`: resposta aos poucos, uma linha por ferramenta,
+  aprovação com o diff colorido (`[s]im / [n]ão / [a] sempre`), perguntas do
+  agente e plano aprovados no terminal, `Esc` ou `Ctrl+C` para interromper,
+  histórico, Tab para `/comandos` e `@arquivos`, e rodapé com modelo,
+  raciocínio, modo e contexto. Comandos `/ajuda`, `/modelo`, `/effort`,
+  `/modo`, `/alcance`, `/plano`, `/objetivo`, `/compactar`, `/contexto`,
+  `/novo`, `/conversas`, `/desfazer`, `/mudancas`, `/exportar`, `/mcp`,
+  `/skills`, `/ide`, `/padrao` e `/sair`, com apelidos em inglês (`/model`,
+  `/permissions`, `/resume`, `/undo`...). `nous -p "pedido"` (ou texto pelo
+  pipe) roda um pedido só, com a resposta no stdout e a atividade no stderr;
+  `--model`, `--effort`, `--modo`, `--alcance`, `-c`. É cliente do mesmo serviço
+  do IDE (liga o serviço sozinho): as conversas aparecem na janela do Nous
+  Code. O serviço passa a aceitar o terminal por um token aleatório em
+  `NousData\code\cli-token`; as páginas do navegador continuam barradas.
+  `/abrir-janela` aceita `sessao` e o IDE abre direto aquela conversa.
 - **Telegram e WhatsApp** (`mensageiros/`, painel **Seu Nous › Telegram e
   WhatsApp**). Fale com o Nous pelo celular de qualquer lugar: a mensagem entra
   pelo mesmo caminho da conversa normal (memória, agenda, habilidades e e-mail
@@ -124,6 +164,18 @@
   dos botões ficou um tom mais escuro (o mesmo dos painéis) pelo mesmo motivo.
   Relatórios de pesquisa gravados antes desta versão continuam com as cores que
   tinham.
+- O atualizador automático apagava a pasta `runtime` (Node portátil do Nous
+  Code) a cada atualização, porque o `robocopy /MIR` remove o que não vem no
+  pacote. Agora `runtime` e `bin` ficam.
+- A Loja dava erro 500 ao conferir um modelo de poucos MB (`all-minilm:22m`):
+  o tamanho arredondava para 0,0 GB e a estimativa de velocidade dividia por
+  zero.
+- **Pedidos do chat que viram ação não chegavam à tela** no Open WebUI 0.12:
+  "/pc ..." respondia "Abrindo o Nous Code" e nada abria; "abre a agenda", o
+  botão "↩ Desfazer" da agenda, os botões do e-mail e o aviso da Guarda também
+  sumiam. O 0.12 desenha a resposta pelo campo `output` e os filtros só
+  escreviam no `content`. Agora escrevem nos dois (Comandos, Agenda, E-mail e
+  Guarda); teste em `utilidades/testes/test_marcas_output.py`.
 - "Quinta às 10h" dito numa quinta depois das 10h era recusado como horário que já
   passou, e o modelo pequeno confirmava mesmo assim. Agora vale a próxima quinta.
 - Repetir o mesmo pedido à agenda no mesmo dia não gravava nada: a proteção contra

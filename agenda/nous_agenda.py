@@ -345,11 +345,31 @@ def _fmt(ts, all_day=False):
     return s if all_day else s + d.strftime(" as %H:%M")
 
 
+def _anexar_ao_fim(msg, extra):
+    """Poe `extra` no fim da resposta. No Open WebUI 0.12 a resposta chega com `content`
+    e `output` (itens type=message com partes output_text); quando `output` existe a tela
+    desenha so' ele, entao a marca vai nos dois (senao some da tela)."""
+    msg["content"] = (msg.get("content") or "") + extra
+    out = msg.get("output")
+    if not isinstance(out, list) or not out:
+        return
+    for item in reversed(out):
+        if isinstance(item, dict) and item.get("type") == "message" and isinstance(item.get("content"), list):
+            partes = item["content"]
+            if partes and isinstance(partes[-1], dict) and partes[-1].get("type") == "output_text":
+                partes[-1]["text"] = (partes[-1].get("text") or "") + extra
+            else:
+                partes.append({"type": "output_text", "text": extra})
+            return
+    out.append({"type": "message", "role": "assistant", "status": "completed",
+                "content": [{"type": "output_text", "text": extra.lstrip()}]})
+
+
 class Filter:
     class Valves(BaseModel):
         ENABLED: bool = Field(default=True, description="Liga/desliga a agenda pelo chat.")
         AGENDA_URL: str = Field(default="http://127.0.0.1:8996", description="Servico da agenda do Nous.")
-        OLLAMA_URL: str = Field(default="http://127.0.0.1:11434", description="Ollama local (extrai os dados do pedido).")
+        OLLAMA_URL: str = Field(default=os.environ.get("OLLAMA_BASE_URL", "http://127.0.0.1:8989").rstrip("/"), description="Ollama local (extrai os dados do pedido).")
         AVISO_PADRAO_MIN: int = Field(default=30, description="Minutos de antecedencia do aviso de compromissos.")
 
     def __init__(self):
@@ -585,7 +605,7 @@ class Filter:
         msgs = body.get("messages", [])
         asst = next((m for m in reversed(msgs) if m.get("role") == "assistant"), None)
         if asst and isinstance(asst.get("content"), str) and "⟦opcao:↩ Desfazer" not in asst["content"]:
-            asst["content"] += "\n\n⟦opcao:↩ Desfazer|desfazer⟧"
+            _anexar_ao_fim(asst, "\n\n⟦opcao:↩ Desfazer|desfazer⟧")
         return body
 
 

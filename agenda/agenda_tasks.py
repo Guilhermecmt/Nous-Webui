@@ -39,7 +39,7 @@ import requests
 
 import agenda_db as db
 
-OLLAMA_URL = os.environ.get("OLLAMA_BASE_URL", "http://127.0.0.1:11434").rstrip("/")
+OLLAMA_URL = os.environ.get("OLLAMA_BASE_URL", "http://127.0.0.1:8989").rstrip("/")
 EMAIL_URL = "http://127.0.0.1:8995"
 # Mesmo num_ctx do chat (monitor/register_model_ctx.py): com outro valor o
 # Ollama recarrega o modelo (no 0.30 o padrao chega a 256k e estoura a VRAM).

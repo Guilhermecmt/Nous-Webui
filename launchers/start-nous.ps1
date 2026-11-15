@@ -1,6 +1,7 @@
 ﻿<#
   Nous WebUI - Iniciar (em segundo plano, sem janela de terminal).
-  Sobe o Ollama (se preciso) + o servidor Nous OCULTO e abre o navegador.
+  Sobe o motor de IA (nous-motor; o Ollama so' no modo "ollama") + o servidor
+  Nous OCULTO e abre o navegador.
   Chamado sem janela pelo nous-hidden.vbs (atalho "Nous" / iniciar.bat).
   Para encerrar: use stop-nous.ps1 (ou o atalho "Parar Nous").
 #>
@@ -79,13 +80,12 @@ function Ensure-FilesFolder {
 # melhor que o nomic-embed-text. Baixa so' se faltar (~560 MB).
 function Ensure-EmbedModel {
     try {
-        $tags = Invoke-RestMethod "http://127.0.0.1:11434/api/tags" -TimeoutSec 5
+        $tags = Invoke-RestMethod "$env:OLLAMA_BASE_URL/api/tags" -TimeoutSec 5
         $has = $false
         foreach ($m in $tags.models) { if ($m.name -eq "granite-embedding:278m") { $has = $true } }
-        if (-not $has) {
-            $ollamaExe = Join-Path $env:LOCALAPPDATA "Programs\Ollama\ollama.exe"
-            if (-not (Test-Path $ollamaExe)) { $ollamaExe = "ollama" }
-            Start-Process -FilePath $ollamaExe -ArgumentList "pull granite-embedding:278m" -WindowStyle Hidden
+        $puxar = Join-Path $PSScriptRoot "..\motor\puxar.py"
+        if (-not $has -and (Test-Path $puxar)) {
+            Start-Process -FilePath $py -ArgumentList "`"$puxar`" granite-embedding:278m --silencioso" -WindowStyle Hidden
         }
     } catch {}
 }
@@ -359,6 +359,30 @@ function Start-Bandeja {
     Start-Process -FilePath "wscript.exe" -ArgumentList "`"$vbs`"" -WindowStyle Hidden
 }
 
+# Motor de IA (nous-motor, 8989): responde a API do Ollama. No modo "llama" sobe
+# o llama-server do proprio Nous para cada modelo; no modo "ollama" repassa para
+# o Ollama. Roda em TODO inicio (como o monitor). Devolve o modo ("llama" ou
+# "ollama") ou $null se o motor nao subiu.
+function Start-Motor {
+    $motor = Join-Path $PSScriptRoot "..\motor\nous_motor.py"
+    if (-not ((Test-Path $py) -and (Test-Path $motor))) { return $null }
+    try { return (Invoke-RestMethod "http://127.0.0.1:8989/health" -TimeoutSec 2).motor } catch {}
+    Start-Process -FilePath $py -ArgumentList "`"$motor`"" -WindowStyle Hidden
+    for ($i = 0; $i -lt 40; $i++) {
+        Start-Sleep -Milliseconds 250
+        try { return (Invoke-RestMethod "http://127.0.0.1:8989/health" -TimeoutSec 2).motor } catch {}
+    }
+    return $null
+}
+
+# Aponta o Open WebUI (banco) para o mesmo endereco que o resto do Nous usa.
+function Register-Motor {
+    $s = Join-Path $PSScriptRoot "..\ajustes\register_motor.py"
+    if ((Test-Path $py) -and (Test-Path $s)) {
+        & $py "$s" --data-dir "$env:DATA_DIR" --url "$env:OLLAMA_BASE_URL" | Out-Null
+    }
+}
+
 # Mesma busca do instalador: o Ollama pode estar no PATH ou em Program Files,
 # nao so' em LOCALAPPDATA.
 function Find-OllamaApp {
@@ -383,7 +407,7 @@ function Test-ServerProcess {
 }
 
 function Register-All {
-    Ensure-Branding; Register-Ajustes; Set-ContaNome; Register-Memory; Register-Pipe; Register-Research; Register-Arena
+    Register-Motor; Ensure-Branding; Register-Ajustes; Set-ContaNome; Register-Memory; Register-Pipe; Register-Research; Register-Arena
     Register-Cloud; Register-Voice; Start-VoiceServer; Start-ComfyUI; Setup-Files
     Setup-History; Hide-EmbedModels; Set-ModelCtx; Start-MemoryAPI; Start-EmailAPI
     Register-Utilidades; Start-AgendaAPI; Register-Agenda; Start-SkillsAPI; Register-Skills
@@ -403,6 +427,12 @@ if (-not (Test-Path $exe)) {
     return
 }
 
+$motorModo = Start-Motor
+if (-not $motorModo) {
+    # Motor nao subiu (arquivo faltando, porta ocupada): o Nous fala direto com o
+    # Ollama, como antes. O Register-Motor grava o mesmo endereco no banco.
+    $env:OLLAMA_BASE_URL = $env:NOUS_OLLAMA_REAL
+}
 Start-Monitor
 Start-Bandeja
 
@@ -420,13 +450,15 @@ if ((Test-Path $loading) -and $env:NOUS_SEM_NAVEGADOR -ne "1") { Start-Process $
 # Sem esta trava, cada clique subia OUTRO servidor contra o mesmo webui.db.
 if (Test-ServerProcess) { return }
 
-# Garante o Ollama (em segundo plano)
-try { Invoke-RestMethod "http://127.0.0.1:11434/api/version" -TimeoutSec 3 | Out-Null }
-catch {
-    $ol = Find-OllamaApp
-    if ($ol) {
-        if ($ol.args) { Start-Process $ol.exe -ArgumentList $ol.args -WindowStyle Hidden }
-        else          { Start-Process $ol.exe -WindowStyle Hidden }
+# O Ollama so' e' preciso no modo "ollama" (ou se o motor nao subiu).
+if ($motorModo -ne "llama") {
+    try { Invoke-RestMethod "$env:NOUS_OLLAMA_REAL/api/version" -TimeoutSec 3 | Out-Null }
+    catch {
+        $ol = Find-OllamaApp
+        if ($ol) {
+            if ($ol.args) { Start-Process $ol.exe -ArgumentList $ol.args -WindowStyle Hidden }
+            else          { Start-Process $ol.exe -WindowStyle Hidden }
+        }
     }
 }
 
@@ -435,7 +467,7 @@ catch {
 if ($manifestModel) {
     for ($i = 0; $i -lt 10; $i++) {
         try {
-            $tags = Invoke-RestMethod "http://127.0.0.1:11434/api/tags" -TimeoutSec 3
+            $tags = Invoke-RestMethod "$env:OLLAMA_BASE_URL/api/tags" -TimeoutSec 3
             if ($tags.models | Where-Object { $_.name -eq $manifestModel -or $_.name -eq "${manifestModel}:latest" }) {
                 $env:DEFAULT_MODELS = $manifestModel
             }

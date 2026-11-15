@@ -9,7 +9,12 @@ function Set-NousEnv {
 # --- Configuracao ---
 $env:WEBUI_NAME          = "Nous"
 $env:DATA_DIR            = if ($env:NOUS_DATA_DIR) { $env:NOUS_DATA_DIR } else { Join-Path $env:USERPROFILE "NousData" }
-$env:OLLAMA_BASE_URL     = "http://127.0.0.1:11434"
+# Todo o Nous fala com o nous-motor (motor\nous_motor.py), que responde a API do
+# Ollama: no modo "llama" com o llama-server do proprio Nous, no modo "ollama"
+# repassando para o Ollama. O Ollama deixou de ser obrigatorio.
+$env:OLLAMA_BASE_URL     = "http://127.0.0.1:8989"
+# Onde fica o Ollama de verdade (modo "ollama" do motor e plano B se o motor nao subir).
+$env:NOUS_OLLAMA_REAL    = "http://127.0.0.1:11434"
 # Modelo fica na VRAM por 5 min apos a ultima mensagem. Era 30s, mas recarregar
 # um modelo de ~8 GB custa ~100s; com 30s, qualquer pausa para ler/digitar fazia
 # o modelo sair e a proxima resposta demorar muito. 5 min cobre conversas

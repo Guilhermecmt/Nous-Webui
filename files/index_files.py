@@ -40,7 +40,7 @@ CONFIG_NAME = "nous_files.json"
 # Multilingue: em portugues separa trechos relevantes de irrelevantes bem melhor
 # que o nomic-embed-text (calibracao no CHANGELOG da 2.8).
 EMBED_MODEL = os.environ.get("NOUS_EMBED_MODEL", "granite-embedding:278m")
-OLLAMA_URL = os.environ.get("OLLAMA_BASE_URL", "http://127.0.0.1:11434").rstrip("/")
+OLLAMA_URL = os.environ.get("OLLAMA_BASE_URL", "http://127.0.0.1:8989").rstrip("/")
 EXTS = (".md", ".txt")
 SKIP_DIRS = {".obsidian", ".git", ".trash", "node_modules", ".vscode", "__pycache__"}
 MAX_FILE_BYTES = 2_000_000          # ignora arquivos absurdamente grandes

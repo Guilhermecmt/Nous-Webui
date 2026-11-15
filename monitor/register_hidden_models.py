@@ -31,7 +31,7 @@ import time
 import argparse
 import sqlite3
 
-OLLAMA_URL = os.environ.get("OLLAMA_BASE_URL", "http://127.0.0.1:11434").rstrip("/")
+OLLAMA_URL = os.environ.get("OLLAMA_BASE_URL", "http://127.0.0.1:8989").rstrip("/")
 
 # Padrões que identificam um modelo de embedding (mesma lista usada na Loja,
 # na Arena e no wizard do nous-loader.js).

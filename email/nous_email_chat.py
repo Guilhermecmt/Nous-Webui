@@ -72,11 +72,31 @@ def _split_email(text):
     return subject[:200], body
 
 
+def _anexar_ao_fim(msg, extra):
+    """Poe `extra` no fim da resposta. No Open WebUI 0.12 a resposta chega com `content`
+    e `output` (itens type=message com partes output_text); quando `output` existe a tela
+    desenha so' ele, entao a marca vai nos dois (senao some da tela)."""
+    msg["content"] = (msg.get("content") or "") + extra
+    out = msg.get("output")
+    if not isinstance(out, list) or not out:
+        return
+    for item in reversed(out):
+        if isinstance(item, dict) and item.get("type") == "message" and isinstance(item.get("content"), list):
+            partes = item["content"]
+            if partes and isinstance(partes[-1], dict) and partes[-1].get("type") == "output_text":
+                partes[-1]["text"] = (partes[-1].get("text") or "") + extra
+            else:
+                partes.append({"type": "output_text", "text": extra})
+            return
+    out.append({"type": "message", "role": "assistant", "status": "completed",
+                "content": [{"type": "output_text", "text": extra.lstrip()}]})
+
+
 class Filter:
     class Valves(BaseModel):
         ENABLED: bool = Field(default=True, description="Liga/desliga o e-mail pelo chat.")
         EMAIL_URL: str = Field(default="http://127.0.0.1:8995", description="Servico de e-mail do Nous.")
-        OLLAMA_URL: str = Field(default="", description="URL do Ollama. Vazio = OLLAMA_BASE_URL ou 127.0.0.1:11434.")
+        OLLAMA_URL: str = Field(default="", description="URL do Ollama. Vazio = OLLAMA_BASE_URL ou 127.0.0.1:8989 (nous-motor).")
 
     def __init__(self):
         self.valves = self.Valves()
@@ -85,7 +105,7 @@ class Filter:
         self._saved = {}    # hash da resposta -> draft id (regenerar nao duplica)
 
     def _ollama(self):
-        return (self.valves.OLLAMA_URL or os.environ.get("OLLAMA_BASE_URL", "http://127.0.0.1:11434")).rstrip("/")
+        return (self.valves.OLLAMA_URL or os.environ.get("OLLAMA_BASE_URL", "http://127.0.0.1:8989")).rstrip("/")
 
     def _local_names(self):
         """Nomes dos modelos que rodam nesta maquina (sem os de nuvem e sem os de embeddings)."""
@@ -225,8 +245,8 @@ class Filter:
         if opts and time.time() - opts[0] < 900:
             asst = next((m for m in reversed(body.get("messages", [])) if m.get("role") == "assistant"), None)
             if asst and isinstance(asst.get("content"), str):
-                asst["content"] += "\n\n" + " ".join(
-                    f"⟦opcao:{rot.replace('|', '/').replace('⟧', '')}|{cmd}⟧" for rot, cmd in opts[1])
+                _anexar_ao_fim(asst, "\n\n" + " ".join(
+                    f"⟦opcao:{rot.replace('|', '/').replace('⟧', '')}|{cmd}⟧" for rot, cmd in opts[1]))
             return body
         pend = self._pending.pop(uid, None) if uid else None
         if not pend or time.time() - pend[0] > 900:

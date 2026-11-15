@@ -2,7 +2,7 @@
 .SYNOPSIS
   Nous WebUI - Verificacao inteligente pos-instalacao.
 .DESCRIPTION
-  Confere se a instalacao esta integra: Ollama instalado e no ar, modelo
+  Confere se a instalacao esta integra: motor de IA no ar, modelo
   presente, ambiente Open WebUI, identidade Nous aplicada e (se rodando)
   o servidor respondendo. Retorna 0 se tudo certo, 1 se houver falhas.
 #>
@@ -36,18 +36,30 @@ function Note($name, $msg) { Write-Host ("  [i]     {0} -> {1}" -f $name, $msg) 
 
 Write-Host "=== Nous - Verificacao de Saude ===`n" -ForegroundColor Cyan
 
-Check "Ollama instalado" ($null -ne $ollamaExe) "ollama nao encontrado (PATH nem locais comuns)"
+$motorUrl = if ($env:OLLAMA_BASE_URL) { $env:OLLAMA_BASE_URL } else { "http://127.0.0.1:8989" }
+$llamaExe = Join-Path (Split-Path $PSScriptRoot -Parent) "motor\bin\llama-server.exe"
+$modo = $null
+try { $modo = (Invoke-RestMethod "http://127.0.0.1:8989/health" -TimeoutSec 3).motor } catch {}
+if ($modo) { Note "Motor de IA" "nous-motor no ar, modo $modo" }
+else { Note "Motor de IA" "nous-motor parado (sobe junto com o Nous)" }
+if ($modo -eq "ollama" -or -not (Test-Path $llamaExe)) {
+    Check "Ollama instalado" ($null -ne $ollamaExe) "sem o llama-server do Nous e sem Ollama, nao ha' motor de IA"
+} else {
+    Check "llama-server do Nous presente" $true ""
+}
 
 $apiUp = $false
-try { Invoke-RestMethod "http://127.0.0.1:11434/api/version" -TimeoutSec 3 | Out-Null; $apiUp = $true } catch {}
-Check "Servico Ollama no ar" $apiUp "API 11434 nao responde"
+try { Invoke-RestMethod "$motorUrl/api/version" -TimeoutSec 3 | Out-Null; $apiUp = $true } catch {}
+# O motor sobe junto com o Nous: parado logo depois da instalacao nao e' falha.
+if ($modo) { Check "Motor de IA respondendo" $apiUp "$motorUrl nao responde" }
+elseif ($apiUp) { Check "Motor de IA respondendo" $true "" }
 
 # Pela API, nunca por "ollama list": com o servico parado o CLI abre o app do
 # Ollama, que herda o pipe de saida, e o script fica esperando para sempre.
 $chatModels = @()
 if ($apiUp) {
     try {
-        $tags = Invoke-RestMethod "http://127.0.0.1:11434/api/tags" -TimeoutSec 5
+        $tags = Invoke-RestMethod "$motorUrl/api/tags" -TimeoutSec 5
         $chatModels = @($tags.models | Where-Object { $_.name -notmatch "embed|minilm|bge-|rerank" } | ForEach-Object { $_.name })
     } catch {}
 }

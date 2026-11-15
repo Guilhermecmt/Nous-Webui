@@ -4,7 +4,8 @@
 .DESCRIPTION
   0) Analisa a capacidade da maquina (aborta se INCAPAZ)
   1) Copia o app para %LOCALAPPDATA%\Programs\Nous (sai da pasta Downloads)
-  2) Instala o Ollama (silencioso)         - pula se ja existir
+  2) Motor de IA: baixa o llama-server (llama.cpp, ~40 MB, SHA256 fixado);
+     o Ollama so' com -ComOllama (ou se o download do llama-server falhar)
   3) Modelo: menu numerado (Enter pula) ou -WithModel
   4) Instala o Python 3.11                 - pula se ja existir
   5) Cria o ambiente + Open WebUI          - pula se ja existir
@@ -18,7 +19,10 @@
 .PARAMETER Force
   Reinstala/atualiza componentes mesmo que ja existam.
 .PARAMETER Model
-  Modelo do Ollama (padrao gemma4:12b).
+  Modelo (nome do catalogo do Ollama, padrao gemma4:12b).
+.PARAMETER ComOllama
+  Instala e usa o Ollama como motor (modo antigo). Sem isto o Nous roda os
+  modelos com o proprio llama-server e o Ollama nao e' necessario.
 #>
 param(
     [switch]$Force,
@@ -27,7 +31,8 @@ param(
     [string]$Model = "gemma4:12b",
     [string]$AdminEmail,               # se a conta ja existir, registra o Pipe de imagem
     [string]$AdminPassword,
-    [switch]$NoUninstallEntry          # o Nous-Setup.exe (Inno) ja registra a propria entrada
+    [switch]$NoUninstallEntry,         # o Nous-Setup.exe (Inno) ja registra a propria entrada
+    [switch]$ComOllama                 # instala e usa o Ollama como motor (modo antigo)
 )
 $ErrorActionPreference = "Stop"
 
@@ -267,11 +272,31 @@ $REPO = $APP
 $null = New-NousShortcut ([Environment]::GetFolderPath("Desktop"))
 $null = New-NousShortcut ([Environment]::GetFolderPath("Programs"))
 
-# 1) Ollama -----------------------------------------------------------------
-Step 1 "Ollama"
+# 1) Motor de IA --------------------------------------------------------------
+# O Nous roda os modelos com o llama-server (llama.cpp, build Vulkan: AMD, NVIDIA
+# e Intel) atras do nous-motor (motor\nous_motor.py), que fala a API do Ollama.
+# O Ollama virou opcional: so' com -ComOllama ou se este download falhar.
+Step 1 "Motor de IA (llama.cpp)"
+. (Join-Path $REPO "launchers\llama-nous.ps1")
+$llamaOk = Test-LlamaAtual $REPO
+if ($llamaOk) { Ok "llama-server ja presente ($((Get-LlamaPin $REPO).tag))" }
+else {
+    Info "baixando o llama-server (~40 MB; roda os modelos na placa de video, sem Ollama)..."
+    $llamaOk = Install-LlamaServer -AppDir $REPO
+    if ($llamaOk) { Ok "llama-server instalado ($((Get-LlamaPin $REPO).tag))" }
+    else { Info "nao consegui baixar o llama-server ($script:LlamaErro); o Nous vai usar o Ollama." }
+}
+$usarOllama = [bool]($ComOllama -or -not $llamaOk)
+New-Item -ItemType Directory -Force -Path (Join-Path $dataDir "motor") | Out-Null
+$motorCfg = Join-Path $dataDir "motor\ajustes.json"
+if ($ComOllama) { [IO.File]::WriteAllText($motorCfg, '{"motor": "ollama"}') }
+elseif ($llamaOk -and (Test-Path $motorCfg)) { Remove-Item $motorCfg -Force -ErrorAction SilentlyContinue }
+
 $instOllama = $false   # o Nous instalou? (para o desinstalador saber)
 $ollamaExe = Find-Ollama
-if (($ollamaExe -or (Test-OllamaUp)) -and -not $Force) {
+if (-not $usarOllama) {
+    Ok "Ollama nao e' necessario$(if ($ollamaExe) { ' (o que ja existe fica como esta)' }) - use -ComOllama para usar o Ollama"
+} elseif (($ollamaExe -or (Test-OllamaUp)) -and -not $Force) {
     Ok "ja instalado - nao vou baixar de novo$(if ($ollamaExe) { " ($ollamaExe)" })"
 } else {
     $ollamaSetup = Join-Path $env:TEMP "OllamaSetup.exe"
@@ -332,12 +357,14 @@ if (($ollamaExe -or (Test-OllamaUp)) -and -not $Force) {
     $instOllama = $true
     Ok "instalado"
 }
-if (-not (Test-OllamaUp)) {
-    if (Test-Path $ollamaApp)   { Start-Process $ollamaApp -WindowStyle Hidden }
-    elseif ($ollamaExe)         { Start-Process $ollamaExe -ArgumentList "serve" -WindowStyle Hidden }
-    for ($i = 0; $i -lt 15 -and -not (Test-OllamaUp); $i++) { Start-Sleep -Seconds 1 }
+if ($usarOllama) {
+    if (-not (Test-OllamaUp)) {
+        if (Test-Path $ollamaApp)   { Start-Process $ollamaApp -WindowStyle Hidden }
+        elseif ($ollamaExe)         { Start-Process $ollamaExe -ArgumentList "serve" -WindowStyle Hidden }
+        for ($i = 0; $i -lt 15 -and -not (Test-OllamaUp); $i++) { Start-Sleep -Seconds 1 }
+    }
+    if (Test-OllamaUp) { Ok "servico no ar" } else { Info "servico nao respondeu ainda (confira o Ollama)" }
 }
-if (Test-OllamaUp) { Ok "servico no ar" } else { Info "servico nao respondeu ainda (confira o Ollama)" }
 
 # 2) Modelo (baixado DENTRO do app, com progresso na tela) ------------------
 Step 2 "Modelo"
@@ -352,8 +379,17 @@ if (-not $WithModel -and -not $modelExplicit -and [Environment]::UserInteractive
     if ($chosen) { $Model = $chosen; $WithModel = $true }
 }
 
-$hasModel = Test-ModelInstalled $Model
-if ($WithModel) {
+# Sem Ollama o modelo e' baixado pelo nous-motor depois do passo 4 (precisa do Python).
+$puxarPeloMotor = -not $usarOllama
+$hasModel = if ($puxarPeloMotor) { $false } else { Test-ModelInstalled $Model }
+if ($puxarPeloMotor) {
+    if ($WithModel) { Info "$Model sera' baixado pelo motor do Nous depois do Python (passo 4.5)" }
+    else {
+        Info "pulado: no primeiro uso o Nous abre um assistente que recomenda o"
+        Info "modelo ideal p/ esta maquina e baixa em 1 clique (Loja de Modelos)."
+    }
+}
+elseif ($WithModel) {
     if ($hasModel -and -not $Force) { Ok "$Model ja baixado" }
     else {
         Info "baixando $Model (pode levar varios minutos)..."
@@ -428,6 +464,31 @@ if ($LASTEXITCODE -ne 0) {
     Write-Host "    [aviso] identidade nao aplicada agora - o Nous reaplica sozinho a cada inicio." -ForegroundColor Yellow
 }
 
+# 4.5) Modelo pelo nous-motor (sem Ollama) ------------------------------------
+if ($puxarPeloMotor -and $WithModel) {
+    Step "4.5" "Baixando $Model pelo motor do Nous"
+    $vpy = Join-Path $venv "Scripts\python.exe"
+    $env:DATA_DIR = $dataDir
+    try { Invoke-RestMethod "http://127.0.0.1:8989/health" -TimeoutSec 2 | Out-Null }
+    catch {
+        Start-Process -FilePath $vpy -ArgumentList "`"$(Join-Path $REPO 'motor\nous_motor.py')`"" -WindowStyle Hidden
+        for ($i = 0; $i -lt 40; $i++) {
+            Start-Sleep -Milliseconds 250
+            try { Invoke-RestMethod "http://127.0.0.1:8989/health" -TimeoutSec 2 | Out-Null; break } catch {}
+        }
+    }
+    try {
+        $tags = Invoke-RestMethod "http://127.0.0.1:8989/api/tags" -TimeoutSec 5
+        $hasModel = [bool]($tags.models | Where-Object { $_.name -eq $Model -or $_.name -eq "${Model}:latest" })
+    } catch {}
+    if ($hasModel -and -not $Force) { Ok "$Model ja baixado" }
+    else {
+        & $vpy (Join-Path $REPO "motor\puxar.py") $Model --url "http://127.0.0.1:8989"
+        if ($LASTEXITCODE -eq 0) { $instModel = $true; Ok "baixado" }
+        else { Info "download nao concluido - voce pode baixar depois na Loja de Modelos." }
+    }
+}
+
 # 6) Dados + atalho + launcher oculto --------------------------------------
 Step 6 "Dados, atalho e launcher"
 New-Item -ItemType Directory -Force -Path $dataDir | Out-Null
@@ -488,6 +549,14 @@ if ($nodeOk -and (Test-Path (Join-Path $codeDir "package.json"))) {
     $null = New-NousShortcut ([Environment]::GetFolderPath("Programs")) "Nous Code" "nous-code.vbs"
     $null = New-NousShortcut ([Environment]::GetFolderPath("Desktop")) "Nous Code" "nous-code.vbs"
     Ok "atalho 'Nous Code' (editor de codigo com IA local)"
+    # "nous" no terminal (como claude/codex): so' o nous.cmd numa pasta propria no
+    # PATH do usuario (sem admin; os outros scripts do launchers\ ficam fora do PATH).
+    $binDir = Join-Path $REPO "bin"
+    New-Item -ItemType Directory -Force -Path $binDir | Out-Null
+    Copy-Item (Join-Path $REPO "launchers\nous.cmd") (Join-Path $binDir "nous.cmd") -Force
+    . (Join-Path $REPO "launchers\path-nous.ps1")
+    Add-NousPath $binDir
+    Ok "comando 'nous' no terminal (abra um terminal novo e digite: nous)"
 } else {
     Info "Nous Code (opcional): faltou o Node.js 22.18+ (precisa de internet para baixar). Rode o instalador de novo com internet."
 }
@@ -537,6 +606,7 @@ $manifest = [ordered]@{
     python_by_nous = [bool]($instPython -or ($old -and $old.python_by_nous))
     model          = $(if ($WithModel -and ($instModel -or $hasModel)) { $Model } elseif ($old) { $old.model } else { $null })
     model_by_nous  = [bool]($instModel -or ($old -and $old.model_by_nous))
+    motor          = $(if ($usarOllama) { "ollama" } else { "llama" })
 }
 [IO.File]::WriteAllText($manPath, ($manifest | ConvertTo-Json))
 Ok "manifesto de instalacao salvo (ajuda o desinstalador)"
