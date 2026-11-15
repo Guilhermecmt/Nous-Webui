@@ -119,6 +119,12 @@
   `history/nous_history.py`).
 
 ### Corrigido
+- **Pedidos do chat que viram ação não chegavam à tela** no Open WebUI 0.12:
+  "/pc ..." respondia "Abrindo o Nous Code" e nada abria; "abre a agenda", o
+  botão "↩ Desfazer" da agenda, os botões do e-mail e o aviso da Guarda também
+  sumiam. O 0.12 desenha a resposta pelo campo `output` e os filtros só
+  escreviam no `content`. Agora escrevem nos dois (Comandos, Agenda, E-mail e
+  Guarda); teste em `utilidades/testes/test_marcas_output.py`.
 - "Quinta às 10h" dito numa quinta depois das 10h era recusado como horário que já
   passou, e o modelo pequeno confirmava mesmo assim. Agora vale a próxima quinta.
 - Repetir o mesmo pedido à agenda no mesmo dia não gravava nada: a proteção contra

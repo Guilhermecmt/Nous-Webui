@@ -32,6 +32,26 @@ _AGENDA_CLAIM = re.compile(
 _EMAIL_CLAIM = re.compile(r"\b(enviei (?:o |um |seu )?e-?mail|e-?mail (?:foi )?enviado|mandei (?:o |um )?e-?mail)\b", re.I)
 
 
+def _anexar_ao_fim(msg, extra):
+    """Poe `extra` no fim da resposta. No Open WebUI 0.12 a resposta chega com `content`
+    e `output` (itens type=message com partes output_text); quando `output` existe a tela
+    desenha so' ele, entao a marca vai nos dois (senao some da tela)."""
+    msg["content"] = (msg.get("content") or "") + extra
+    out = msg.get("output")
+    if not isinstance(out, list) or not out:
+        return
+    for item in reversed(out):
+        if isinstance(item, dict) and item.get("type") == "message" and isinstance(item.get("content"), list):
+            partes = item["content"]
+            if partes and isinstance(partes[-1], dict) and partes[-1].get("type") == "output_text":
+                partes[-1]["text"] = (partes[-1].get("text") or "") + extra
+            else:
+                partes.append({"type": "output_text", "text": extra})
+            return
+    out.append({"type": "message", "role": "assistant", "status": "completed",
+                "content": [{"type": "output_text", "text": extra.lstrip()}]})
+
+
 class Filter:
     class Valves(BaseModel):
         priority: int = Field(default=50, description="Roda depois dos outros filtros.")
@@ -75,5 +95,5 @@ class Filter:
             aviso = ("⚠ Atenção: nenhum e-mail foi enviado nem salvo. Peça \"manda um e-mail pra Maria ...\": "
                      "o Nous cria um rascunho para você revisar e enviar.")
         if aviso:
-            asst["content"] = text + "\n\n---\n" + aviso
+            _anexar_ao_fim(asst, "\n\n---\n" + aviso)
         return body
