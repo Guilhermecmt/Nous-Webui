@@ -40,7 +40,7 @@ class TestProcessos(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(a[0], "llama-server.exe")
         self.assertEqual(a[a.index("-m") + 1], self.qwen.blob)
         self.assertEqual(a[a.index("-c") + 1], "16384")
-        self.assertEqual(a[a.index("-ngl") + 1], "999")
+        self.assertNotIn("-ngl", a)  # o llama-server decide quantas camadas cabem na placa (--fit)
         self.assertEqual(a[a.index("--host") + 1], "127.0.0.1")
         self.assertEqual(a[a.index("--reasoning-format") + 1], "deepseek")
         self.assertEqual(a[a.index("-np") + 1], "1")
@@ -165,6 +165,25 @@ class TestProcessos(unittest.IsolatedAsyncioTestCase):
         self.fab.morrer_ao_carregar = False
         await g.garantir(self.qwen, None)
         self.assertEqual(len(g.ativos()), 1)
+
+    async def test_sem_memoria_libera_ociosos_e_tenta_de_novo(self):
+        g = self.gerente(max_modelos=3)
+        await g.garantir(self.outro("a:1"), None)
+        await g.garantir(self.emb, None)
+        self.fab.morrer_vezes = 1
+        await g.garantir(self.outro("grande:14b"), None)
+        self.assertEqual([x["name"] for x in g.ativos()], ["grande:14b"])
+
+    async def test_sem_memoria_nao_derruba_quem_esta_em_uso(self):
+        g = self.gerente(max_modelos=3)
+        a = self.outro("a:1")
+        cm = g.usando(a, None, "5m")
+        await cm.__aenter__()
+        self.fab.morrer_vezes = 2
+        with self.assertRaises(ErroMotor):
+            await g.garantir(self.outro("grande:14b"), None)
+        self.assertEqual([x["name"] for x in g.ativos()], ["a:1"])
+        await cm.__aexit__(None, None, None)
 
     async def test_demora_demais_para_ficar_pronto(self):
         self.fab.opcoes["health_503"] = 10 ** 6

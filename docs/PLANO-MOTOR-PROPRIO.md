@@ -51,8 +51,8 @@ No modo `ollama` todas as rotas `/api/*` são repassadas como estão (inclusive 
 
 ### Regras do modo `llama`
 - **Um `llama-server` por modelo carregado**, numa porta livre de 127.0.0.1.
-  Argumentos: `-m <blob> --host 127.0.0.1 --port <p> -c <ctx> -ngl 999 --jinja
-  --reasoning-format deepseek -np 1`; modelos de embedding ganham `--embeddings`;
+  Argumentos: `-m <blob> --host 127.0.0.1 --port <p> -c <ctx> --jinja
+  --reasoning-format deepseek -np 1 --no-webui` (sem `-ngl`: o `--fit` do llama-server põe na placa o que cabe); embedding ganha `--embeddings -b <ctx> -ub <ctx>`; se faltar memória ao carregar, os modelos ociosos saem e tenta de novo;
   com projetor (visão), `--mmproj <blob>` (não testado neste plano, ver "Fora").
 - **Contexto:** `options.num_ctx` do pedido, senão `OLLAMA_CONTEXT_LENGTH` (16384), nunca
   acima do `context_length` do GGUF. Pedido com contexto maior que o carregado recarrega.

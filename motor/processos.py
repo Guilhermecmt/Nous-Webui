@@ -24,6 +24,12 @@ from traduz import keep_alive_segundos
 PARA_SEMPRE = "2318-08-30T00:00:00Z"  # o Ollama usa uma data longe assim para keep_alive -1
 
 
+def _falta_memoria(texto):
+    t = texto.lower()
+    return any(x in t for x in ("out of memory", "outofdevicememory", "memory allocation", "failed to allocate",
+                                "unable to allocate", "not enough memory"))
+
+
 class ErroMotor(Exception):
     """Erro com mensagem em portugues, pronta para ir ao usuario."""
 
@@ -145,8 +151,11 @@ class Gerente:
         return max(alvo, 256)
 
     def _argv(self, m, ctx, porta):
+        # sem -ngl: o llama-server (--fit, padrao) poe na placa as camadas que cabem e o
+        # resto na CPU, como o Ollama faz; com -ngl 999 um modelo maior que a VRAM livre
+        # simplesmente nao carregava
         a = [self.binario, "-m", m.blob, "--host", "127.0.0.1", "--port", str(porta), "-c", str(ctx),
-             "-ngl", "999", "--jinja", "--reasoning-format", "deepseek", "-np", "1", "--no-webui"]
+             "--jinja", "--reasoning-format", "deepseek", "-np", "1", "--no-webui"]
         if m.gguf.get("embedding"):
             # lote do tamanho do contexto: um texto longo cabe numa passada so'
             a += ["--embeddings", "-b", str(ctx), "-ub", str(ctx)]
@@ -275,7 +284,16 @@ class Gerente:
             async with self._subindo:
                 if not m.gguf.get("embedding"):
                     await self._abrir_espaco(m.nome)
-                return await self._subir(m, alvo)
+                try:
+                    return await self._subir(m, alvo)
+                except ErroMotor as e:
+                    ociosos = [p for n, p in self._procs.items() if n != m.nome and p.em_uso == 0]
+                    if not (_falta_memoria(str(e)) and ociosos):
+                        raise
+                    # faltou VRAM: tira da placa os modelos parados e tenta uma vez mais
+                    for p in ociosos:
+                        await self._encerrar(p)
+                    return await self._subir(m, alvo)
 
     # ------------------------------------------------------------ publico
     async def garantir(self, m, ctx):

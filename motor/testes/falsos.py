@@ -229,14 +229,18 @@ class FabricaFalsa:
     def __init__(self, **opcoes):
         self.opcoes = opcoes
         self.morrer_ao_carregar = False
+        self.morrer_vezes = 0  # quantas proximas subidas morrem por falta de memoria
         self.argvs = []
         self.processos = []
 
     async def __call__(self, argv):
         self.argvs.append(argv)
         srv = LlamaFalso(**self.opcoes)
-        p = ProcessoFalso(argv, srv, self.morrer_ao_carregar)
-        if not self.morrer_ao_carregar:
+        morre = self.morrer_ao_carregar or self.morrer_vezes > 0
+        if self.morrer_vezes > 0:
+            self.morrer_vezes -= 1
+        p = ProcessoFalso(argv, srv, morre)
+        if not morre:
             await srv.subir(int(argv[argv.index("--port") + 1]))
         self.processos.append(p)
         return p
