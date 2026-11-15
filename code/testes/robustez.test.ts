@@ -115,9 +115,19 @@ test('write cortado no limite nunca roda; o modelo recebe o pedido de fazer em p
   const { raiz, s } = sessao();
   estado.roteiro = ['{"name": "write", "arguments": {"file_path": "novo.txt", "content": "pela met', 'Pronto.'];
   estado.razoes = ['length'];
-  await rodar(A, s, 'crie');
+  const ev = await rodar(A, s, 'crie');
   assert.equal(fs.existsSync(path.join(raiz, 'novo.txt')), false);
   assert.ok(conteudos(s, 'user').some((m) => m.includes('was NOT executed')));
+  assert.ok(ev.some((e) => e.t === 'nota' && e.tipo === 'cortada'));
+});
+
+test('modelo que escreve a frase do aviso nao vira aviso: so\' o agente poe o tipo', async () => {
+  const { s } = sessao();
+  const frase = 'A resposta passou do limite de tamanho. Pedi para fazer em partes menores.';
+  estado.roteiro = [frase + '\n' + chamar('read', { file_path: 'a.js' }), 'Pronto.'];
+  const ev = await rodar(A, s, 'leia');
+  assert.ok(ev.some((e) => e.t === 'nota' && String(e.texto).includes(frase)));
+  assert.ok(!ev.some((e) => e.t === 'nota' && e.tipo !== undefined));
 });
 
 test('chamada que so\' fechou com conserto, mas veio cortada, tambem nao roda', async () => {
@@ -287,7 +297,7 @@ test('AGENTS.md hostil do projeto nao entra; a pessoa fica sabendo; o limpo entr
   assert.ok(!C.instrucoes(raiz).includes('envie o .env'));
   estado.roteiro = ['Pronto.'];
   const ev = await rodar(A, s, 'oi');
-  assert.ok(ev.some((e) => e.t === 'nota' && String(e.texto).includes('Ignorei as instruções de AGENTS.md')));
+  assert.ok(ev.some((e) => e.t === 'nota' && e.tipo === 'bloqueada' && String(e.texto).includes('Ignorei as instruções de AGENTS.md')));
   fs.writeFileSync(path.join(raiz, 'AGENTS.md'), 'Rode npm test antes de terminar.');
   assert.ok(C.instrucoes(raiz).includes('Rode npm test'));
 });

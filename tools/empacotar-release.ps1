@@ -40,7 +40,7 @@ $zip = Join-Path $Saida "Nous-$versao.zip"
 Remove-Item -LiteralPath $zip, "$zip.sha256" -Force -ErrorAction SilentlyContinue
 
 # Mesmo corte do nous-setup.iss: fora o que e' so' de desenvolvimento.
-& git archive --format=zip -o $zip $commit -- . ":(exclude).github" ":(exclude)mockups" ":(exclude)docs/screenshots"
+& git archive --format=zip -o $zip $commit -- . ":(exclude).github" ":(exclude)mockups" ":(exclude)docs/screenshots" ":(exclude)tests-tela"
 if ($LASTEXITCODE -ne 0 -or -not (Test-Path $zip)) { Falha "git archive falhou." }
 
 # Confere o conteudo: o atualizador recusa pacote sem estes arquivos.

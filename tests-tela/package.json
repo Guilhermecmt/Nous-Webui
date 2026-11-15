@@ -1,0 +1,11 @@
+{
+  "name": "nous-testes-de-tela",
+  "private": true,
+  "description": "Testes de tela do Nous com Playwright: Open WebUI de verdade, com o branding aplicado, e monitor falso.",
+  "scripts": {
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.49.1"
+  }
+}
