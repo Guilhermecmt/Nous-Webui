@@ -36,6 +36,11 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ASSETS = os.path.join(REPO, "branding", "assets")
 MASTER = os.path.join(ASSETS, "nous_logo.png")
 CSS_SRC = os.path.join(REPO, "branding", "nous-gold.css")
+# As paletas (variaveis --nous-*) vao na frente do tema no mesmo custom.css.
+PALETAS_CSS = os.path.join(REPO, "branding", "nous-paletas.css")
+# Icone em selo (branding/gerar_icone.py): legivel em aba, atalho e celular.
+SELO = os.path.join(ASSETS, "nous-selo.png")
+ICO = os.path.join(ASSETS, "nous.ico")
 JS_SRC = os.path.join(REPO, "branding", "nous-loader.js")
 # Paineis extras (agenda, skills...): cada um e' um IIFE proprio, concatenado
 # depois do nous-loader.js no mesmo loader.js (sem <script> a mais).
@@ -76,6 +81,10 @@ IMG_TARGETS = {
     "web-app-manifest-192x192.png": 192,
     "web-app-manifest-512x512.png": 512,
 }
+# Estes usam o selo (fundo escuro proprio); logo e tela de abertura seguem com a
+# coruja sem fundo, por cima da propria tela do Nous.
+SELO_TARGETS = {"apple-touch-icon.png", "favicon-96x96.png",
+                "web-app-manifest-192x192.png", "web-app-manifest-512x512.png"}
 
 
 def _ow_version():
@@ -97,7 +106,7 @@ def _sha256(path):
 def _inputs_hash():
     """Hash conjunto da logo + css + js: qualquer mudanca reaplica tudo."""
     h = hashlib.sha256()
-    for p in (MASTER, CSS_SRC, JS_SRC, *_module_files()):
+    for p in (MASTER, CSS_SRC, PALETAS_CSS, SELO, ICO, JS_SRC, *_module_files()):
         if os.path.exists(p):
             h.update(_sha256(p).encode())
     return h.hexdigest()
@@ -149,7 +158,7 @@ def _fit(Image, master, w, h):
     return out
 
 
-def apply_images(Image, master):
+def apply_images(Image, master, selo):
     # frontend/favicon.png (raiz)
     extra = os.path.join(OW, "frontend", "favicon.png")
     if os.path.exists(extra):
@@ -168,11 +177,11 @@ def apply_images(Image, master):
                     w, h = im.size
             else:
                 w = h = default  # cria do zero (instalacao que nao trazia o arquivo)
-            _fit(Image, master, w, h).save(p)
+            _fit(Image, selo if name in SELO_TARGETS else master, w, h).save(p)
 
 
-def apply_favicons_and_css(Image, master):
-    small = master.resize((128, 128), Image.LANCZOS)
+def apply_favicons_and_css(Image, selo):
+    small = selo.resize((128, 128), Image.LANCZOS)
     buf = io.BytesIO(); small.save(buf, format="PNG")
     b64 = base64.b64encode(buf.getvalue()).decode()
     svg = (
@@ -180,8 +189,9 @@ def apply_favicons_and_css(Image, master):
         'viewBox="0 0 128 128"><image href="data:image/png;base64,'
         + b64 + '" width="128" height="128"/></svg>'
     )
-    ico_sizes = [(256, 256), (128, 128), (64, 64), (48, 48), (32, 32), (16, 16)]
     css = open(CSS_SRC, encoding="utf-8").read()
+    if os.path.exists(PALETAS_CSS):
+        css = open(PALETAS_CSS, encoding="utf-8").read() + "\n" + css
     js = _loader_js()
     for label, d in STATIC_DIRS.items():
         if not os.path.isdir(d):
@@ -192,7 +202,7 @@ def apply_favicons_and_css(Image, master):
         if js:
             open(os.path.join(d, "loader.js"), "w", encoding="utf-8").write(js)
         open(os.path.join(d, "favicon.svg"), "w", encoding="utf-8").write(svg)
-        master.save(os.path.join(d, "favicon.ico"), sizes=ico_sizes)
+        shutil.copyfile(ICO, os.path.join(d, "favicon.ico"))
 
 
 def patch_name(app_name="Nous"):
@@ -243,9 +253,10 @@ def main():
 
     os.makedirs(BACKUP, exist_ok=True)
     master = Image.open(MASTER).convert("RGBA")
+    selo = Image.open(SELO).convert("RGBA") if os.path.exists(SELO) else master
     print("Open WebUI em:", OW)
-    apply_images(Image, master);            print("  [ok] logos/favicons (png)")
-    apply_favicons_and_css(Image, master);  print("  [ok] favicon.svg/.ico + tema custom.css + loader.js")
+    apply_images(Image, master, selo);      print("  [ok] logos/favicons (png)")
+    apply_favicons_and_css(Image, selo);    print("  [ok] favicon.svg/.ico + tema custom.css + loader.js")
     print("  [nome]", patch_name())
     write_marker(args.data_dir);            print("  [ok] marcador gravado (auto-cura no boot)")
     print("\nIdentidade Nous aplicada. Reinicie o servidor e use Ctrl+Shift+R no navegador.")

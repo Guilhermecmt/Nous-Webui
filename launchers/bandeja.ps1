@@ -115,7 +115,8 @@ function New-IconeEstado([string]$cor) {
     $g.SmoothingMode = "AntiAlias"
     $g.DrawIcon($base, (New-Object Drawing.Rectangle(0, 0, $tam.Width, $tam.Height)))
     if ($cor) {
-        $d = [int]($tam.Width * 0.5)
+        # 34% do icone: a bolinha marca o estado sem cobrir a coruja (antes era metade)
+        $d = [math]::Max(6, [int][math]::Round($tam.Width * 0.34))
         $pincel = New-Object Drawing.SolidBrush([Drawing.ColorTranslator]::FromHtml($cor))
         $borda = New-Object Drawing.Pen([Drawing.Color]::FromArgb(230, 20, 20, 24), 1.4)
         $g.FillEllipse($pincel, $tam.Width - $d - 1, $tam.Height - $d - 1, $d, $d)
