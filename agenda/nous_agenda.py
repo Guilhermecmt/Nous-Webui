@@ -349,7 +349,7 @@ class Filter:
     class Valves(BaseModel):
         ENABLED: bool = Field(default=True, description="Liga/desliga a agenda pelo chat.")
         AGENDA_URL: str = Field(default="http://127.0.0.1:8996", description="Servico da agenda do Nous.")
-        OLLAMA_URL: str = Field(default="http://127.0.0.1:11434", description="Ollama local (extrai os dados do pedido).")
+        OLLAMA_URL: str = Field(default=os.environ.get("OLLAMA_BASE_URL", "http://127.0.0.1:8989").rstrip("/"), description="Ollama local (extrai os dados do pedido).")
         AVISO_PADRAO_MIN: int = Field(default=30, description="Minutos de antecedencia do aviso de compromissos.")
 
     def __init__(self):

@@ -67,7 +67,7 @@ class Filter:
         ok = True
         try:
             import requests
-            base = os.environ.get("OLLAMA_BASE_URL", "http://127.0.0.1:11434").rstrip("/")
+            base = os.environ.get("OLLAMA_BASE_URL", "http://127.0.0.1:8989").rstrip("/")
             r = requests.post(f"{base}/api/show", json={"model": model}, timeout=10)
             if r.status_code == 200:
                 ok = "vision" in (r.json().get("capabilities") or [])

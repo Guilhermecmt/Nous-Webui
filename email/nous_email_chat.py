@@ -76,7 +76,7 @@ class Filter:
     class Valves(BaseModel):
         ENABLED: bool = Field(default=True, description="Liga/desliga o e-mail pelo chat.")
         EMAIL_URL: str = Field(default="http://127.0.0.1:8995", description="Servico de e-mail do Nous.")
-        OLLAMA_URL: str = Field(default="", description="URL do Ollama. Vazio = OLLAMA_BASE_URL ou 127.0.0.1:11434.")
+        OLLAMA_URL: str = Field(default="", description="URL do Ollama. Vazio = OLLAMA_BASE_URL ou 127.0.0.1:8989 (nous-motor).")
 
     def __init__(self):
         self.valves = self.Valves()
@@ -85,7 +85,7 @@ class Filter:
         self._saved = {}    # hash da resposta -> draft id (regenerar nao duplica)
 
     def _ollama(self):
-        return (self.valves.OLLAMA_URL or os.environ.get("OLLAMA_BASE_URL", "http://127.0.0.1:11434")).rstrip("/")
+        return (self.valves.OLLAMA_URL or os.environ.get("OLLAMA_BASE_URL", "http://127.0.0.1:8989")).rstrip("/")
 
     def _local_names(self):
         """Nomes dos modelos que rodam nesta maquina (sem os de nuvem e sem os de embeddings)."""

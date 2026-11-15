@@ -26,7 +26,7 @@ param(
     [string]$DataDir,                # padrao: %USERPROFILE%\NousData
     [string]$Venv,                   # padrao: %USERPROFILE%\open-webui
     [string]$ApiUrl = "https://api.github.com/repos/Guilhermecmt/Nous-Webui/releases/latest",
-    [string]$OllamaUrl = "http://127.0.0.1:11434",
+    [string]$OllamaUrl = "http://127.0.0.1:8989",   # nous-motor (fala a API do Ollama)
     [string]$RegistroUrl = "https://registry.ollama.ai",
     [string]$PortaNous = "8080",
     [int]$EsperaSubirSeg = 180,      # quanto esperar o Nous responder depois de atualizar, antes de voltar atras

@@ -153,7 +153,7 @@ def _clean_image_prompt(text):
 class Pipe:
     class Valves(BaseModel):
         COMFYUI_URL: str = Field(default="http://localhost:8188")
-        OLLAMA_URL: str = Field(default="http://localhost:11434")
+        OLLAMA_URL: str = Field(default=os.environ.get("OLLAMA_BASE_URL", "http://127.0.0.1:8989").rstrip("/"))
         TEXT_MODEL: str = Field(default="gemma4:12b")
         WORKFLOW_PATH: str = Field(default="")
         UNET_GGUF: str = Field(default="flux1-schnell-Q4_K_S.gguf")

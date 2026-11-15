@@ -101,7 +101,7 @@ class Filter:
                 "Desativado por padrao: conversas em nuvem nao enviam dados pessoais para servidores externos."
             ),
         )
-        OLLAMA_BASE: str = Field(default="http://127.0.0.1:11434")
+        OLLAMA_BASE: str = Field(default=os.environ.get("OLLAMA_BASE_URL", "http://127.0.0.1:8989").rstrip("/"))
         EXTRACT_MODEL: str = Field(
             default="",
             description="Modelo local que extrai os fatos. Vazio: usa o da conversa, que ja' esta' na GPU.",

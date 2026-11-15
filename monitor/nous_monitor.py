@@ -55,7 +55,7 @@ from pathlib import Path
 import aiohttp
 from aiohttp import web
 
-OLLAMA = os.environ.get("NOUS_OLLAMA_URL") or "http://127.0.0.1:11434"   # NOUS_OLLAMA_URL: so' para testes (Ollama de mentira)
+OLLAMA = (os.environ.get("NOUS_OLLAMA_URL") or os.environ.get("OLLAMA_BASE_URL") or "http://127.0.0.1:8989").rstrip("/")   # NOUS_OLLAMA_URL: so' para testes (Ollama de mentira)
 PORT = int(os.environ.get("NOUS_MONITOR_PORT") or 8990)
 GB = 1073741824
 CATALOG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "catalog.json")

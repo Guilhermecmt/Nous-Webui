@@ -44,7 +44,7 @@ WATCH_SECONDS = 60            # conversas mudam com menos frequencia que arquivo
 OVERLAP_SECS  = 3600          # 1 h de sobreposicao: captura respostas que chegam depois
 MIN_TEXT_LEN  = 15            # ignora mensagens muito curtas ("ok", emojis, etc.)
 EMBED_MODEL   = os.environ.get("NOUS_EMBED_MODEL", "granite-embedding:278m")
-OLLAMA_URL    = os.environ.get("OLLAMA_BASE_URL", "http://127.0.0.1:11434").rstrip("/")
+OLLAMA_URL    = os.environ.get("OLLAMA_BASE_URL", "http://127.0.0.1:8989").rstrip("/")
 PARSER_VERSION = "2"          # bump => forca reindex (mudou a extracao de texto)
 
 

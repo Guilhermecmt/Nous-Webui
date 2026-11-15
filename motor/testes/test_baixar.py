@@ -153,6 +153,37 @@ class TestBaixar(unittest.IsolatedAsyncioTestCase):
             await cli.close()
             await g.soltar_todos()
 
+    async def test_puxar_cli(self):
+        import asyncio
+        import sys
+        g = Gerente("llama-server.exe", iniciar=falsos.FabricaFalsa())
+
+        class Puxar:
+            @staticmethod
+            def puxar(pasta, nome):
+                return baixar.puxar(pasta, nome, self.reg.url)
+            apagar = staticmethod(baixar.apagar)
+
+        cli = TestClient(TestServer(nous_motor.criar_app("llama", self.pasta, g, "", Puxar)))
+        await cli.start_server()
+        script = os.path.join(os.path.dirname(baixar.__file__), "puxar.py")
+        try:
+            async def rodar(nome):
+                p = await asyncio.create_subprocess_exec(sys.executable, script, nome, "--url", str(cli.make_url("")),
+                                                         stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+                out, err = await p.communicate()
+                return p.returncode, out.decode(), err.decode()
+            cod, out, _ = await rodar("minilm:22m")
+            self.assertEqual(cod, 0)
+            self.assertIn("pronto: minilm:22m", out)
+            self.assertIsNotNone(registro.achar(self.pasta, "minilm:22m"))
+            cod, _, err = await rodar("nada:1b")
+            self.assertEqual(cod, 1)
+            self.assertIn("nao existe", err)
+        finally:
+            await cli.close()
+            await g.soltar_todos()
+
 
 if __name__ == "__main__":
     unittest.main()

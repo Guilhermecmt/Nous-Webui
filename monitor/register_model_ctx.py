@@ -34,7 +34,7 @@ import sqlite3
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "ajustes"))
 from config_db import obter, definir, tem_config, caminho_busca_web  # noqa: E402
 
-OLLAMA_URL = os.environ.get("OLLAMA_BASE_URL", "http://127.0.0.1:11434").rstrip("/")
+OLLAMA_URL = os.environ.get("OLLAMA_BASE_URL", "http://127.0.0.1:8989").rstrip("/")
 NUM_CTX = int(os.environ.get("NOUS_NUM_CTX", "16384"))
 SYSTEM_PT = ("Você é o Nous, um assistente pessoal que roda no computador do usuário. "
              "Responda sempre em português do Brasil, a menos que o usuário peça outro idioma. "
