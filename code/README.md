@@ -100,6 +100,8 @@ O serviço `servidor.ts` roda em `127.0.0.1:8998` e serve também a página do I
 | `mcp.ts` | Cliente MCP (stdio e HTTP) e a permissão dos servidores de projeto. |
 | `tarefas.ts` | Tarefas separadas: a cópia do projeto em worktree do Git, a revisão, o aplicar e o descartar. |
 | `lembretes.ts` | Lembretes com fuso horário e cron, sem biblioteca. |
+| `reparo.ts` | Conserta JSON e nome de ferramenta que o modelo errou por pouco; acha ciclos de chamadas. |
+| `ameacas.ts` | Barra instrução hostil de projeto baixado e marca comando sem volta. |
 | `modelo.ts` | O `/api/chat` do Ollama, o `chat/completions` dos compatíveis com OpenAI e a leitura das chamadas de ferramenta. |
 | `ide.ts` | Arquivos, busca, Git, a janela (modo app do Edge) e o WebSocket do terminal e dos avisos. |
 | `ide/` | A página: `app.js` sem build, com Monaco e xterm servidos de `node_modules`. |

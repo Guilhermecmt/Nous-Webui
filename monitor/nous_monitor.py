@@ -32,6 +32,7 @@ Expoe (em http://127.0.0.1:8990, so' para paginas locais - ver cors_mw):
   GET  /catalog?vram_gb=&ram_gb=&gpu=  simulacao "e se eu tivesse outra maquina"
   GET  /update/status, POST /update/check|apply|config|modelos/atualizar   (nous_update.py)
   GET  /celular/estado, POST /celular/ligar|desligar|codigo|aparelhos/remover   (celular/controle.py)
+  GET  /mensageiros/estado, POST /mensageiros/telegram/*|whatsapp/*             (mensageiros/mensageiros_controle.py)
 
 GPU: lido dos contadores de desempenho do Windows (funcionam em PT-BR com os
 nomes em ingles) + tamanho real da VRAM via registro (qwMemorySize).
@@ -1812,6 +1813,13 @@ def build_app():
         celular_controle.add_routes(app, _data_dir)
     except Exception as e:
         print(f"[Nous][celular] rotas do celular indisponiveis: {e}", file=sys.stderr)
+    # Telegram e WhatsApp (v2.12): conectar, parear, ligar/desligar (mensageiros/mensageiros_controle.py)
+    try:
+        sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "mensageiros"))
+        import mensageiros_controle
+        mensageiros_controle.add_routes(app, _data_dir)
+    except Exception as e:
+        print(f"[Nous][mensageiros] rotas indisponiveis: {e}", file=sys.stderr)
     return app
 
 

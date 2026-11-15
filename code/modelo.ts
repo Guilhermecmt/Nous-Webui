@@ -10,6 +10,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { repararJson, repararNome } from './reparo.ts';
 
 export const OLLAMA = process.env.OLLAMA_BASE_URL || 'http://127.0.0.1:11434';
 
@@ -77,16 +78,39 @@ function objetoJson(s: string, inicio: number): { fim: number; valor: unknown } 
     else if (c === '}') {
       nivel--;
       if (nivel === 0) {
-        try { return { fim: i + 1, valor: JSON.parse(s.slice(inicio, i + 1)) }; } catch { return null; }
+        const valor = repararJson(s.slice(inicio, i + 1));
+        return valor === undefined ? null : { fim: i + 1, valor };
       }
     }
   }
-  return null;
+  // chaves sem fechar: o modelo parou antes do fim do JSON
+  const valor = repararJson(s.slice(inicio));
+  return valor === undefined ? null : { fim: s.length, valor };
+}
+
+/* Chamada com argumentos em texto ou em objeto. Sem conserto: entra em invalidas. */
+function argumentos(nome: string, args: unknown, invalidas: string[]): Record<string, unknown> | null {
+  let a: unknown = args ?? {};
+  if (typeof a === 'string') {
+    a = a.trim() ? repararJson(a) : {};
+    if (a === undefined) { invalidas.push(`the arguments of tool "${nome}" are not valid JSON`); return null; }
+  }
+  if (typeof a !== 'object' || a === null || Array.isArray(a)) { invalidas.push(`the arguments of tool "${nome}" must be a JSON object`); return null; }
+  return a as Record<string, unknown>;
+}
+
+/* Chamada pelo canal nativo: conserta o nome; nome sem conserto volta ao modelo. */
+function nativa(nome: string, args: unknown, nomes: Set<string>, invalidas: string[]): Chamada | null {
+  const n = nomes.has(nome) ? nome : repararNome(nome, nomes);
+  if (!n) { invalidas.push(`tool "${nome}" does not exist`); return null; }
+  const a = argumentos(n, args, invalidas);
+  return a ? { id: novoId(), nome: n, args: a } : null;
 }
 
 /* Chamadas escritas no texto: JSON solto, em ```json ou entre <tool_call>. */
-export function chamadasNoTexto(texto: string, nomes: Set<string>): { chamadas: Chamada[]; resto: string } {
+export function chamadasNoTexto(texto: string, nomes: Set<string>): { chamadas: Chamada[]; resto: string; invalidas: string[] } {
   const chamadas: Chamada[] = [];
+  const invalidas: string[] = [];
   let resto = '';
   let i = 0;
   while (i < texto.length) {
@@ -94,10 +118,16 @@ export function chamadasNoTexto(texto: string, nomes: Set<string>): { chamadas: 
     if (j < 0) { resto += texto.slice(i); break; }
     const obj = objetoJson(texto, j);
     const v = obj && obj.valor as { name?: unknown; arguments?: unknown; parameters?: unknown };
-    if (obj && v && typeof v.name === 'string' && nomes.has(v.name)) {
-      let args = v.arguments ?? v.parameters ?? {};
-      if (typeof args === 'string') { try { args = JSON.parse(args); } catch { args = {}; } }
-      chamadas.push({ id: novoId(), nome: v.name, args: (args || {}) as Record<string, unknown> });
+    // nome so' e' consertado com "arguments" junto: {"name": "Maria"} e' dado, nao chamada
+    const temArgs = !!v && typeof v === 'object' && ('arguments' in v || 'parameters' in v);
+    const nome = obj && v && typeof v.name === 'string' ? (nomes.has(v.name) ? v.name : temArgs ? repararNome(v.name, nomes) : null) : null;
+    if (obj && nome) {
+      const args = argumentos(nome, v!.arguments ?? v!.parameters, invalidas);
+      if (args) chamadas.push({ id: novoId(), nome, args });
+      resto += texto.slice(i, j);
+      i = obj.fim;
+    } else if (obj && temArgs && typeof v!.name === 'string') {
+      invalidas.push(`tool "${v!.name}" does not exist`);
       resto += texto.slice(i, j);
       i = obj.fim;
     } else {
@@ -106,7 +136,30 @@ export function chamadasNoTexto(texto: string, nomes: Set<string>): { chamadas: 
     }
   }
   resto = resto.replace(/```(?:json)?\s*```/g, '').replace(/<\/?tool_call>/g, '').trim();
-  return { chamadas, resto };
+  // comecou como chamada e nao virou nada: JSON sem conserto (em geral cortado)
+  if (!chamadas.length && !invalidas.length && /^\s*(?:```(?:json)?\s*|<tool_call>\s*)?\{\s*"(?:name|tool|function)"\s*:/.test(texto)) {
+    invalidas.push('your tool call was not valid JSON');
+    resto = '';
+  }
+  return { chamadas, resto, invalidas };
+}
+
+/* O erro que veio do servidor e' de contexto? Falta de memoria tambem diz
+ * "exceed", e compactar tudo nao resolve isso. */
+function estourouContexto(erro: string, extra = false): boolean {
+  if (/\b(?:memory|vram|cuda|oom)\b/i.test(erro)) return false;
+  return (extra ? /context|too long|exceed|maximum/i : /context|too long|exceed/i).test(erro);
+}
+
+/* Fecha a rodada: junta as chamadas, separa o que precisa voltar ao modelo e
+ * solta o texto retido se ele era resposta mesmo. */
+function fechar(texto: string, nativas: Chamada[], invNativas: string[], cortada: boolean, retido: boolean, o: Opcoes, tokens: number, prompt: number, t0: number): Resposta {
+  const { chamadas, resto, invalidas } = chamadasNoTexto(texto, o.nomes);
+  const todas = nativas.concat(chamadas);
+  // JSON de exemplo no meio de uma explicacao nao e' chamada errada
+  const inv = invNativas.concat(todas.length || resto.length <= 200 ? invalidas : []);
+  if (retido && !todas.length && !inv.length && !cortada) o.onTexto(texto);
+  return { texto: todas.length || inv.length ? resto : texto, chamadas: todas, invalidas: inv, cortada, tokens, prompt, segundos: (Date.now() - t0) / 1000 };
 }
 
 /* Contexto do Ollama para o agente: o mesmo do resto do Nous. */
@@ -120,7 +173,12 @@ export type Opcoes = {
   onTexto: (pedaco: string) => void; onPensamento?: (pedaco: string) => void;
   sinal: AbortSignal; think?: boolean | 'low' | 'medium' | 'high';
 };
-export type Resposta = { texto: string; chamadas: Chamada[]; tokens: number; prompt: number; segundos: number };
+export type Resposta = {
+  texto: string; chamadas: Chamada[];
+  invalidas: string[];   // chamadas sem conserto, ja' no texto que volta ao modelo
+  cortada: boolean;      // parou no limite de saida (done_reason/finish_reason "length")
+  tokens: number; prompt: number; segundos: number;
+};
 
 /* Uma rodada com o modelo. onTexto recebe so' o que e' resposta para a pessoa:
  * enquanto o texto parece o comeco de uma chamada ({, ``` ou <tool_call>), ele
@@ -138,14 +196,15 @@ export async function conversar(o: Opcoes): Promise<Resposta> {
   const r = await fetch(OLLAMA + '/api/chat', { method: 'POST', signal: o.sinal, body: JSON.stringify(corpo) });
   if (!r.ok || !r.body) {
     const erro = (await r.text()).slice(0, 300);
-    if (/context|too long|exceed/i.test(erro)) throw new ContextoCheio(erro);
+    if (estourouContexto(erro)) throw new ContextoCheio(erro);
     // modelo sem suporte a think: tenta de novo sem ele
     if (o.think !== undefined && /think/i.test(erro)) return conversar({ ...o, think: undefined });
     throw new Error('o Ollama respondeu ' + r.status + ': ' + erro);
   }
 
-  let texto = '', decidido: 'texto' | 'talvez' | null = null, tokens = 0, prompt = 0;
+  let texto = '', decidido: 'texto' | 'talvez' | null = null, tokens = 0, prompt = 0, cortada = false;
   const nativas: Chamada[] = [];
+  const invalidas: string[] = [];
   const leitor = r.body.getReader();
   const dec = new TextDecoder();
   let buf = '';
@@ -159,11 +218,12 @@ export async function conversar(o: Opcoes): Promise<Resposta> {
       buf = buf.slice(k + 1);
       if (!linha) continue;
       const d = JSON.parse(linha);
-      if (d.error) throw /context|too long|exceed/i.test(d.error) ? new ContextoCheio(d.error) : new Error(d.error);
+      if (d.error) throw estourouContexto(d.error) ? new ContextoCheio(d.error) : new Error(d.error);
       const m = d.message || {};
       if (m.thinking && o.onPensamento) o.onPensamento(m.thinking);
       for (const c of m.tool_calls || []) {
-        nativas.push({ id: novoId(), nome: c.function?.name, args: c.function?.arguments || {} });
+        const ch = nativa(String(c.function?.name ?? ''), c.function?.arguments, o.nomes, invalidas);
+        if (ch) nativas.push(ch);
       }
       if (m.content) {
         texto += m.content;
@@ -173,15 +233,12 @@ export async function conversar(o: Opcoes): Promise<Resposta> {
           if (decidido === 'texto') o.onTexto(texto);
         } else if (decidido === 'texto') o.onTexto(m.content);
       }
-      if (d.done) { prompt = d.prompt_eval_count || 0; tokens = prompt + (d.eval_count || 0); }
+      if (d.done) { prompt = d.prompt_eval_count || 0; tokens = prompt + (d.eval_count || 0); cortada = d.done_reason === 'length'; }
     }
   }
   // um <think>...</think> que vazou no texto (modelos que sempre pensam) sai da resposta
   texto = texto.replace(/^\s*<think>[\s\S]*?<\/think>\s*/, '');
-  const { chamadas, resto } = chamadasNoTexto(texto, o.nomes);
-  const todas = nativas.filter((c) => o.nomes.has(c.nome)).concat(chamadas);
-  if (decidido === 'talvez' && !todas.length) o.onTexto(texto);
-  return { texto: todas.length ? resto : texto, chamadas: todas, tokens, prompt, segundos: (Date.now() - t0) / 1000 };
+  return fechar(texto, nativas, invalidas, cortada, decidido === 'talvez', o, tokens, prompt, t0);
 }
 
 /* Mesma rodada num servidor compativel com OpenAI (SSE de chat/completions). */
@@ -195,10 +252,10 @@ async function conversarOpenAI(o: Opcoes, pv: { nome: string; p: Provedor; id: s
   const r = await fetch(pv.p.url + '/chat/completions', { method: 'POST', signal: o.sinal, headers: cabecalhosOpenAI(pv.p), body: JSON.stringify(corpo) });
   if (!r.ok || !r.body) {
     const erro = (await r.text()).slice(0, 300);
-    if (/context|too long|exceed|maximum/i.test(erro)) throw new ContextoCheio(erro);
+    if (estourouContexto(erro, true)) throw new ContextoCheio(erro);
     throw new Error(pv.nome + ' respondeu ' + r.status + ': ' + erro);
   }
-  let texto = '', decidido: 'texto' | 'talvez' | null = null, tokens = 0, prompt = 0;
+  let texto = '', decidido: 'texto' | 'talvez' | null = null, tokens = 0, prompt = 0, cortada = false;
   const parciais = new Map<number, { nome: string; args: string }>();
   const leitor = r.body.getReader();
   const dec = new TextDecoder();
@@ -218,6 +275,7 @@ async function conversarOpenAI(o: Opcoes, pv: { nome: string; p: Provedor; id: s
       try { d = JSON.parse(dados); } catch { continue; }
       if (d.error) throw new Error(d.error.message || String(d.error));
       if (d.usage) { prompt = d.usage.prompt_tokens || 0; tokens = d.usage.total_tokens || prompt + (d.usage.completion_tokens || 0); }
+      if (d.choices?.[0]?.finish_reason === 'length') cortada = true;
       const delta = d.choices?.[0]?.delta || {};
       const pens = delta.reasoning_content || delta.reasoning;
       if (pens && o.onPensamento) o.onPensamento(pens);
@@ -238,15 +296,9 @@ async function conversarOpenAI(o: Opcoes, pv: { nome: string; p: Provedor; id: s
     }
   }
   texto = texto.replace(/^\s*<think>[\s\S]*?<\/think>\s*/, '');
-  const nativas: Chamada[] = [...parciais.values()].map((x) => {
-    let args: Record<string, unknown> = {};
-    try { args = x.args ? JSON.parse(x.args) : {}; } catch { /* argumentos quebrados: vao vazios e o erro volta ao modelo */ }
-    return { id: novoId(), nome: x.nome, args };
-  });
-  const { chamadas, resto } = chamadasNoTexto(texto, o.nomes);
-  const todas = nativas.filter((c) => o.nomes.has(c.nome)).concat(chamadas);
-  if (decidido === 'talvez' && !todas.length) o.onTexto(texto);
-  return { texto: todas.length ? resto : texto, chamadas: todas, tokens, prompt, segundos: (Date.now() - t0) / 1000 };
+  const invalidas: string[] = [];
+  const nativas = [...parciais.values()].map((x) => nativa(x.nome, x.args, o.nomes, invalidas)).filter((c): c is Chamada => !!c);
+  return fechar(texto, nativas, invalidas, cortada, decidido === 'talvez', o, tokens, prompt, t0);
 }
 
 /* Pedido simples, sem ferramentas e sem stream (resumo da compactacao, titulos). */

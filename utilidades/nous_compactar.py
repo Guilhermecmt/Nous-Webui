@@ -100,7 +100,7 @@ class Filter:
         return (r.json().get("response") or "").strip() or None
 
     async def inlet(self, body: dict, __user__: Optional[dict] = None,
-                    __event_emitter__=None) -> dict:
+                    __event_emitter__=None, __metadata__: Optional[dict] = None) -> dict:
         if not self.valves.ENABLED or requests is None:
             return body
         messages = body.get("messages", [])
@@ -112,9 +112,13 @@ class Filter:
             return body
 
         older, recent = convo[:-keep], convo[-keep:]
-        # Identidade da conversa = sua primeira mensagem. O cache guarda quantas
-        # mensagens ja' estao no resumo; nos turnos seguintes so' entram as novas.
-        ident = hashlib.sha1(_text(older[0]).encode("utf-8")).hexdigest()
+        # Identidade da conversa = pessoa + id do chat + primeira mensagem. Sem os
+        # dois primeiros, duas conversas que abrem com "Oi" dividiam o mesmo resumo,
+        # ate' entre contas diferentes. O cache guarda quantas mensagens ja' estao
+        # no resumo; nos turnos seguintes so' entram as novas.
+        chat = (__metadata__ or {}).get("chat_id") or body.get("chat_id") or ""
+        pessoa = (__user__ or {}).get("id") or ""
+        ident = hashlib.sha1(f"{pessoa}\0{chat}\0{_text(older[0])}".encode("utf-8")).hexdigest()
         now = time.time()
         self._cache = {k: v for k, v in self._cache.items() if now - v[0] < 86400}
         _t, done_n, summary = self._cache.get(ident, (0, 0, None))

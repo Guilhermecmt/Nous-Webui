@@ -887,7 +887,7 @@
 					headers: { 'Content-Type': 'application/json' },
 					body: JSON.stringify({ user_id: _nousUid, persona: _activePer, fatos: sel })
 				}).then(function(r) { return r.json(); }).then(function(d) {
-					if (window.NousUI && window.NousUI.toast) window.NousUI.toast((d.salvas || 0) + ' memoria(s) guardada(s).');
+					if (window.NousUI && window.NousUI.toast) window.NousUI.toast((d.salvas || 0) + ' memoria(s) guardada(s).' + (d.recusadas ? ' ' + d.recusadas + ' recusada(s): pareciam ordens escondidas para a IA.' : ''));
 					memDone();
 				}, memDone);
 			});

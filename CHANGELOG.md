@@ -1,7 +1,39 @@
 # Changelog
 
 ## [Não lançado]
+### Adicionado
+- **Telegram e WhatsApp** (`mensageiros/`, painel **Seu Nous › Telegram e
+  WhatsApp**). Fale com o Nous pelo celular de qualquer lugar: a mensagem entra
+  pelo mesmo caminho da conversa normal (memória, agenda, habilidades e e-mail
+  valem) e a resposta volta pelo app. Áudio é transcrito no computador. Vem
+  desligado: o texto da conversa passa pelo Telegram ou pelo WhatsApp, e a tela
+  avisa. Telegram pareia por QR com código de uso único; estranhos não recebem
+  resposta. WhatsApp é experimental (ponte do Hermes Agent com a Baileys, não
+  oficial, só a conversa consigo mesmo, pode suspender o número). Veja
+  [docs/MENSAGEIROS.md](docs/MENSAGEIROS.md).
+- **Nous Code mais firme com modelo pequeno** (adaptado do Hermes Agent, MIT).
+  Chamada com JSON quase certo ou nome quase certo é consertada
+  (`code/reparo.ts`). O que não tem conserto volta ao modelo como erro, com a
+  lista de ferramentas, em vez de aparecer como resposta final.
+- Resposta cortada no limite de tamanho: texto continua de onde parou, até 3
+  vezes; chamada cortada nunca roda, e o modelo é orientado a fazer em partes.
+  Resposta vazia ganha até 2 empurrões.
+- `write` recusa conteúdo que não é texto ou que faltou (antes gravava
+  `[object Object]` ou esvaziava o arquivo), conteúdo com os números de linha do
+  `read` e sobrescrever arquivo que o agente só leu em parte.
+- `edit` aceita aspas curvas e travessões, `\n` escrito como texto, trata edit
+  repetido como "nada mudou" e mostra a linha parecida quando não acha.
+- Aviso quando o agente entra em ciclo A, B, A, B.
+- Instruções e skills de projeto baixado com cara de ataque contra a IA não
+  entram no contexto, e a pessoa é avisada (`code/ameacas.ts`).
+- Habilidade importada de link e memória importada de arquivo passam pela mesma
+  barreira (`utilidades/ameacas.py`).
+
 ### Mudado
+- **Comando sem volta pede OK até no modo Acesso total**, com o motivo no cartão:
+  apagar pasta, `git reset --hard`, `git push --force`, formatar disco, baixar e
+  executar script. Lembrete que roda sozinho não executa esses comandos.
+- A poda de contexto não corta mais o resultado que o modelo acabou de pedir.
 - **Conversa mais limpa.** As respostas não mostram mais o nome do modelo nem o
   avatar em cima do texto, como no ChatGPT e no Claude; o modelo em uso segue no
   seletor da caixa de texto (`branding/nous-gold.css`).
@@ -9,6 +41,19 @@
   em N conversa(s)" aparecem só na primeira mensagem da conversa e somem cerca de
   2 segundos depois, sem ficar em cima da resposta (`memory/nous_memory.py`,
   `history/nous_history.py`).
+
+### Corrigido
+- A extração automática de memórias usava sempre `gemma4:12b`. Quem instalou outro
+  modelo ficava sem memórias novas, sem aviso; quem tinha os dois trocava de modelo
+  na placa de vídeo a cada mensagem. Agora usa o modelo da conversa
+  (`memory/nous_memory.py`).
+- Fato que a pessoa não disse virava memória: perguntado onde ela morava, um modelo
+  pequeno chutou uma cidade e o chute ficava gravado. Agora o fato precisa ter
+  âncora no que a pessoa escreveu (`memory/nous_memory.py`).
+- Duas conversas que começavam com a mesma frase dividiam o resumo de conversa
+  longa, até entre contas diferentes do mesmo PC (`utilidades/nous_compactar.py`).
+- Falta de memória na placa de vídeo não é mais tratada como contexto cheio, o
+  que fazia o agente resumir a conversa inteira à toa (`code/modelo.ts`).
 
 ## [2.11.0] - 2026-10-25
 O Nous passa para o Open WebUI 0.12.3, abre no celular, sincroniza a agenda nos

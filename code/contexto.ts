@@ -7,6 +7,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import { bloquearSeHostil, varrerAmeacas } from './ameacas.ts';
 
 const CANDIDATOS = ['NOUS.md', 'AGENTS.md', 'CLAUDE.md'];
 const LOCAIS = ['AGENTS.local.md', 'CLAUDE.local.md'];
@@ -52,7 +53,9 @@ function arquivosInstrucao(raiz: string): Arquivo[] {
       const t = ler(path.join(d, n));
       if (!t || daPasta.has(hash(t))) continue;
       daPasta.add(hash(t));
-      out.push({ mostra: path.relative(topo, path.join(d, n)).split(path.sep).join('/') || n, texto: t });
+      // o que vem com o projeto pode ser de terceiros; o que esta' em ~/.nous e' da pessoa
+      const mostra = path.relative(topo, path.join(d, n)).split(path.sep).join('/') || n;
+      out.push({ mostra, texto: bloquearSeHostil(t, mostra) });
     }
   }
   return out;
@@ -98,7 +101,7 @@ export function instrucoesDaPasta(raiz: string, arquivoAbs: string, jaVistas: st
         vistos.add(hash(t));
         achadas.unshift({ pasta: rel, texto: `Additional instructions from: ${rel}/${n}\n\nThese instructions apply to work under \`${rel}\`. ` +
           'Use them as guidance when relevant; more specific instructions take precedence. They do not override system, developer, or direct user instructions.\n\n' +
-          escapar(t.slice(0, 3000)) });
+          escapar(bloquearSeHostil(t, `${rel}/${n}`).slice(0, 3000)) });
       }
     }
     dir = path.dirname(dir);
@@ -151,7 +154,7 @@ const esc = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replac
 
 /* Catalogo das skills (mensagem do dsh), ou '' se nao houver nenhuma. */
 export function catalogo(raiz: string): string {
-  const l = skills(raiz).filter((x) => x.modelo);
+  const l = skills(raiz).filter((x) => x.modelo && !varrerAmeacas(x.descricao).length);
   if (!l.length) return '';
   return '<system-reminder>\nA skill is a reusable set of task-specific instructions. The following skills are available in this session:\n\n<available_skills>\n' +
     l.map((x) => `- \`${x.nome}\`: ${esc(x.descricao)}`).join('\n') + '\n</available_skills>\n\n' +
@@ -166,7 +169,9 @@ export function conteudoSkill(raiz: string, nome: string, paraModelo = true): st
   const s = skills(raiz).find((x) => x.nome.toLowerCase() === n.toLowerCase());
   if (!s) throw new Error(`skill "${n}" is unknown or no longer available`);
   if (paraModelo && !s.modelo) throw new Error(`skill "${n}" is not available for model invocation`);
-  const corpo = frontmatter(ler(s.arquivo)).corpo.trim().slice(0, 12000);
+  const daPessoa = [path.join(os.homedir(), '.nous', 'skills'), path.join(os.homedir(), '.agents', 'skills')].some((d) => s.arquivo.startsWith(d + path.sep));
+  const texto = frontmatter(ler(s.arquivo)).corpo.trim().slice(0, 12000);
+  const corpo = daPessoa ? texto : bloquearSeHostil(texto, `skill ${s.nome}`);
   return `<skill_content name="${s.nome.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;')}">\n<skill_resources>\n` +
     `Base directory for this skill: ${esc(s.base)}\nResolve relative paths mentioned by this skill against the base directory before using them. Load referenced resources only as needed.\n` +
     `</skill_resources>\n\n<skill_instructions>\n${corpo}\n</skill_instructions>\n</skill_content>`;

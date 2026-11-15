@@ -25,6 +25,8 @@ import * as C from './contexto.ts';
 import * as L from './lsp.ts';
 import * as M from './mcp.ts';
 import * as R from './lembretes.ts';
+import { periodoDoCiclo, pareceNumerado } from './reparo.ts';
+import { comandoPerigoso } from './ameacas.ts';
 
 export type Evento = Record<string, unknown> & { t: string };
 /* leitura: so' olha | perguntar: mudar arquivo e rodar comando pedem OK |
@@ -50,6 +52,7 @@ export type Sessao = {
   tarefas: Tarefa[];              // checklist do todo_write
   objetivo: Objetivo | null;
   lidos: Record<string, number>;  // arquivo -> mtime quando o agente leu (ler antes de editar)
+  parciais?: Record<string, number>;  // arquivo lido so' em parte -> ate' que linha viu, sem buraco desde a 1
   pastasInstr: string[];          // subpastas cujas instrucoes ja' entraram no contexto
   internet: boolean | null;       // null = ainda nao perguntou
   raciocinio: Raciocinio;
@@ -249,7 +252,9 @@ const PREAMBULO = 'This is an automatically generated checkpoint condensing an e
 export async function compactar(s: Sessao, ctx: Ctx, forcar = false, ferramentas: object[] = [], tudo = false): Promise<Evento | null> {
   const antes = estimar(s.mensagens, ferramentas);
   const msgs = s.mensagens;
-  for (let i = 1; i < msgs.length; i++) {
+  // o que veio depois da ultima fala do modelo ele ainda nem leu: so' poda se estourou
+  const ate = tudo ? msgs.length : msgs.map((m) => m.role).lastIndexOf('assistant');
+  for (let i = 1; i < ate; i++) {
     const m = msgs[i];
     if (m.role === 'tool' && m.content.length > PODA.limite && !m.content.includes(MARCA_PODA.trim())) {
       m.content = m.content.slice(0, PODA.cabeca) + MARCA_PODA + m.content.slice(-PODA.cauda);
@@ -279,6 +284,7 @@ export async function compactar(s: Sessao, ctx: Ctx, forcar = false, ferramentas
         if (estimar([novo]) < estimar(trecho)) {
           s.mensagens = [msgs[0], novo, ...msgs.slice(corte)];
           s.lidos = {};  // o conteudo lido saiu do contexto: precisa ler de novo antes de editar
+          s.parciais = {};
           modo = 'resumo';
         }
       }
@@ -335,6 +341,23 @@ export function anunciaSemFazer(t: string): boolean {
 }
 
 /* @caminho no pedido: o conteudo do arquivo vai junto (e conta como lido). */
+/* Guarda o que o agente viu do arquivo. Quem leu so' um pedaco pode usar edit,
+ * mas nao reescrever o arquivo inteiro: o resto sumiria (Hermes:
+ * tools/file_tools_read_tracking.py). Leituras em sequencia somam. */
+function notarLeitura(s: Sessao, rel: string, mtime: number, offset: number, saida: string) {
+  const mudou = s.lidos[rel] !== undefined && Math.abs(s.lidos[rel] - mtime) > 1;
+  const inteiro = s.lidos[rel] !== undefined && !mudou && s.parciais?.[rel] === undefined;
+  const visto = mudou ? 0 : s.parciais?.[rel] ?? 0;
+  s.lidos[rel] = mtime;
+  s.parciais ??= {};
+  if (inteiro) return;
+  const fim = /\(End of file - total (\d+) lines\)/.exec(saida);
+  const m = /\((?:Showing|Output capped\. Showing) lines \d+-(\d+)/.exec(saida);
+  const alcance = offset <= visto + 1;
+  if (fim && alcance) { delete s.parciais[rel]; return; }
+  s.parciais[rel] = alcance && m ? Math.max(visto, Number(m[1])) : visto;
+}
+
 export function anexarArquivos(s: Sessao, pedido: string): string {
   const anexos: string[] = [];
   const vistos = new Set<string>();
@@ -344,8 +367,9 @@ export function anexarArquivos(s: Sessao, pedido: string): string {
       const rel = F.relativo(s.pasta, abs);
       if (vistos.has(rel) || !fs.existsSync(abs) || fs.statSync(abs).isDirectory()) continue;
       vistos.add(rel);
-      anexos.push(F.ler(s.pasta, { file_path: rel }));
-      s.lidos[rel] = fs.statSync(abs).mtimeMs;
+      const t = F.ler(s.pasta, { file_path: rel });
+      anexos.push(t);
+      notarLeitura(s, rel, fs.statSync(abs).mtimeMs, 1, t);
     } catch { /* nao e' arquivo do projeto */ }
   }
   return anexos.length ? pedido + '\n\n' + anexos.join('\n\n') : pedido;
@@ -412,6 +436,15 @@ export type Ctx = {
 type Turno = { humano: boolean; rodada: number; depois: string[]; mcp: Map<string, M.FerrMcp>;
   escopo?: { rel: string; pasta: boolean }[] };   // subagente que edita: so' estes arquivos/pastas
 
+/* Respostas que voltam ao modelo, do Hermes Agent (Nous Research, MIT,
+ * agent/conversation_loop.py e agent/turn_truncation.py). */
+const MAX_CONTINUAR = 3, MAX_INVALIDAS = 3, MAX_VAZIAS = 2, MAX_CORTES = 3;
+const CONTINUE = '[System: Your previous response was truncated by the output length limit. Continue exactly where you left off. Do not restart or repeat prior text. Finish the answer directly.]';
+const CORTE_FERRAMENTA = '[System: Your previous tool call was cut off by the output length limit and was NOT executed. Do not retry it with the same large content. Break the work into smaller calls: write a first part of the file, then add the rest with edit.]';
+const VAZIA_DEPOIS_DE_FERRAMENTA = 'You just executed tool calls but returned an empty response. Please process the tool results above and continue with the task.';
+const VAZIA = 'Your last reply was empty. Answer the request, or call the next tool.';
+const ciclo = (nomes: string[]) => `You are looping through the same sequence of tool calls (${nomes.join(' -> ')}) with no progress. Stop repeating it: analyze the results you already have, then change approach or give your final answer.`;
+
 const GENTIL = 'You are repeating the exact same tool call with identical arguments. Carefully analyze the previous result before calling again: ' +
   'if the task is not complete, try a different approach or different arguments instead of repeating the call.';
 function detalhado(nome: string, n: number, args: string): string {
@@ -453,6 +486,7 @@ export async function turno(s: Sessao, pedido: string, ctx: Ctx, origem: 'humano
     s.instrEnviadas = true;
     const ins = C.instrucoes(s.pasta);
     if (ins) s.mensagens.push({ role: 'user', content: ins });
+    for (const b of ins.matchAll(/\[BLOCKED: (\S+) contained/g)) ev({ t: 'nota', texto: `Ignorei as instruções de ${b[1]}: o texto tem cara de ataque contra a IA. Confira esse arquivo antes de confiar neste projeto.` });
   }
   const cat = C.catalogo(s.pasta);
   const hc = cat ? crypto.createHash('sha256').update(cat).digest('hex').slice(0, 16) : '';
@@ -478,6 +512,8 @@ export async function turno(s: Sessao, pedido: string, ctx: Ctx, origem: 'humano
   const vistos = new Map<string, number>();  // acao + resultado -> vezes neste turno (parada)
   let cadeia = { chave: '', n: 0 };          // mesma chamada seguida (aviso do dsh)
   let empurroes = 0, tentouCompactar = false, passo = 0;
+  let continuacoes = 0, cortes = 0, invalidos = 0, vazias = 0, semRaciocinio = false, avisouCiclo = false;
+  const trilha: string[] = [];               // chamadas deste turno (ciclo A,B,A,B)
   for (;;) {
     passo++;
     if (ctx.sinal.aborted) break;
@@ -495,7 +531,7 @@ export async function turno(s: Sessao, pedido: string, ctx: Ctx, origem: 'humano
     let texto = '';
     let r;
     try {
-      r = await conversar({ modelo: s.modelo, mensagens: s.mensagens, ferramentas: esquemas, nomes, sinal: ctx.sinal, think: think(s),
+      r = await conversar({ modelo: s.modelo, mensagens: s.mensagens, ferramentas: esquemas, nomes, sinal: ctx.sinal, think: semRaciocinio ? false : think(s),
         onTexto: (p) => { texto += p; ctx.emitir({ t: 'texto', d: p }); },
         onPensamento: (p) => ctx.emitir({ t: 'pensamento', d: p }) });
     } catch (e) {
@@ -511,8 +547,53 @@ export async function turno(s: Sessao, pedido: string, ctx: Ctx, origem: 'humano
     s.tokens = r.tokens;
     ctx.emitir({ t: 'passo', n: passo, segundos: Math.round(r.segundos * 10) / 10, tokens: r.tokens, prompt: r.prompt, limite: NUM_CTX });
 
+    // o contexto acabou, nao o limite de saida: continuar nao adianta, compacta antes
+    if (r.cortada && r.prompt && NUM_CTX - r.prompt < 512 && !tentouCompactar) {
+      tentouCompactar = true;
+      const c = await compactar(s, ctx, true, esquemas);
+      if (c) ev(c);
+    }
+    // chamada cortada nunca roda: um write pela metade estragaria o arquivo
+    if (r.cortada && (r.chamadas.length || r.invalidas.length)) {
+      if (texto) ctx.emitir({ t: 'limpar' });
+      if (++cortes > MAX_CORTES) {
+        ev({ t: 'resposta', texto: 'Parei: o modelo tentou uma mudança grande demais para uma resposta só, várias vezes. Peça em partes menores, ou tente outro modelo.' });
+        await fecharTitulo(s, titulo);
+        ctx.salvar();
+        return;
+      }
+      ev({ t: 'nota', texto: 'A resposta passou do limite de tamanho. Pedi para fazer em partes menores.' });
+      s.mensagens.push({ role: 'user', content: CORTE_FERRAMENTA });
+      continue;
+    }
+    // chamada com erro que nao deu para consertar: o modelo fica sabendo, em vez de virar resposta
+    if (r.invalidas.length) {
+      const lista = esquemas.map((e) => (e as { function: { name: string } }).function.name).join(', ');
+      const erro = `Error: ${[...new Set(r.invalidas)].join('; ')}. Nothing was executed for that call. Available tools: ${lista}. Reply with only the JSON of the tool call: {"name": "...", "arguments": {...}}.`;
+      if (r.chamadas.length) tt.depois.push(erro);
+      else if (++invalidos <= MAX_INVALIDAS) {
+        if (texto) ctx.emitir({ t: 'limpar' });
+        s.mensagens.push({ role: 'user', content: erro });
+        continue;
+      }
+    }
+
     if (!r.chamadas.length) {
+      // resposta vazia: um empurrao antes de desistir
+      if (!r.texto.trim() && !r.cortada && vazias < MAX_VAZIAS) {
+        vazias++;
+        s.mensagens.push({ role: 'user', content: passo > 1 ? VAZIA_DEPOIS_DE_FERRAMENTA : VAZIA });
+        continue;
+      }
       s.mensagens.push({ role: 'assistant', content: r.texto });
+      // texto cortado no limite: continua de onde parou; so' raciocinio, sem resposta: desliga o raciocinio
+      if (r.cortada && continuacoes < MAX_CONTINUAR) {
+        continuacoes++;
+        if (r.texto.trim()) ev({ t: 'nota', texto: r.texto.trim() });
+        else semRaciocinio = true;
+        s.mensagens.push({ role: 'user', content: CONTINUE });
+        continue;
+      }
       // modelo pequeno anuncia ("Vamos verificar o package.json:") e para: empurra
       if (empurroes < 2 && anunciaSemFazer(r.texto)) {
         empurroes++;
@@ -545,6 +626,7 @@ export async function turno(s: Sessao, pedido: string, ctx: Ctx, origem: 'humano
     }
     if (r.texto.trim()) ev({ t: 'nota', texto: r.texto.trim() });
     else if (texto) ctx.emitir({ t: 'limpar' });  // o que foi transmitido era a chamada
+    invalidos = 0;
     const chamadas = r.chamadas.slice(0, MAX_CHAMADAS_POR_PASSO).map((c) => ({ ...c, ...F.canonica(c.nome, c.args) }));
     s.mensagens.push({ role: 'assistant', content: chamadas.map((c) => JSON.stringify({ name: c.nome, arguments: c.args })).join('\n') });
 
@@ -562,6 +644,13 @@ export async function turno(s: Sessao, pedido: string, ctx: Ctx, origem: 'humano
       const canon = JSON.stringify(ordenado(c.args));
       const chave = c.nome + '\u0000' + canon;
       cadeia = cadeia.chave === chave ? { chave, n: cadeia.n + 1 } : { chave, n: 1 };
+      // ciclo A,B,A,B: a mesma sequencia tres vezes, sem conferir job que ainda roda
+      trilha.push(chave);
+      const p = periodoDoCiclo(trilha);
+      if (p && !avisouCiclo && !trilha.slice(-p).some((k) => k.startsWith('job_output\u0000'))) {
+        avisouCiclo = true;
+        tt.depois.push(ciclo(trilha.slice(-p).map((k) => k.split('\u0000')[0])));
+      }
       if (cadeia.n === 3) tt.depois.push(GENTIL);
       else if (cadeia.n === 5 || cadeia.n === 8) tt.depois.push(detalhado(c.nome, cadeia.n, canon));
       // a mesma acao com o mesmo resultado 10 vezes no turno: para
@@ -660,7 +749,7 @@ async function executar(s: Sessao, c: Chamada, ctx: Ctx, tt: Turno): Promise<Res
         const t = F.ler(s.pasta, a);
         const abs = F.resolver(s.pasta, a.file_path, true);
         const rel = F.relativo(s.pasta, abs);
-        if (!rel.includes(':') && !rel.startsWith('/')) { s.lidos[rel] = fs.statSync(abs).mtimeMs; instrSubpasta(s, abs, tt); }
+        if (!rel.includes(':') && !rel.startsWith('/')) { notarLeitura(s, rel, fs.statSync(abs).mtimeMs, Number(a.offset) || 1, t); instrSubpasta(s, abs, tt); }
         const m = /\((?:Showing|Output capped\. Showing) lines (\d+)-(\d+)(?: of (\d+))?|total (\d+) lines/.exec(t);
         return { ok: true, resumo: m ? (m[4] ? m[4] + ' linhas' : `linhas ${m[1]}-${m[2]}` + (m[3] ? ' de ' + m[3] : '')) : 'lido', saida: t };
       }
@@ -683,6 +772,11 @@ async function executar(s: Sessao, c: Chamada, ctx: Ctx, tt: Turno): Promise<Res
         if (tt.escopo && !tt.escopo.some((e) => rel === e.rel || (e.pasta && (e.rel === '.' || rel.startsWith(e.rel + '/'))))) {
           return negado(`this subagent may only change: ${tt.escopo.map((e) => e.rel + (e.pasta && e.rel !== '.' ? '/' : '')).join(', ')}. "${rel}" is outside that scope; do not retry it — mention it in your report so the delegating agent can handle it.`);
         }
+        // sem isto, um argumento faltando apaga o arquivo e um objeto vira "[object Object]"
+        if (c.nome === 'write') {
+          if (typeof a.content !== 'string') throw new Error(`content must be a string with the full text of the file, got ${a.content === undefined || a.content === null ? 'nothing' : typeof a.content}. For a JSON file, pass the JSON as text`);
+          if (pareceNumerado(a.content)) throw new Error('content has the line numbers from the read tool. Write the real text of the file, without the line numbers');
+        }
         const atual = F.conteudoAtual(abs);
         const verbo = c.nome === 'edit' ? 'edit' : 'write';
         // ler antes de mudar, e o arquivo nao pode ter mudado desde a leitura
@@ -690,10 +784,12 @@ async function executar(s: Sessao, c: Chamada, ctx: Ctx, tt: Turno): Promise<Res
         if (atual !== null) {
           if (!(rel in s.lidos)) throw new Error(`cannot modify "${rel}": file has not been read — read the file, then retry`);
           if (Math.abs(s.lidos[rel] - fs.statSync(abs).mtimeMs) > 1) throw new Error(`cannot ${verbo} "${rel}": file changed since it was read — re-read the file, then retry`);
+          const visto = s.parciais?.[rel];
+          if (c.nome === 'write' && visto !== undefined) throw new Error(`cannot overwrite "${rel}": you only read part of it, so writing the whole file would lose the rest. Use edit for a targeted change, or read from offset=${visto + 1} to the end first`);
         }
         const novo = c.nome === 'edit'
           ? F.aplicarEdicao(atual!, String(a.old_string ?? ''), String(a.new_string ?? ''), a.replace_all === true || a.replace_all === 'true', rel)
-          : String(a.content ?? '');
+          : a.content as string;
         if (atual !== null && novo === atual) return { ok: true, resumo: 'nada mudou', saida: `The file ${rel} already had this content; nothing changed.` };
         const d = F.diff(atual || '', novo);
         if (s.modo === 'perguntar') {
@@ -704,6 +800,7 @@ async function executar(s: Sessao, c: Chamada, ctx: Ctx, tt: Turno): Promise<Res
         if (!(rel in s.originais)) s.originais[rel] = atual;
         F.gravar(abs, novo);
         s.lidos[rel] = fs.statSync(abs).mtimeMs;
+        if (c.nome === 'write' && s.parciais) delete s.parciais[rel];
         instrSubpasta(s, abs, tt);
         const diag = await diagnosticosEdicao(s, ctx, abs, rel, atual, novo);
         const saida = (c.nome === 'edit'
@@ -723,8 +820,9 @@ async function executar(s: Sessao, c: Chamada, ctx: Ctx, tt: Turno): Promise<Res
         }
         const cwd = a.workdir ? F.resolver(s.pasta, a.workdir) : s.pasta;
         const fundo = a.run_in_background === true || a.run_in_background === 'true';
-        if (s.modo !== 'total' && !s.sempre.includes(cmd)) {
-          const r = await ctx.aprovar({ t: 'pede', id: c.id, tipo: 'comando', comando: cmd, descricao: desc, fundo });
+        const perigo = comandoPerigoso(cmd);
+        if ((s.modo !== 'total' || perigo) && !s.sempre.includes(cmd)) {
+          const r = await ctx.aprovar({ t: 'pede', id: c.id, tipo: 'comando', comando: cmd, descricao: desc, fundo, perigo });
           if (r.semCanal) return semCanal('pwsh');
           if (!r.ok) return negado('the user rejected tool "pwsh" for this command; it stays denied, so stop and explain instead of working around it');
           if (r.sempre) s.sempre.push(cmd);
@@ -1049,6 +1147,7 @@ export function desfazer(s: Sessao, arquivo?: string): string[] {
     else F.gravar(abs, orig);
     delete s.originais[rel];
     delete s.lidos[rel];
+    if (s.parciais) delete s.parciais[rel];
     feitos.push(rel);
   }
   return feitos;

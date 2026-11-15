@@ -17,8 +17,15 @@ O filtro nous_skills.py le estes mesmos arquivos (formato e' o contrato).
 """
 import os
 import re
+import sys
 import datetime
 import unicodedata
+
+_UTIL = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "utilidades")
+if _UTIL not in sys.path:
+    sys.path.append(_UTIL)
+
+import ameacas  # noqa: E402
 
 FIELDS = ("nome", "quando_usar", "origem", "criado", "fonte")
 MAX_BODY = 12000
@@ -120,6 +127,10 @@ def save_skill(user_id, s, sid=None):
         raise ValueError("diga quando o Nous deve usar esta habilidade")
     if len(corpo) > MAX_BODY:
         raise ValueError("passos longos demais (limite de 12 mil caracteres)")
+    # o que a propria pessoa escreve passa; o que veio de um link pode ser armadilha
+    if s.get("origem") == "importada" and ameacas.varrer("\n".join((nome, quando, corpo))):
+        raise ValueError("esta habilidade tem trechos que tentam dar ordens escondidas para a IA e nao foi salva. "
+                         "Se confia no texto, copie os passos para uma habilidade nova")
     d = user_dir(user_id)
     sid = _safe(sid) if sid else None
     if not sid:
