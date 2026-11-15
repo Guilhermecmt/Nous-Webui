@@ -1,16 +1,19 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-BR" class="dark">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Nous — iniciando…</title>
+<!-- cores: a versao escura da paleta escolhida no Nous (Aparencia). A escolha vem do
+     monitor por <script> (esta pagina e' file://, nao passa no CORS); sem ele, Ouro. -->
+<link rel="stylesheet" href="../branding/nous-paletas.css">
 <style>
-  :root { --gold:#c8962e; --gold-soft:#e7c069; }
+  :root { --gold:var(--nous-acc); --gold-soft:var(--nous-acc-txt); }
   * { box-sizing:border-box; margin:0; padding:0; }
   html, body { height:100%; }
   body {
-    background:#0d0d0f;
-    color:#eee;
+    background:var(--nous-lado);
+    color:var(--nous-txt);
     font-family:Inter, system-ui, -apple-system, Segoe UI, sans-serif;
     display:flex; align-items:center; justify-content:center;
     text-align:center; padding:24px;
@@ -71,6 +74,22 @@
 <script>
   (function () {
     var TARGET = 'http://localhost:8080';
+    var temPaleta = false;
+
+    /* paleta escolhida: o monitor (8990) responde window.NOUS_PALETA="id"; ele pode
+       ainda estar subindo, entao tenta de novo a cada volta do poll */
+    function paleta() {
+      if (temPaleta) return;
+      var s = document.createElement('script');
+      s.src = 'http://127.0.0.1:8990/aparencia.js?t=' + Date.now();
+      s.onload = function () {
+        var p = window.NOUS_PALETA;
+        if (typeof p === 'string' && /^[a-z0-9-]{1,32}$/.test(p) && p !== 'ouro') document.documentElement.setAttribute('data-nous-paleta', p);
+        temPaleta = true;
+      };
+      s.onerror = function () { s.remove(); };
+      document.head.appendChild(s);
+    }
     var started = Date.now();
     var tries = 0;
 
@@ -78,6 +97,7 @@
 
     function poll() {
       tries++;
+      paleta();
       // no-cors: uma conexao bem-sucedida resolve (resposta opaca); servidor
       // fora do ar rejeita. Basta detectar que o servidor aceitou a conexao.
       fetch(TARGET + '/health', { mode: 'no-cors', cache: 'no-store' })

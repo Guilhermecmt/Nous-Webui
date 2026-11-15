@@ -1075,9 +1075,15 @@ async def h_research_view(request):
     if not p:
         return web.Response(status=404, text="Relatorio nao encontrado.")
     with open(p, encoding="utf-8") as f:
-        return web.Response(text=f.read(), content_type="text/html",
-                            headers={"Content-Security-Policy": _REPORT_CSP,
-                                     "Referrer-Policy": "no-referrer"})
+        html = f.read()
+    try:  # o relatorio traz as paletas embutidas; aqui so' se marca a escolhida
+        import aparencia
+        html = aparencia.marcar_html(html, aparencia.ler(_data_dir()))
+    except Exception:
+        pass
+    return web.Response(text=html, content_type="text/html",
+                        headers={"Content-Security-Policy": _REPORT_CSP,
+                                 "Referrer-Policy": "no-referrer"})
 
 
 async def h_research_delete(request):

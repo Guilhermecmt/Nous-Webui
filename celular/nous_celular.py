@@ -47,6 +47,14 @@ if _HERE not in sys.path:
 
 import pareamento as par  # noqa: E402
 
+# Paleta de cores escolhida no Nous (Aparencia): a mesma leitura do monitor.
+sys.path.insert(0, os.path.join(os.path.dirname(_HERE), "monitor"))
+try:
+    import aparencia  # noqa: E402
+except Exception:  # sem o monitor ao lado (copia parcial): fica a Ouro
+    aparencia = None
+_FOLHA_PALETAS = os.path.join(os.path.dirname(_HERE), "branding", "nous-paletas-auto.css")
+
 PORTA = 8999
 OWUI = 8080
 # so' o que o Nous usa pelo navegador. O 8998 (Nous Code) NAO entra: tem terminal.
@@ -65,16 +73,17 @@ PAGINA_PAREAR = """<!doctype html>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="dark light"><title>Nous - ligar este celular</title>
 <style>
-:root{color-scheme:dark light;--fundo:#141210;--card:#1c1916;--txt:#ddd5c6;--mut:#958a76;--ouro:#c8962e;--ouro2:#e7c069;--erro:#e58b7a}
-@media (prefers-color-scheme:light){:root{--fundo:#faf6ee;--card:#fff;--txt:#2a251e;--mut:#7a6f5d;--ouro:#a87a1c;--ouro2:#8a6414;--erro:#b3402c}}
+/*PALETAS*/
+:root{color-scheme:dark light;--fundo:var(--nous-bg);--card:var(--nous-alto);--txt:var(--nous-txt);--mut:var(--nous-mut);
+--ouro:var(--nous-acc);--ouro2:var(--nous-acc-txt);--erro:var(--nous-perigo)}
 *{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;background:var(--fundo);color:var(--txt);
 font:16px/1.55 Inter,system-ui,sans-serif;padding:16px}
-main{width:100%;max-width:420px;background:var(--card);border:1px solid rgba(200,150,46,.3);border-radius:16px;padding:22px 20px}
+main{width:100%;max-width:420px;background:var(--card);border:1px solid rgba(var(--nous-acc-rgb),.3);border-radius:16px;padding:22px 20px}
 h1{margin:0 0 4px;font:600 22px Cinzel,Georgia,serif;letter-spacing:.06em;color:var(--ouro2)}
 p{margin:.6em 0}ol{padding-left:1.2em;margin:.6em 0}li{margin:.35em 0}.mut{color:var(--mut);font-size:14px}
 input{width:100%;font:600 22px ui-monospace,Consolas,monospace;letter-spacing:.18em;text-transform:uppercase;text-align:center;
 padding:12px;border-radius:12px;border:1px solid var(--ouro);background:transparent;color:var(--txt)}
-button{width:100%;margin-top:12px;padding:13px;border-radius:12px;border:0;background:var(--ouro);color:#fff;font:600 16px system-ui,sans-serif;cursor:pointer}
+button{width:100%;margin-top:12px;padding:13px;border-radius:12px;border:0;background:var(--ouro);color:var(--nous-on-acc);font:600 16px system-ui,sans-serif;cursor:pointer}
 button:disabled{opacity:.5}#msg{min-height:1.4em;margin-top:10px;color:var(--erro);font-size:14px}
 </style></head><body><main>
 <h1>Nous</h1>
@@ -105,14 +114,35 @@ if(h)enviar();
 </script></body></html>"""
 
 PAGINA_ERRO = """<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Nous</title><style>body{font:16px/1.55 system-ui,sans-serif;margin:0;display:grid;place-items:center;min-height:100vh;padding:16px;
-background:#141210;color:#ddd5c6}main{max-width:420px}h1{font:600 20px Georgia,serif;color:#e7c069}</style></head><body><main>
+<title>Nous</title><style>/*PALETAS*/
+body{font:16px/1.55 system-ui,sans-serif;margin:0;display:grid;place-items:center;min-height:100vh;padding:16px;
+background:var(--nous-bg);color:var(--nous-txt)}main{max-width:420px}h1{font:600 20px Georgia,serif;color:var(--nous-acc-txt)}</style></head><body><main>
 <h1>%(titulo)s</h1><p>%(texto)s</p></main></body></html>"""
 
 
-def _erro_html(status, titulo, texto):
+def _folha_paletas():
+    try:
+        with open(_FOLHA_PALETAS, encoding="utf-8") as f:
+            return f.read()
+    except OSError:
+        return ""
+
+
+def _com_paleta(html, data_dir=None):
+    """Embute as paletas (claro/escuro pelo proprio celular) e marca a escolhida no Nous."""
+    p = aparencia.ler(data_dir) if (aparencia and data_dir) else "ouro"
+    if p != "ouro":
+        html = html.replace('<html lang="pt-BR">', '<html lang="pt-BR" data-nous-paleta="%s">' % p, 1)
+    return html.replace("/*PALETAS*/", _folha_paletas(), 1)
+
+
+def pagina_parear(data_dir):
+    return _com_paleta(PAGINA_PAREAR, data_dir)
+
+
+def _erro_html(status, titulo, texto, data_dir=None):
     return web.Response(status=status, content_type="text/html", charset="utf-8",
-                        text=PAGINA_ERRO % {"titulo": titulo, "texto": texto},
+                        text=_com_paleta(PAGINA_ERRO % {"titulo": titulo, "texto": texto}, data_dir),
                         headers={"Cache-Control": "no-store"})
 
 
@@ -183,7 +213,7 @@ async def entrada_mw(request, handler):
     if not achou:
         quer_html = "text/html" in request.headers.get("Accept", "") and request.method == "GET"
         if quer_html:
-            return web.Response(status=401, content_type="text/html", charset="utf-8", text=PAGINA_PAREAR,
+            return web.Response(status=401, content_type="text/html", charset="utf-8", text=pagina_parear(request.app["data_dir"]),
                                 headers={"Cache-Control": "no-store"})
         return web.json_response({"erro": "Aparelho nao pareado."}, status=401, headers={"Cache-Control": "no-store"})
     d, caminho = achou
@@ -193,7 +223,7 @@ async def entrada_mw(request, handler):
 
 # ------------------------------------------------------------------ rotas do portao
 async def h_parear(request):
-    return web.Response(status=200, content_type="text/html", charset="utf-8", text=PAGINA_PAREAR,
+    return web.Response(status=200, content_type="text/html", charset="utf-8", text=pagina_parear(request.app["data_dir"]),
                         headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"})
 
 

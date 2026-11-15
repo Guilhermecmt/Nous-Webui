@@ -294,5 +294,27 @@ class Repasse(Base):
         self.assertIn("Abra o Nous", await r.text())
 
 
+class Paleta(Base):
+    """A pagina de ligar o celular segue a paleta escolhida no Nous (NousData/aparencia.json)."""
+
+    async def test_pagina_de_parear_usa_a_paleta_salva(self):
+        with open(os.path.join(self.d, "aparencia.json"), "w", encoding="utf-8") as f:
+            f.write('{"paleta": "pitaya"}')
+        r = await self.sess.get(self.base + "/", headers={**CASA, "Accept": "text/html"})
+        self.assertEqual(r.status, 401)
+        t = await r.text()
+        self.assertIn('<html lang="pt-BR" data-nous-paleta="pitaya">', t)
+        self.assertIn('[data-nous-paleta="pitaya"]{', t)          # a folha das paletas vem junto
+        self.assertIn("prefers-color-scheme:dark", t)             # claro/escuro pelo celular
+        self.assertIn("--ouro:var(--nous-acc)", t)               # o estilo da pagina usa a paleta, nao o ouro fixo
+        self.assertNotIn("--ouro:#", t)
+
+    async def test_sem_escolha_fica_ouro(self):
+        r = await self.sess.get(self.base + "/_portao/parear", headers={**CASA, "Accept": "text/html"})
+        t = await r.text()
+        self.assertIn('<html lang="pt-BR">', t)
+        self.assertIn("--nous-acc:#a87a1c", t)
+
+
 if __name__ == "__main__":
     unittest.main()

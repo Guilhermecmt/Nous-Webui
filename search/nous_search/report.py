@@ -92,9 +92,23 @@ def _toc(body_html):
     return f'<nav class="toc"><b>Neste relatorio</b><ol>{lis}</ol></nav>'
 
 
+# As paletas do Nous (branding/nous-paletas-auto.css) vao embutidas: o relatorio salvo ou
+# exportado se abre sozinho; o monitor so' marca a escolhida no <html> ao mostrar.
+_FOLHA_PALETAS = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+                              "branding", "nous-paletas-auto.css")
+
+
+def _paletas():
+    try:
+        with open(_FOLHA_PALETAS, encoding="utf-8") as f:
+            return f.read()
+    except OSError:
+        return ""
+
+
 _CSS = """
-:root{--bg:#fbfaf7;--fg:#1d1d1f;--mut:#6b6b70;--card:#fff;--line:#e8e4da;--gold:#a8791c;--gold2:#c8962e;--chip:#f4efe3}
-@media (prefers-color-scheme:dark){:root{--bg:#121216;--fg:#ececec;--mut:#9a9aa2;--card:#1b1b20;--line:#2b2b31;--gold:#e7c069;--gold2:#c8962e;--chip:#25221b}}
+:root{--bg:var(--nous-bg);--fg:var(--nous-txt);--mut:var(--nous-mut);--card:var(--nous-alto);--line:var(--nous-linha);
+--gold:var(--nous-acc-txt);--gold2:var(--nous-acc);--chip:rgba(var(--nous-acc-rgb),.1)}
 *{box-sizing:border-box}html{scroll-behavior:smooth}
 body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.7 Georgia,'Iowan Old Style',serif}
 .wrap{max-width:1080px;margin:0 auto;padding:40px 20px 80px;display:grid;grid-template-columns:minmax(0,1fr) 240px;gap:40px}
@@ -122,9 +136,9 @@ aside{position:sticky;top:20px;align-self:start;font:13px/1.5 Inter,system-ui,sa
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
 .src{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;
  font:13px/1.45 Inter,system-ui,sans-serif;scroll-margin-top:20px}
-.src:target{border-color:var(--gold2);box-shadow:0 0 0 3px rgba(200,150,46,.2)}
+.src:target{border-color:var(--gold2);box-shadow:0 0 0 3px rgba(var(--nous-acc-rgb),.2)}
 .src .n{display:inline-flex;width:22px;height:22px;border-radius:6px;align-items:center;justify-content:center;
- background:var(--gold2);color:#111;font-weight:700;font-size:11px;margin-right:8px}
+ background:var(--gold2);color:var(--nous-on-acc);font-weight:700;font-size:11px;margin-right:8px}
 .src .t{font-weight:600}.src .d{color:var(--mut);margin:4px 0}.src p{margin:6px 0 0;color:var(--mut)}
 footer{grid-column:1/-1;color:var(--mut);font:12px Inter,system-ui,sans-serif;text-align:center;margin-top:30px}
 @media (max-width:820px){.wrap{grid-template-columns:1fr}aside{position:static}}
@@ -158,7 +172,7 @@ def build_html(question, report_md, sources, meta):
     q = html.escape(question)
     return f"""<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>{q[:90]} - Pesquisa Nous</title><style>{_CSS}</style></head><body><div class="wrap">
+<title>{q[:90]} - Pesquisa Nous</title><style>{_paletas()}{_CSS}</style></head><body><div class="wrap">
 <header><div class="kicker">Pesquisa Profunda · Nous</div><h1>{q}</h1>
 <div class="meta"><span class="chip">{data}</span><span class="chip">{n} fontes</span>
 <span class="chip">{len(domains)} sites</span><span class="chip">~{max(1, round(words / 200))} min de leitura</span>

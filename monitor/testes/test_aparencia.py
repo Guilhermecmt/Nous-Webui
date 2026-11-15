@@ -52,6 +52,13 @@ class TestArquivo(unittest.TestCase):
         (self.dir / "aparencia.json").write_text('["pitaya"]', encoding="utf-8")
         self.assertEqual(aparencia.ler(self.dir), "ouro")
 
+    def test_marcar_html(self):
+        html = '<!doctype html><html lang="pt-BR"><head></head><body><p>&lt;html&gt;</p></body></html>'
+        self.assertEqual(aparencia.marcar_html(html, "ceu"),
+                         '<!doctype html><html data-nous-paleta="ceu" lang="pt-BR"><head></head><body><p>&lt;html&gt;</p></body></html>')
+        self.assertEqual(aparencia.marcar_html(html, "ouro"), html)        # Ouro e' o padrao: sem atributo
+        self.assertEqual(aparencia.marcar_html(html, 'x" onload="y'), html)  # so' paleta conhecida
+
     def test_gravar_recusa_desconhecida(self):
         with self.assertRaises(ValueError):
             aparencia.gravar(self.dir, "abacaxi")

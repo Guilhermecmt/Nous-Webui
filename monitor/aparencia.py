@@ -15,6 +15,7 @@ Rotas:
 """
 import json
 import os
+import re
 from pathlib import Path
 
 from aiohttp import web
@@ -56,6 +57,14 @@ def gravar(data_dir, paleta):
     tmp.write_text(json.dumps({"paleta": paleta}), encoding="utf-8")
     os.replace(tmp, d / ARQUIVO)
     return paleta
+
+
+def marcar_html(html, paleta):
+    """Poe data-nous-paleta no primeiro <html> (relatorios de pesquisa). Ouro e' o padrao
+    e fica sem atributo; paleta desconhecida nao entra."""
+    if paleta == PADRAO or paleta not in ids():
+        return html
+    return re.sub(r"<html\b", '<html data-nous-paleta="%s"' % paleta, html, count=1, flags=re.I)
 
 
 def _resposta(data_dir):
