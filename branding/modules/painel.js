@@ -113,7 +113,7 @@
 			'#nous-pn-titulo{margin:0;font:600 21px/1.15 Cinzel,Georgia,serif;letter-spacing:.06em;color:var(--pn-ouro2)}' +
 			'#nous-pn-estado{font-size:12.5px;line-height:1.45;color:var(--pn-mut);margin-top:5px;font-variant-numeric:tabular-nums}' +
 			'#nous-pn-estado b{font-weight:600;color:var(--pn-txt)}' +
-			'#nous-pn-liberar{margin-top:5px;padding:0!important;font-size:12.5px!important;font-weight:600!important;color:var(--pn-ouro)!important;text-decoration:underline;text-underline-offset:3px}' +
+			'#nous-pn-liberar{margin-top:5px;padding:0!important;font-size:12.5px!important;font-weight:600!important;color:var(--pn-ouro2)!important;text-decoration:underline;text-underline-offset:3px}' +
 			'.nous-pn-acoes{display:flex;flex-direction:column;gap:2px;align-self:start}' +
 			'.nous-pn-acoes button{width:34px;height:34px;display:grid;place-items:center;border-radius:8px;color:var(--pn-mut)!important}' +
 			'.nous-pn-acoes button:hover{background:var(--pn-alto);color:var(--pn-ouro2)!important}' +
@@ -122,7 +122,7 @@
 			'.nous-pn-sec{padding:13px 21px 21px;border-top:1px solid var(--pn-linha)}' +
 			'.nous-pn-sec-h{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:8px}' +
 			'.nous-pn-sec-h h3{margin:0;font-size:13.5px;font-weight:600;color:var(--pn-txt)}' +
-			'.nous-pn-sec-h button{font-size:12.5px!important;color:var(--pn-ouro)!important;padding:0!important}' +
+			'.nous-pn-sec-h button{font-size:12.5px!important;color:var(--pn-ouro2)!important;padding:0!important}' +
 			'.nous-pn-sec-h button:hover{text-decoration:underline;text-underline-offset:3px}' +
 			'.nous-pn-vazio{font-size:13px;color:var(--pn-mut);line-height:1.5}' +
 
@@ -133,7 +133,7 @@
 			'#nous-pn-priv[aria-checked="true"]{border-color:var(--pn-ouro)!important;background:var(--pn-alto)}' +
 			'#nous-pn-priv .t{font-size:13.5px;font-weight:500}' +
 			'#nous-pn-priv .s{font-size:12px;color:var(--pn-mut);line-height:1.35}' +
-			'#nous-pn-priv .nous-pn-ic{color:var(--pn-ouro)}' +
+			'#nous-pn-priv .nous-pn-ic{color:var(--pn-ouro2)}' +
 			'.nous-pn-sw{width:34px;height:21px;border-radius:21px;background:var(--pn-trilho);position:relative;transition:background .2s}' +
 			'.nous-pn-sw::after{content:"";position:absolute;left:3px;top:3px;width:15px;height:15px;border-radius:50%;background:var(--pn-mut);transition:transform .2s,background .2s}' +
 			'[aria-checked="true"] .nous-pn-sw{background:var(--pn-ouro)}' +
@@ -146,13 +146,13 @@
 			'.nous-pn-lista .h.atraso{color:#c0573f}' +
 			'.nous-pn-fatos{margin:0;padding:0;list-style:none}' +
 			'.nous-pn-fatos li{position:relative;padding:4px 0 4px 13px;font-size:13.5px;line-height:1.45}' +
-			'.nous-pn-fatos li::before{content:"";position:absolute;left:0;top:12px;width:5px;height:5px;border-radius:50%;background:var(--pn-ouro)}' +
+			'.nous-pn-fatos li::before{content:"";position:absolute;left:0;top:12px;width:5px;height:5px;border-radius:50%;background:var(--nous-sec)}' +
 
 			/* ferramentas */
 			'#nous-pn-ferr .grade{display:grid;grid-template-columns:1fr 1fr;gap:2px 8px}' +
 			'#nous-pn-ferr .grade button{display:flex;align-items:center;gap:8px;padding:6px 8px!important;border-radius:8px;text-align:left;font-size:13px!important;line-height:1.3}' +
 			'#nous-pn-ferr .grade button:hover{background:var(--pn-alto);color:var(--pn-ouro2)!important}' +
-			'#nous-pn-ferr .grade .nous-pn-ic{width:16px;height:16px;color:var(--pn-ouro)}' +
+			'#nous-pn-ferr .grade .nous-pn-ic{width:16px;height:16px;color:var(--pn-ouro2)}' +
 
 			/* coruja sozinha, com o painel fechado */
 			'#nous-pn-alca{position:fixed;right:13px;top:68px;z-index:39;width:44px;height:44px;border-radius:50%;border:0;padding:0;cursor:pointer;' +
@@ -174,7 +174,7 @@
 			'.nous-pn-estrela{display:grid;place-items:center;width:28px;height:28px;margin-left:2px;border-radius:8px;border:0;background:none;cursor:pointer;color:var(--pn-mut);align-self:center}' +
 			'.nous-pn-estrela:hover{color:var(--pn-ouro2);background:var(--pn-alto)}' +
 			'.nous-pn-estrela .nous-pn-ic{width:17px;height:17px}' +
-			'.nous-pn-estrela.on{color:var(--pn-ouro)}.nous-pn-estrela.on .nous-pn-ic{fill:currentColor}' +
+			'.nous-pn-estrela.on{color:var(--pn-ouro2)}.nous-pn-estrela.on .nous-pn-ic{fill:currentColor}' +
 
 			'@media (max-width:640px){#nous-pn{--pn-w:88vw}}' +
 			'@media (prefers-reduced-motion:reduce){#nous-pn,.nous-pn-anel .uso,.nous-pn-sw,.nous-pn-sw::after{transition:none!important}}';

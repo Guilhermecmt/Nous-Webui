@@ -64,13 +64,19 @@
 		return r.json().then(function (j) { if (j && j.paletas) lista = j.paletas; return j; });
 	}
 
+	/* cada escolha conta uma vez: resposta de conferencia que saiu antes do clique
+	 * chega atrasada e nao pode desfazer a escolha nova */
+	var escolhas = 0;
+
 	function conferir() {
+		var vez = escolhas;
 		return fetch(MON + '/aparencia', { cache: 'no-store' }).then(resposta)
-			.then(function (j) { if (j && j.paleta) aplicar(j.paleta); })
+			.then(function (j) { if (j && j.paleta && vez === escolhas) aplicar(j.paleta); })
 			.catch(function () { /* monitor fora do ar: fica a ultima escolha */ });
 	}
 
 	function escolher(id) {
+		escolhas++;
 		aplicar(id);
 		return fetch(MON + '/aparencia', { method: 'POST', headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ paleta: id }) }).then(resposta);
@@ -147,7 +153,7 @@
 			var b = e.target.closest('.nous-cor');
 			if (!b) return;
 			escolher(b.getAttribute('data-id')).catch(function () {
-				if (window.NousUI && NousUI.toast) NousUI.toast('Não consegui guardar a escolha: o Nous está ligado?', { tipo: 'erro' });
+				if (window.NousUI && NousUI.toast) NousUI.toast('Não consegui guardar a escolha: o Nous está ligado? Por enquanto ela vale só nesta janela.', { tipo: 'erro' });
 			});
 			marcar();
 		});

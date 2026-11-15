@@ -131,7 +131,7 @@
 			'.nous-ag-cal button.out{opacity:.3}.nous-ag-cal button.today{border-color:var(--nous-acc);color:var(--nous-acc-txt)}' +
 			'.nous-ag-cal button.sel{background:' + g + '.25)}' +
 			'.nous-ag-cal button i{position:absolute;left:50%;bottom:4px;transform:translateX(-50%);' +
-			'width:5px;height:5px;border-radius:50%;background:var(--nous-acc)}' +
+			'width:5px;height:5px;border-radius:50%;background:var(--nous-sec)}' +
 			'.nous-ag-calhead{display:flex;align-items:center;gap:8px;margin-bottom:8px}' +
 			'.nous-ag-calhead b{flex:1;text-align:center;text-transform:capitalize}' +
 			'.nous-ag-list{opacity:.9}.nous-ag-chk{display:flex;gap:6px;align-items:center;cursor:pointer;margin:2px 0}' +

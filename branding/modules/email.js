@@ -67,7 +67,7 @@
 			'#nous-em-tabs{display:flex;gap:2px;padding:0 12px;border-bottom:1px solid ' + g + '.15);flex-wrap:wrap}' +
 			'.nous-em-tab{background:none;border:none;border-bottom:2px solid transparent;color:var(--nd-mut);padding:8px 9px;cursor:pointer;font-size:12px;font-weight:600}' +
 			'.nous-em-tab.on{color:var(--nd-texto-ouro);border-bottom-color:var(--nous-acc)}' +
-			'.nous-em-badge{display:inline-block;min-width:16px;padding:0 4px;margin-left:4px;border-radius:8px;background:var(--nous-acc);color:var(--nous-on-acc);font-size:10px}' +
+			'.nous-em-badge{display:inline-block;min-width:16px;padding:0 4px;margin-left:4px;border-radius:8px;background:var(--nous-det);color:var(--nous-on-det);font-size:10px}' +
 			'#nous-em-body{flex:1;overflow-y:auto;padding:12px 16px 16px}' +
 			'.nous-em-row{padding:8px 9px;border-radius:9px;background:rgba(var(--nd-tom),.04);margin-bottom:5px;cursor:pointer}' +
 			'.nous-em-row:hover{background:' + g + '.08)}.nous-em-row.unread .nous-em-subj{font-weight:700}' +

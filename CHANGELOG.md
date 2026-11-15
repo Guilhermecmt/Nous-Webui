@@ -120,7 +120,10 @@
   guardava os tamanhos pequenos em PNG, e a bandeja (PowerShell 5.1) não lê PNG
   nesses tamanhos. Agora eles vão em BMP (`branding/gerar_icone.py`).
 - No tema Ouro escuro, a letra dos botões dourados passou de branca para escura:
-  a branca não passava no contraste mínimo de leitura.
+  a branca não passava no contraste mínimo de leitura. No Ouro claro, o dourado
+  dos botões ficou um tom mais escuro (o mesmo dos painéis) pelo mesmo motivo.
+  Relatórios de pesquisa gravados antes desta versão continuam com as cores que
+  tinham.
 - "Quinta às 10h" dito numa quinta depois das 10h era recusado como horário que já
   passou, e o modelo pequeno confirmava mesmo assim. Agora vale a próxima quinta.
 - Repetir o mesmo pedido à agenda no mesmo dia não gravava nada: a proteção contra

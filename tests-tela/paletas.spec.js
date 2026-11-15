@@ -2,7 +2,7 @@
  * usuario troca pelo painel "Seu Nous" (secao Aparencia) e pelas licoes. */
 const { test, expect } = require('@playwright/test');
 const path = require('path');
-const { TEMAS, entrar } = require('./ajuda');
+const { TEMAS, entrar, medirContraste } = require('./ajuda');
 
 const SAIDA = path.join(__dirname, 'saida', 'paletas');
 const CLARO = TEMAS[0], ESCURO = TEMAS[1];
@@ -114,3 +114,18 @@ test('licao das cores nos Primeiros passos', async ({ page }) => {
   await jan.locator('.nous-cor[data-id="melancia"]').click();
   await expect(page.locator('html')).toHaveAttribute('data-nous-paleta', 'melancia');
 });
+
+/* o painel Seu Nous (links, icones, seletor) legivel nas 14 combinacoes de paleta e tema */
+const TODAS = ['ouro', 'pitaya', 'maracuja', 'melancia', 'ametista', 'ceu', 'mata'];
+for (const id of TODAS) {
+  for (const tema of TEMAS) {
+    test('painel Seu Nous legivel: ' + id + ' ' + tema.nome, async ({ page }) => {
+      await entrar(page, tema, { paleta: id });
+      await expect(page.locator('#nous-pn-aparencia .nous-cor')).toHaveCount(7);
+      await page.waitForTimeout(250);
+      const c = await page.evaluate(medirContraste, '#nous-pn');
+      expect(c.length).toBeGreaterThan(0);
+      expect(c.filter((x) => x.razao < 4.5)).toEqual([]);
+    });
+  }
+}

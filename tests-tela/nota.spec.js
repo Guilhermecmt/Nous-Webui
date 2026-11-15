@@ -26,6 +26,8 @@ async function abrirIde(page, eventos) {
     if (u.pathname === '/') return rota.fulfill({ contentType: 'text/html', body: fs.readFileSync(path.join(IDE, 'index.html'), 'utf8') });
     if (u.pathname === '/ide/app.js') return rota.fulfill({ contentType: 'text/javascript', body: fs.readFileSync(path.join(IDE, 'app.js'), 'utf8') });
     if (u.pathname === '/ide/app.css') return rota.fulfill({ contentType: 'text/css', body: fs.readFileSync(path.join(IDE, 'app.css'), 'utf8') });
+    /* as cores do IDE sao as da paleta do Nous (variaveis --nous-*) */
+    if (u.pathname === '/tema/nous-paletas.css') return rota.fulfill({ contentType: 'text/css', body: fs.readFileSync(path.join(IDE, '..', '..', 'branding', 'nous-paletas.css'), 'utf8') });
     if (u.pathname === '/vendor/monaco/vs/loader.js') return rota.fulfill({ contentType: 'text/javascript', body: CASCA });
     if (u.pathname.startsWith('/vendor/') || u.pathname.startsWith('/marca/')) return rota.fulfill({ status: 200, body: '' });
     if (u.pathname === '/sessoes') return json([{ id: 's1', titulo: 'Teste', pasta: sessao.pasta }]);

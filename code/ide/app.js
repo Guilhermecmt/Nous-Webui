@@ -34,7 +34,8 @@
   };
   const ic = (n, cls) => '<svg class="ic ' + (cls || '') + '" viewBox="0 0 24 24" aria-hidden="true">' + SVG[n] + '</svg>';
 
-  /* cor e sigla por extensao (a arvore fica legivel sem pacote de icones) */
+  /* cor e sigla por extensao (a arvore fica legivel sem pacote de icones). Sao as cores
+   * de cada linguagem (JS amarelo, TS azul...), as mesmas em qualquer paleta do Nous. */
   const EXT = { js: ['JS', '#e6c36a'], mjs: ['JS', '#e6c36a'], cjs: ['JS', '#e6c36a'], ts: ['TS', '#8fb8c9'], tsx: ['TX', '#8fb8c9'], jsx: ['JX', '#e6c36a'],
     py: ['PY', '#8fb8c9'], json: ['{}', '#d9a066'], md: ['MD', '#b5c98a'], html: ['<>', '#e29a8a'], css: ['#', '#b39ddb'], scss: ['#', '#b39ddb'],
     ps1: ['PS', '#8fb8c9'], bat: ['BT', '#958a76'], vbs: ['VB', '#958a76'], sql: ['SQ', '#d9a066'], yml: ['YM', '#e29a8a'], yaml: ['YM', '#e29a8a'],
