@@ -87,11 +87,9 @@
 		var st = document.createElement('style');
 		st.id = 'nous-pn-style';
 		st.textContent =
-			/* tokens: noite, ouro velho, ouro claro, pergaminho, bronze apagado */
-			':root{--pn-w:300px;--pn-bg:#ffffff;--pn-alto:#faf6ee;--pn-linha:rgba(138,100,20,.16);--pn-ouro:#a87a1c;' +
-			'--pn-ouro2:#8a6414;--pn-txt:#2a251e;--pn-mut:#7a6f5d;--pn-trilho:rgba(138,100,20,.14)}' +
-			'.dark{--pn-bg:#141210;--pn-alto:#1c1916;--pn-linha:rgba(231,192,105,.12);--pn-ouro:#c8962e;' +
-			'--pn-ouro2:#e7c069;--pn-txt:#ddd5c6;--pn-mut:#958a76;--pn-trilho:rgba(231,192,105,.13)}' +
+			/* tokens do painel: os da paleta escolhida (--nous-*, nous-paletas.css) */
+			':root{--pn-w:300px;--pn-bg:var(--nous-bg);--pn-alto:var(--nous-alto);--pn-linha:var(--nous-linha);--pn-ouro:var(--nous-acc);' +
+			'--pn-ouro2:var(--nous-acc-txt);--pn-txt:var(--nous-txt);--pn-mut:var(--nous-mut);--pn-trilho:rgba(var(--nous-acc-rgb),.14)}' +
 
 			'#nous-pn{position:fixed;top:0;right:0;bottom:0;width:var(--pn-w);z-index:40;background:var(--pn-bg);' +
 			'border-left:1px solid var(--pn-linha);color:var(--pn-txt);font:14px/1.5 Inter,system-ui,sans-serif;' +
@@ -211,8 +209,11 @@
 				'<button type="button" data-abre="nous-agenda-open">Abrir agenda</button></div><div class="corpo"></div></section>' +
 			'<section class="nous-pn-sec" id="nous-pn-mem"><div class="nous-pn-sec-h"><h3>O que eu sei de você</h3>' +
 				'<button type="button" id="nous-pn-mem-ver">Ver e editar</button></div><div class="corpo"></div></section>' +
-			'<section class="nous-pn-sec" id="nous-pn-ferr"><div class="nous-pn-sec-h"><h3>Ferramentas</h3></div><div class="grade"></div></section>';
+			'<section class="nous-pn-sec" id="nous-pn-ferr"><div class="nous-pn-sec-h"><h3>Ferramentas</h3></div><div class="grade"></div></section>' +
+			'<section class="nous-pn-sec" id="nous-pn-aparencia"><div class="nous-pn-sec-h"><h3>Aparência</h3></div><div class="corpo"></div></section>';
 		document.body.appendChild(el);
+		/* paleta de cores + claro/escuro: o seletor e' do nous-loader.js (NousPaleta) */
+		if (window.NousPaleta) window.NousPaleta.seletor(el.querySelector('#nous-pn-aparencia .corpo'));
 
 		el.querySelector('#nous-pn-fechar').addEventListener('click', function () { abrir(false, true); });
 		el.querySelector('#nous-pn-tema').addEventListener('click', function () {
@@ -560,7 +561,16 @@
 	});
 	new MutationObserver(function () { pintarTema(); }).observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
 
-	window.NousPainel = { abrir: function () { if (el) abrir(true, true); }, recarregar: carregarListas };
+	window.NousPainel = { abrir: function () { if (el) abrir(true, true); }, recarregar: carregarListas,
+		/* abre o painel ja' na secao Aparencia (menu "?" > Cores do Nous) */
+		aparencia: function () {
+			if (!el) return;
+			abrir(true, true);
+			var s = el.querySelector('#nous-pn-aparencia');
+			if (s && s.scrollIntoView) s.scrollIntoView({ block: 'start' });
+			var b = s && (s.querySelector('.nous-cor[aria-pressed="true"]') || s.querySelector('.nous-cor'));
+			if (b) b.focus();
+		} };
 
 	function start() {
 		injectStyle();

@@ -28,6 +28,152 @@
 	window.NousUrl.noCelular = !direto;
 })();
 
+/* Paleta de cores (Aparencia). As cores de todas as telas sao variaveis --nous-*
+ * (branding/nous-paletas.css, gerado de paletas.json); a paleta escolhida e' o
+ * atributo data-nous-paleta do <html> (sem atributo = Ouro). A escolha e' da
+ * instalacao: fica em NousData/aparencia.json, pelo monitor (GET/POST /aparencia).
+ * Para a tela nao piscar o dourado, a ultima escolha fica tambem no localStorage e
+ * e' aplicada ja' aqui; depois confere com o monitor (e de novo quando a aba volta).
+ *   NousPaleta.atual() / aplicar(id) / escolher(id) -> Promise / lista() -> Promise
+ *   NousPaleta.aoMudar(fn) / seletor(host) -> {destruir}   (evento 'nous-paleta') */
+(function () {
+	'use strict';
+	var CHAVE = 'nous-paleta', PADRAO = 'ouro';
+	var MON = window.NousUrl(8990);
+	var ouvintes = [], lista = null;
+	/* so' para o seletor aparecer com o monitor fora do ar (a lista certa vem dele) */
+	var RESERVA = [['ouro', 'Ouro'], ['pitaya', 'Pitaya'], ['maracuja', 'Maracujá'], ['melancia', 'Melancia'],
+		['ametista', 'Ametista e Sol'], ['ceu', 'Céu e Flamingo'], ['mata', 'Mata']].map(function (p) { return { id: p[0], nome: p[1], tag: '' }; });
+
+	function guardada() { try { return localStorage.getItem(CHAVE) || PADRAO; } catch (e) { return PADRAO; } }
+	function atual() { return document.documentElement.getAttribute('data-nous-paleta') || PADRAO; }
+
+	function aplicar(id) {
+		id = typeof id === 'string' && /^[a-z0-9-]{1,32}$/.test(id) ? id : PADRAO;
+		var antes = atual();
+		if (id === PADRAO) document.documentElement.removeAttribute('data-nous-paleta');
+		else document.documentElement.setAttribute('data-nous-paleta', id);
+		try { localStorage.setItem(CHAVE, id); } catch (e) {}
+		if (antes === id) return;
+		ouvintes.forEach(function (fn) { try { fn(id); } catch (e) {} });
+		try { window.dispatchEvent(new CustomEvent('nous-paleta', { detail: { paleta: id } })); } catch (e) {}
+	}
+
+	function resposta(r) {
+		if (!r.ok) throw new Error('monitor respondeu ' + r.status);
+		return r.json().then(function (j) { if (j && j.paletas) lista = j.paletas; return j; });
+	}
+
+	function conferir() {
+		return fetch(MON + '/aparencia', { cache: 'no-store' }).then(resposta)
+			.then(function (j) { if (j && j.paleta) aplicar(j.paleta); })
+			.catch(function () { /* monitor fora do ar: fica a ultima escolha */ });
+	}
+
+	function escolher(id) {
+		aplicar(id);
+		return fetch(MON + '/aparencia', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ paleta: id }) }).then(resposta);
+	}
+
+	function pegarLista() {
+		if (lista) return Promise.resolve(lista);
+		return fetch(MON + '/aparencia', { cache: 'no-store' }).then(resposta).then(function () { return lista || []; });
+	}
+
+	function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+
+	function estiloSeletor() {
+		if (document.getElementById('nous-cores-style')) return;
+		var st = document.createElement('style');
+		st.id = 'nous-cores-style';
+		/* cada cartao tem o proprio data-nous-paleta: as variaveis dentro dele sao as
+		 * daquela paleta, no tema (claro/escuro) que esta' na tela */
+		st.textContent =
+			'.nous-cores{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:8px}' +
+			'.nous-cor{display:flex;flex-direction:column;gap:6px;padding:6px;border-radius:12px;cursor:pointer;text-align:left;' +
+			'background:var(--nous-bg)!important;color:var(--nous-txt)!important;border:1px solid var(--nous-linha)!important;font:500 12.5px/1.3 Inter,system-ui,sans-serif}' +
+			'.nous-cor:hover{border-color:var(--nous-acc)!important}' +
+			'.nous-cor[aria-pressed="true"]{border-color:var(--nous-acc)!important;box-shadow:0 0 0 2px var(--nous-acc)}' +
+			'.nous-cor:focus-visible{outline:2px solid var(--nous-acc);outline-offset:2px}' +
+			'.nous-cor-tela{display:grid;grid-template-columns:22px 1fr;height:46px;border-radius:8px;overflow:hidden;border:1px solid var(--nous-linha)}' +
+			'.nous-cor-lado{background:var(--nous-lado)}' +
+			'.nous-cor-meio{background:var(--nous-alto);display:flex;flex-direction:column;justify-content:center;gap:5px;padding:0 7px}' +
+			'.nous-cor-btn{height:9px;width:62%;border-radius:4px;background:var(--nous-acc)}' +
+			'.nous-cor-pts{display:flex;gap:4px}.nous-cor-pts i{width:8px;height:8px;border-radius:50%}' +
+			'.nous-cor-nome{display:flex;align-items:center;justify-content:space-between;gap:4px;padding:0 2px}' +
+			'.nous-cor-nome b{font-weight:600}.nous-cor-ok{color:var(--nous-acc-txt);font-weight:700;visibility:hidden}' +
+			'.nous-cor[aria-pressed="true"] .nous-cor-ok{visibility:visible}' +
+			'.nous-cores-modo{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}' +
+			'.nous-cores-modo button{flex:1 1 auto;padding:6px 8px;border-radius:9px;cursor:pointer;font:500 12.5px Inter,system-ui,sans-serif;' +
+			'border:1px solid var(--nous-linha)!important;background:transparent;color:var(--nous-txt)!important;white-space:nowrap}' +
+			'.nous-cores-modo button[aria-pressed="true"]{border-color:var(--nous-acc)!important;background:rgba(var(--nous-acc-rgb),.14)!important;color:var(--nous-acc-txt)!important;font-weight:600}' +
+			'.nous-cores-modo button:focus-visible{outline:2px solid var(--nous-acc);outline-offset:2px}' +
+			'@media (prefers-reduced-motion:reduce){.nous-cor{transition:none}}';
+		document.head.appendChild(st);
+	}
+
+	function temaGuardado() { try { return localStorage.getItem('theme') || 'system'; } catch (e) { return 'system'; } }
+
+	/* Escolha de paleta + claro/escuro/igual ao Windows, dentro de `host`. Usado no
+	 * painel "Seu Nous" e na licao "Escolha as cores" dos Primeiros passos. */
+	function seletor(host) {
+		estiloSeletor();
+		var vivo = true;
+		host.innerHTML = '<div class="nous-cores" role="group" aria-label="Paleta de cores"></div>' +
+			'<div class="nous-cores-modo" role="group" aria-label="Claro ou escuro">' +
+			'<button type="button" data-tema="light">Claro</button><button type="button" data-tema="dark">Escuro</button>' +
+			'<button type="button" data-tema="system">Igual ao Windows</button></div>';
+		var grade = host.querySelector('.nous-cores'), modo = host.querySelector('.nous-cores-modo');
+		function marcar() {
+			var a = atual();
+			[].forEach.call(grade.children, function (b) { b.setAttribute('aria-pressed', b.getAttribute('data-id') === a ? 'true' : 'false'); });
+			var t = temaGuardado();
+			t = t === 'oled-dark' ? 'dark' : (t === 'her' ? 'light' : t);
+			[].forEach.call(modo.children, function (b) { b.setAttribute('aria-pressed', b.getAttribute('data-tema') === t ? 'true' : 'false'); });
+		}
+		function montar(itens) {
+			if (!vivo) return;
+			grade.innerHTML = itens.map(function (p) {
+				return '<button type="button" class="nous-cor" data-id="' + esc(p.id) + '" data-nous-paleta="' + esc(p.id) + '" title="' + esc(p.tag || p.nome) + '">' +
+					'<span class="nous-cor-tela" aria-hidden="true"><span class="nous-cor-lado"></span><span class="nous-cor-meio">' +
+					'<span class="nous-cor-btn"></span><span class="nous-cor-pts"><i style="background:var(--nous-sec)"></i>' +
+					'<i style="background:var(--nous-det)"></i><i style="background:var(--nous-acc-txt)"></i></span></span></span>' +
+					'<span class="nous-cor-nome"><b>' + esc(p.nome) + '</b><span class="nous-cor-ok" aria-hidden="true">✓</span></span></button>';
+			}).join('');
+			marcar();
+		}
+		grade.addEventListener('click', function (e) {
+			var b = e.target.closest('.nous-cor');
+			if (!b) return;
+			escolher(b.getAttribute('data-id')).catch(function () {
+				if (window.NousUI && NousUI.toast) NousUI.toast('Não consegui guardar a escolha: o Nous está ligado?', { tipo: 'erro' });
+			});
+			marcar();
+		});
+		modo.addEventListener('click', function (e) {
+			var b = e.target.closest('[data-tema]');
+			if (!b || !window.NousUI || !NousUI.setTheme) return;
+			NousUI.setTheme(b.getAttribute('data-tema'));
+			marcar();
+		});
+		var aoMudar = function () { if (vivo) marcar(); };
+		window.addEventListener('nous-paleta', aoMudar);
+		montar(lista || RESERVA);
+		pegarLista().then(montar).catch(function () { /* monitor fora: fica a lista de reserva */ });
+		return { destruir: function () { vivo = false; window.removeEventListener('nous-paleta', aoMudar); host.innerHTML = ''; } };
+	}
+
+	aplicar(guardada());
+	conferir();
+	/* outra aba trocou a paleta; ou o Nous Code / outra janela mudou o arquivo */
+	window.addEventListener('storage', function (e) { if (e.key === CHAVE && e.newValue) aplicar(e.newValue); });
+	document.addEventListener('visibilitychange', function () { if (!document.hidden) conferir(); });
+
+	window.NousPaleta = { atual: atual, aplicar: aplicar, escolher: escolher, lista: pegarLista,
+		aoMudar: function (fn) { ouvintes.push(fn); }, seletor: seletor };
+})();
+
 (function () {
 	'use strict';
 

@@ -64,6 +64,7 @@ def tokens(paleta, modo):
     c = paleta[modo]
     t = {nome: c[chave] for chave, nome in CHAVES}
     t["acc-rgb"] = ",".join(str(v) for v in _rgb(c["acc"]))
+    t["txt-rgb"] = ",".join(str(v) for v in _rgb(c["txt"]))  # tons translucidos da cor do texto
     t["on-sec"] = letra_sobre(c["sec"])
     t["on-det"] = letra_sobre(c["det"])
     return t
@@ -75,12 +76,16 @@ def _num(x):
 
 
 def cinzas(paleta):
+    """Cinzas do Open WebUI tingidos pela paleta. Vao com !important porque o Open
+    WebUI escreve --color-gray-800..950 direto no style do <html> no tema escuro.
+    Paleta sem croma (Ouro) nao declara nada: fica exatamente como o Open WebUI."""
     matiz, croma = paleta["cinza"]["matiz"], paleta["cinza"]["croma"]
+    if not croma:
+        return []
     out = []
     for passo, luz in CINZAS:
         fator = 0.5 if passo <= 300 else (0.8 if passo <= 600 else 1.0)
-        c = croma * fator
-        out.append((f"color-gray-{passo}", f"oklch({luz}% 0 0)" if c == 0 else f"oklch({luz}% {_num(c)} {_num(matiz)})"))
+        out.append((f"color-gray-{passo}", f"oklch({luz}% {_num(croma * fator)} {_num(matiz)}) !important"))
     return out
 
 
@@ -89,7 +94,7 @@ def _decl(pares):
 
 
 def _nous(t):
-    ordem = ["bg", "lado", "alto", "linha", "txt", "mut", "acc", "acc-rgb", "on-acc",
+    ordem = ["bg", "lado", "alto", "linha", "txt", "txt-rgb", "mut", "acc", "acc-rgb", "on-acc",
              "acc-txt", "sec", "on-sec", "det", "on-det", "ok", "perigo"]
     return [(f"nous-{k}", t[k]) for k in ordem]
 

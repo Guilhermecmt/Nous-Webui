@@ -1,47 +1,46 @@
 /* =====================================================================
-   Nous — Tema "Branco & Ouro" (camada de CSS customizada)
+   Nous — tema (camada de CSS customizada)
    Carregado automaticamente pelo Open WebUI via /static/custom.css
    Edite e rode  branding/apply_branding.py  para reaplicar.
+
+   As cores vem das paletas (--nous-*, em nous-paletas.css, gerado de
+   paletas.json): o apply_branding.py poe aquele arquivo na frente deste no
+   mesmo custom.css. A paleta escolhida e' o atributo data-nous-paleta do <html>
+   (NousPaleta, em nous-loader.js); sem atributo vale a Ouro.
    ===================================================================== */
 
 @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600&display=swap');
 
-:root {
-    --nous-gold: #c8962e;        /* ouro principal */
-    --nous-gold-deep: #a9781f;   /* ouro escuro (hover) */
-    --nous-gold-soft: #e7c977;   /* ouro claro */
-}
+/* Acento da paleta nos controles nativos (checkbox, radio, range, progress) */
+* { accent-color: var(--nous-acc); }
 
-/* Acento dourado nos controles nativos (checkbox, radio, range, progress) */
-* { accent-color: var(--nous-gold); }
+/* Selecao de texto na cor da paleta */
+::selection { background: rgba(var(--nous-acc-rgb), 0.32); color: var(--nous-txt); }
 
-/* Selecao de texto dourada */
-::selection { background: var(--nous-gold-soft); color: #2a2110; }
-
-/* Barra de rolagem dourada e discreta */
+/* Barra de rolagem discreta, na cor da paleta */
 *::-webkit-scrollbar { width: 10px; height: 10px; }
-*::-webkit-scrollbar-thumb { background: var(--nous-gold-soft); border-radius: 999px; }
-*::-webkit-scrollbar-thumb:hover { background: var(--nous-gold); }
+*::-webkit-scrollbar-thumb { background: rgba(var(--nous-acc-rgb), 0.38); border-radius: 999px; }
+*::-webkit-scrollbar-thumb:hover { background: var(--nous-acc); }
 *::-webkit-scrollbar-track { background: transparent; }
 
-/* Links em ouro escuro */
-a:not(.no-gold) { color: var(--nous-gold-deep); }
+/* Links na cor de texto da paleta (a que se le' em cima do fundo) */
+a:not(.no-gold) { color: var(--nous-acc-txt); }
 
-/* Foco dourado em campos */
-input:focus, textarea:focus, select:focus { outline-color: var(--nous-gold) !important; }
-.ring-2 { --tw-ring-color: var(--nous-gold) !important; }
+/* Foco na cor da paleta */
+input:focus, textarea:focus, select:focus { outline-color: var(--nous-acc) !important; }
+.ring-2 { --tw-ring-color: var(--nous-acc) !important; }
 
-/* Botoes primarios (preto/cinza-escuro -> ouro) */
+/* Botoes primarios (preto/cinza-escuro -> cor da paleta) */
 button.bg-black,
 button.bg-gray-900,
 button.bg-gray-850 {
-    background-color: var(--nous-gold) !important;
-    color: #ffffff !important;
-    transition: background-color 0.2s ease;
+    background-color: var(--nous-acc) !important;
+    color: var(--nous-on-acc) !important;
+    transition: background-color 0.2s ease, filter 0.2s ease;
 }
 button.bg-black:hover,
 button.bg-gray-900:hover,
-button.bg-gray-850:hover { background-color: var(--nous-gold-deep) !important; }
+button.bg-gray-850:hover { filter: brightness(0.9); }
 
 /* Cantos um pouco mais suaves (toque "Apple") */
 .rounded-xl { border-radius: 1rem; }
@@ -61,7 +60,7 @@ body::after {
     font-weight: 600;
     font-size: 18px;
     letter-spacing: 0.42em;
-    color: var(--nous-gold);
+    color: var(--nous-acc-txt);
     opacity: 0.92;
     z-index: 9999;
     pointer-events: none;
@@ -96,9 +95,9 @@ body::after {
     align-items: center;
     justify-content: center;
     border-radius: 999px;
-    border: 1px solid var(--nous-gold);
-    background: rgba(200, 150, 46, 0.10);
-    color: var(--nous-gold);
+    border: 1px solid var(--nous-acc);
+    background: rgba(var(--nous-acc-rgb), 0.10);
+    color: var(--nous-acc-txt);
     cursor: pointer;
     -webkit-backdrop-filter: blur(6px);
     backdrop-filter: blur(6px);
@@ -106,10 +105,10 @@ body::after {
     transition: background 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
 }
 #nous-theme-toggle:hover {
-    background: var(--nous-gold);
-    color: #ffffff;
+    background: var(--nous-acc);
+    color: var(--nous-on-acc);
     transform: translateY(-1px);
-    box-shadow: 0 4px 14px rgba(200, 150, 46, 0.35);
+    box-shadow: 0 4px 14px rgba(var(--nous-acc-rgb), 0.35);
 }
 #nous-theme-toggle:active { transform: translateY(0); }
 #nous-theme-toggle svg { width: 20px; height: 20px; display: block; }
@@ -155,7 +154,7 @@ body.nous-shell-mark::after { opacity: 0; }
     font-size: 18px;
     letter-spacing: 0.42em;
     padding-left: 0.42em;          /* compensa o letter-spacing p/ centralizar */
-    color: var(--nous-gold);
+    color: var(--nous-acc-txt);
     opacity: 0.92;
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
     user-select: none;

@@ -45,6 +45,7 @@ class TestPaletas(unittest.TestCase):
         t = gp.tokens(pitaya, "claro")
         self.assertEqual(t["acc"], "#c2185b")
         self.assertEqual(t["acc-rgb"], "194,24,91")
+        self.assertEqual(t["txt-rgb"], "38,22,31")
         self.assertEqual(t["on-sec"], "#ffffff")   # verde escuro pede letra branca
         self.assertEqual(t["on-det"], "#ffffff")   # semente preta
         ceu = gp.tokens(self.dados["paletas"][5], "escuro")
@@ -76,10 +77,13 @@ class TestPaletas(unittest.TestCase):
     def test_ouro_cinza_neutro(self):
         css = gp.css(self.dados, escuro="classe")
         raiz = css.split(":root{", 1)[1].split("}", 1)[0]
-        self.assertIn("--color-gray-900:oklch(20% 0 0)", raiz)
+        self.assertNotIn("--color-gray", raiz)  # Ouro nao mexe nos cinzas do Open WebUI
+        ouro = css.split('[data-nous-paleta="ouro"]{', 1)[1].split("}", 1)[0]
+        self.assertNotIn("--color-gray", ouro)
         pit = css.split('[data-nous-paleta="pitaya"]{', 1)[1].split("}", 1)[0]
-        self.assertIn("--color-gray-900:oklch(20% 0.014 345)", pit)
-        self.assertIn("--color-gray-100:oklch(94% 0.007 345)", pit)
+        # !important: o Open WebUI escreve os cinzas escuros no style do <html>
+        self.assertIn("--color-gray-900:oklch(20% 0.014 345) !important", pit)
+        self.assertIn("--color-gray-100:oklch(94% 0.007 345) !important", pit)
 
     def test_css_versionado_igual_ao_gerado(self):
         for nome, modo in (("nous-paletas.css", "classe"), ("nous-paletas-auto.css", "auto")):

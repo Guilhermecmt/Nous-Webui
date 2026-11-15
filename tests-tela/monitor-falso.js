@@ -51,15 +51,36 @@ const MONITOR = {
 
 const CORS = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': '*', 'Access-Control-Allow-Methods': '*' };
 
+const PALETAS = [['ouro', 'Ouro'], ['pitaya', 'Pitaya'], ['maracuja', 'Maracujá'], ['melancia', 'Melancia'],
+  ['ametista', 'Ametista e Sol'], ['ceu', 'Céu e Flamingo'], ['mata', 'Mata']].map(([id, nome]) => ({ id, nome, tag: '' }));
+
+/* inicio.paleta: o que o "aparencia.json" guarda; inicio.atrasoAparencia: ms ate'
+ * responder /aparencia; inicio.aparenciaFora: /aparencia nao responde (monitor fora) */
 async function ligarMonitor(page, inicio) {
-  const m = { mensageiros: 'desligado', celular: 'desligado', extra: {}, recebidos: [], instalados: ['modelo-a', 'modelo-b'] };
+  const m = { mensageiros: 'desligado', celular: 'desligado', extra: {}, recebidos: [], corpos: [], instalados: ['modelo-a', 'modelo-b'],
+    paleta: 'ouro', atrasoAparencia: 0, aparenciaFora: false };
   Object.assign(m, inicio);
 
-  await page.route(/^http:\/\/127\.0\.0\.1:899\d\//, (rota) => {
+  await page.route(/^http:\/\/127\.0\.0\.1:899\d\//, async (rota) => {
     const pedido = rota.request();
     const url = new URL(pedido.url());
     if (pedido.method() === 'OPTIONS') return rota.fulfill({ status: 204, headers: CORS });
-    if (pedido.method() === 'POST') m.recebidos.push(url.pathname);
+    if (pedido.method() === 'POST') {
+      m.recebidos.push(url.pathname);
+      let corpo = null;
+      try { corpo = pedido.postDataJSON(); } catch (e) { /* nao era JSON */ }
+      m.corpos.push({ caminho: url.pathname, corpo });
+    }
+    if (url.port === '8990' && url.pathname === '/aparencia') {
+      if (m.aparenciaFora) return rota.abort();
+      if (m.atrasoAparencia) await new Promise((r) => setTimeout(r, m.atrasoAparencia));
+      if (pedido.method() === 'POST') {
+        const id = (m.corpos[m.corpos.length - 1].corpo || {}).paleta;
+        if (!PALETAS.some((p) => p.id === id)) return rota.fulfill({ status: 400, headers: CORS, contentType: 'application/json', body: '{"error":"paleta desconhecida"}' });
+        m.paleta = id;
+      }
+      return rota.fulfill({ status: 200, headers: CORS, contentType: 'application/json', body: JSON.stringify({ paleta: m.paleta, paletas: PALETAS }) });
+    }
     const agora = Date.now() / 1000;
     let corpo = {};
     if (url.port === '8995') corpo = EMAIL[url.pathname] || {};

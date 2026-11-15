@@ -46,7 +46,10 @@
 		{ t: 'Foto e documento', h:
 			'<p>Para a IA olhar uma foto ou ler um documento, clique no <b>+</b> ao lado da caixa de mensagem e escolha o arquivo. Também dá para <b>arrastar</b> o arquivo para a conversa ou <b>colar</b> uma imagem com Ctrl+V.</p>' +
 			'<p><b>Documentos</b> (PDF, Word, texto): ela lê e responde perguntas sobre o conteúdo.</p>' +
-			'<p><b>Fotos</b>: só funcionam com um modelo que <b>entende imagens</b>. Na Loja de Modelos, eles têm esse aviso.</p>', anexo: true }
+			'<p><b>Fotos</b>: só funcionam com um modelo que <b>entende imagens</b>. Na Loja de Modelos, eles têm esse aviso.</p>', anexo: true },
+		{ t: 'Escolha as cores', h:
+			'<p>Deixe o Nous com a sua cara. São sete paletas: o Ouro de sempre e seis inspiradas em frutas e na natureza.</p>' +
+			'<p>Clique numa para ver na hora. Dá para trocar quando quiser no painel <b>Seu Nous</b>, em <b>Aparência</b>.</p>', cores: true }
 	];
 
 	var CARTOES = [
@@ -69,7 +72,8 @@
 		{ k: 'exemplos', t: 'Exemplos para começar', d: 'Pedidos prontos do dia a dia: é só clicar e enviar.' },
 		{ k: 'anexo', t: 'Como mandar foto e documento', d: 'Mostra onde fica o botão para anexar.' },
 		{ k: 'passeio', t: 'Passeio pela tela', d: 'Para que serve cada parte do Nous.' },
-		{ k: 'paineis', t: 'Dicas de cada painel', d: 'As dicas de Agenda, E-mail, Documentos e do resto voltam a aparecer.' }
+		{ k: 'paineis', t: 'Dicas de cada painel', d: 'As dicas de Agenda, E-mail, Documentos e do resto voltam a aparecer.' },
+		{ k: 'cores', t: 'Cores do Nous', d: 'Escolha a paleta e se a tela fica clara, escura ou igual ao Windows.' }
 	];
 
 	var ov = null, voltarFoco = null, coach = null, cartoesEl = null, forcarCartoes = false, usou = null;
@@ -178,12 +182,15 @@
 			pontos = sec.querySelector('.pontos'), n = sec.querySelector('#nous-pp-lic-n'),
 			ant = sec.querySelector('[data-x=ant]'), prox = sec.querySelector('[data-x=prox]');
 		pontos.innerHTML = LICOES.map(function () { return '<i></i>'; }).join('');
+		var cores = null;   /* seletor de paleta da licao "Escolha as cores" */
 		function pinta(foco) {
 			var l = LICOES[i];
 			n.textContent = 'Lição ' + (i + 1) + ' de ' + LICOES.length;
 			h3.textContent = l.t;
 			corpo.innerHTML = l.h;
+			if (cores) { cores.destruir(); cores = null; }
 			mostra.innerHTML = '';
+			if (l.cores && window.NousPaleta) cores = window.NousPaleta.seletor(mostra);
 			if (l.anexo && op.mostrarAnexo) {
 				var b = document.createElement('button');
 				b.type = 'button'; b.className = 'nous-pp-btn'; b.textContent = 'Mostrar onde fica o +';
@@ -277,6 +284,7 @@
 	/* o que o menu do "?" faz; algumas coisas precisam da tela inicial: recarrega e continua */
 	function executar(k) {
 		if (k === 'licoes') { abrirLicoes(); return; }
+		if (k === 'cores') { if (window.NousPainel && window.NousPainel.aparencia) window.NousPainel.aparencia(); return; }
 		var precisaChat = k === 'anexo' || k === 'passeio' || k === 'exemplos';
 		if (precisaChat && !document.getElementById('chat-input')) {
 			try { sessionStorage.setItem('nous-pp-depois', k); } catch (e) {}

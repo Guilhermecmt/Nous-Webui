@@ -24,18 +24,15 @@
 		var st = document.createElement('style');
 		st.id = 'nous-base-style';
 		st.textContent =
-			/* cores: as do painel, com reserva porque a tela de entrada nao tem painel.
-			 * --nd-texto-ouro e' o ouro que se le' em cima do fundo (ouro claro no escuro).
-			 * No claro, ele e --nd-mut sao um tom mais fortes que os do painel: aqui o texto
-			 * e' miudo e fica em cima de fundo tingido. */
-			':root{--nd-bg:var(--pn-bg,#fff);--nd-alto:var(--pn-alto,#faf6ee);--nd-linha:var(--pn-linha,rgba(138,100,20,.16));' +
-			'--nd-ouro:var(--pn-ouro,#a87a1c);--nd-texto-ouro:#7f5b10;--nd-txt:var(--pn-txt,#2a251e);' +
-			'--nd-mut:#6f6453;--nd-perigo:#a8322a;--nd-ok:#2a7247;--nd-azul:#35589c;--nd-campo:#fff;--nd-tom:70,52,18;' +
-			'--nd-esquema:light;--nd-veu:rgba(40,30,10,.38);--nd-sombra:rgba(60,45,15,.28)}' +
-			'.dark{--nd-bg:var(--pn-bg,#141210);--nd-alto:var(--pn-alto,#1c1916);--nd-linha:var(--pn-linha,rgba(231,192,105,.12));' +
-			'--nd-ouro:var(--pn-ouro,#c8962e);--nd-texto-ouro:var(--pn-ouro2,#e7c069);--nd-txt:var(--pn-txt,#ddd5c6);' +
-			'--nd-mut:var(--pn-mut,#958a76);--nd-perigo:#f4a3a3;--nd-ok:#5fd693;--nd-azul:#9db8ee;--nd-campo:rgba(0,0,0,.3);--nd-tom:255,255,255;' +
-			'--nd-esquema:dark;--nd-veu:rgba(0,0,0,.55);--nd-sombra:rgba(0,0,0,.55)}' +
+			/* cores: as da paleta escolhida (--nous-*, nous-paletas.css; ver NousPaleta no
+			 * nous-loader.js). --nd-texto-ouro e' a cor da paleta que se le' em cima do
+			 * fundo. --nd-tom e' a cor do texto, para os tons translucidos. So' o que nao
+			 * depende da paleta (azul de informacao, campo, veu, sombra) muda no .dark. */
+			':root{--nd-bg:var(--nous-bg);--nd-alto:var(--nous-alto);--nd-linha:var(--nous-linha);' +
+			'--nd-ouro:var(--nous-acc);--nd-texto-ouro:var(--nous-acc-txt);--nd-txt:var(--nous-txt);' +
+			'--nd-mut:var(--nous-mut);--nd-perigo:var(--nous-perigo);--nd-ok:var(--nous-ok);--nd-azul:#35589c;--nd-campo:#fff;' +
+			'--nd-tom:var(--nous-txt-rgb);--nd-esquema:light;--nd-veu:rgba(40,30,10,.38);--nd-sombra:rgba(60,45,15,.28)}' +
+			'.dark{--nd-azul:#9db8ee;--nd-campo:rgba(0,0,0,.3);--nd-esquema:dark;--nd-veu:rgba(0,0,0,.55);--nd-sombra:rgba(0,0,0,.55)}' +
 
 			'#nous-toasts{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);z-index:10050;display:flex;' +
 			'flex-direction:column;gap:8px;align-items:center;pointer-events:none;max-width:92vw}' +
