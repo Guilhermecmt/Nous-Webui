@@ -1,0 +1,8 @@
+{
+  "tag": "b12359",
+  "versao": "1.0.0",
+  "zip": "https://github.com/ggml-org/llama.cpp/releases/download/b12359/llama-b12359-bin-win-vulkan-x64.zip",
+  "sha256": "e8d18c6e4210cca87e7307c2ea78363ac8d158e4e1397358ec96ab70b53a0d5e",
+  "tamanho": 38090643,
+  "exe": "llama-server.exe"
+}

@@ -1,0 +1,12 @@
+{
+ "status": 400,
+ "corpo": {
+  "error": {
+   "code": 400,
+   "message": "request (6012 tokens) exceeds the available context size (4096 tokens), try increasing it",
+   "type": "exceed_context_size_error",
+   "n_prompt_tokens": 6012,
+   "n_ctx": 4096
+  }
+ }
+}
