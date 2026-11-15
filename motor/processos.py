@@ -53,12 +53,69 @@ def _porta_livre():
     return p
 
 
+_JOB = None
+
+
+def _job_windows():
+    """Job do Windows com KILL_ON_JOB_CLOSE: se o motor morrer de qualquer jeito, os llama-server morrem junto."""
+    global _JOB
+    if _JOB is not None or sys.platform != "win32":
+        return _JOB
+    import ctypes
+    from ctypes import wintypes
+
+    class _Basico(ctypes.Structure):
+        _fields_ = [("PerProcessUserTimeLimit", ctypes.c_int64), ("PerJobUserTimeLimit", ctypes.c_int64),
+                    ("LimitFlags", wintypes.DWORD), ("MinimumWorkingSetSize", ctypes.c_size_t),
+                    ("MaximumWorkingSetSize", ctypes.c_size_t), ("ActiveProcessLimit", wintypes.DWORD),
+                    ("Affinity", ctypes.c_size_t), ("PriorityClass", wintypes.DWORD), ("SchedulingClass", wintypes.DWORD)]
+
+    class _Io(ctypes.Structure):
+        _fields_ = [(n, ctypes.c_uint64) for n in ("R", "W", "O", "RT", "WT", "OT")]
+
+    class _Estendido(ctypes.Structure):
+        _fields_ = [("BasicLimitInformation", _Basico), ("IoInfo", _Io), ("ProcessMemoryLimit", ctypes.c_size_t),
+                    ("JobMemoryLimit", ctypes.c_size_t), ("PeakProcessMemoryUsed", ctypes.c_size_t),
+                    ("PeakJobMemoryUsed", ctypes.c_size_t)]
+
+    k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    k32.CreateJobObjectW.restype = wintypes.HANDLE
+    job = k32.CreateJobObjectW(None, None)
+    if not job:
+        return None
+    info = _Estendido()
+    info.BasicLimitInformation.LimitFlags = 0x2000  # JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+    if not k32.SetInformationJobObject(wintypes.HANDLE(job), 9, ctypes.byref(info), ctypes.sizeof(info)):
+        return None
+    _JOB = (k32, job)
+    return _JOB
+
+
+def _prender_no_job(pid):
+    j = _job_windows()
+    if not j:
+        return
+    import ctypes
+    from ctypes import wintypes
+    k32, job = j
+    k32.OpenProcess.restype = wintypes.HANDLE
+    h = k32.OpenProcess(0x0100 | 0x0001, False, pid)  # PROCESS_SET_QUOTA | PROCESS_TERMINATE
+    if h:
+        k32.AssignProcessToJobObject(wintypes.HANDLE(job), wintypes.HANDLE(h))
+        k32.CloseHandle(wintypes.HANDLE(h))
+
+
 async def _iniciar_padrao(argv):
     extra = {}
     if sys.platform == "win32":
         extra["creationflags"] = subprocess.CREATE_NO_WINDOW
-    return await asyncio.create_subprocess_exec(*argv, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+    proc = await asyncio.create_subprocess_exec(*argv, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
                                                 stderr=subprocess.PIPE, **extra)
+    try:
+        _prender_no_job(proc.pid)
+    except Exception:
+        pass
+    return proc
 
 
 class Gerente:

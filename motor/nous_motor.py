@@ -18,7 +18,6 @@ Ambiente lido pelo main():
 import asyncio
 import json
 import os
-import subprocess
 import sys
 
 import aiohttp
@@ -403,24 +402,6 @@ def criar_app(motor, pasta, gerente, ollama_url, puxar=None):
 
 
 # ------------------------------------------------------------ main
-def _matar_orfaos(arquivo):
-    """Derruba llama-server que sobraram de um motor que morreu sem limpar."""
-    try:
-        with open(arquivo, encoding="utf-8") as f:
-            pids = [int(p) for p in json.load(f)]
-    except (OSError, ValueError, TypeError):
-        return
-    for pid in pids:
-        try:
-            out = subprocess.run(["tasklist", "/FI", "PID eq %d" % pid, "/FO", "CSV", "/NH"], capture_output=True,
-                                 text=True, timeout=10, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0)).stdout
-            if "llama-server" in out.lower():
-                subprocess.run(["taskkill", "/PID", str(pid), "/T", "/F"], capture_output=True, timeout=10,
-                               creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
-        except (OSError, subprocess.SubprocessError):
-            pass
-
-
 def main():
     casa = os.environ.get("USERPROFILE") or os.path.expanduser("~")
     data_dir = os.environ.get("DATA_DIR") or os.environ.get("NOUS_DATA_DIR") or os.path.join(casa, "NousData")
@@ -433,7 +414,6 @@ def main():
     gerente = None
     puxar = None
     if motor == "llama":
-        _matar_orfaos(arquivo_pids)
         gerente = Gerente(binario, max_modelos=int(os.environ.get("NOUS_MOTOR_MAX_MODELOS") or 2),
                           ctx_padrao=int(os.environ.get("OLLAMA_CONTEXT_LENGTH") or 16384),
                           keep_padrao=os.environ.get("OLLAMA_KEEP_ALIVE") or "5m", arquivo_pids=arquivo_pids)
