@@ -84,7 +84,7 @@ def main():
     try:
         gravar("health.json", saude)
         gravar("chat_stream.json", stream(url, {**base, "messages": [{"role": "user", "content": "Diga oi em uma palavra."}],
-                                                "max_tokens": 400}))
+                                                "max_tokens": 3000}))
         gravar("chat_json_schema.json", stream(url, {**base, "messages": [{"role": "user", "content": "Responda ok verdadeiro."}],
                                                      "chat_template_kwargs": {"enable_thinking": False},
                                                      "response_format": {"type": "json_schema", "json_schema": {"name": "saida", "schema": {
@@ -95,7 +95,7 @@ def main():
                                                "tools": [ferramenta], "max_tokens": 600}))
         t0 = time.time()
         sem = stream(url, {**base, "messages": [{"role": "user", "content": "Conte de 1 a 50 separado por virgulas."}],
-                           "chat_template_kwargs": {"enable_thinking": False}, "max_tokens": 300})
+                           "chat_template_kwargs": {"enable_thinking": False}, "max_tokens": 3000})
         gravar("chat_sem_pensar.json", sem)
         tim = next((x.get("timings") for x in reversed(sem) if x.get("timings")), None)
         print("timings:", json.dumps(tim), "parede", round(time.time() - t0, 2), "s")
