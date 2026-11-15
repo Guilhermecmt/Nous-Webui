@@ -1,8 +1,11 @@
-/* Nous Code: o IDE. Noite, ouro velho e pergaminho, como o resto do Nous. */
+/* Nous Code: o IDE. Mesmas cores do resto do Nous (a paleta escolhida em Aparencia). */
 :root {
-  --noite: #141210; --noite2: #100e0c; --alto: #1c1916; --alto2: #231f1a;
-  --linha: rgba(231, 192, 105, .12); --linha2: rgba(231, 192, 105, .22);
-  --ouro: #c8962e; --ouro2: #e7c069; --txt: #ddd5c6; --mut: #958a76; --mut2: #6f6656;
+  /* cores da paleta escolhida no Nous, sempre na versao escura (/tema/nous-paletas.css) */
+  --noite: var(--nous-bg); --noite2: var(--nous-lado); --alto: var(--nous-alto);
+  --alto2: color-mix(in srgb, var(--nous-alto) 94%, #fff);
+  --linha: var(--nous-linha); --linha2: rgba(var(--nous-acc-rgb), .22);
+  --ouro: var(--nous-acc); --ouro2: var(--nous-acc-txt); --txt: var(--nous-txt); --mut: var(--nous-mut);
+  --mut2: color-mix(in srgb, var(--nous-mut) 72%, var(--nous-bg));
   --verde: #8cc79a; --vermelho: #e29a8a; --azul: #8fb8c9;
   --mono: "Cascadia Code", "Cascadia Mono", Consolas, monospace;
   --lado: 260px; --agente: 380px; --term: 240px;
@@ -15,8 +18,8 @@ input, textarea, select { font: inherit; color: var(--txt); }
 .ic { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 .ic.p { width: 15px; height: 15px; }
 ::-webkit-scrollbar { width: 10px; height: 10px; }
-::-webkit-scrollbar-thumb { background: rgba(231, 192, 105, .14); border-radius: 5px; border: 2px solid transparent; background-clip: padding-box; }
-::-webkit-scrollbar-thumb:hover { background-color: rgba(231, 192, 105, .26); }
+::-webkit-scrollbar-thumb { background: rgba(var(--nous-acc-rgb), .14); border-radius: 5px; border: 2px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background-color: rgba(var(--nous-acc-rgb), .26); }
 .oculto { display: none !important; }
 
 #nc-carregando { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 13px; color: var(--mut); }
@@ -65,8 +68,8 @@ input, textarea, select { font: inherit; color: var(--txt); }
 /* arvore */
 .nc-no { display: flex; align-items: center; gap: 5px; height: 24px; padding-right: 8px; white-space: nowrap; cursor: pointer; color: #cfc6b5; border: 1px solid transparent; }
 .nc-no:hover { background: var(--alto); }
-.nc-no.sel { background: rgba(200, 150, 46, .14); color: var(--ouro2); }
-.nc-no.foco { border-color: rgba(200, 150, 46, .5); }
+.nc-no.sel { background: rgba(var(--nous-acc-rgb), .14); color: var(--ouro2); }
+.nc-no.foco { border-color: rgba(var(--nous-acc-rgb), .5); }
 .nc-no .seta { width: 14px; flex: none; color: var(--mut2); font-size: 10px; text-align: center; }
 .nc-no .nome { overflow: hidden; text-overflow: ellipsis; }
 .nc-no.apagado { opacity: .5; }
@@ -79,12 +82,12 @@ input, textarea, select { font: inherit; color: var(--txt); }
 .nc-campo:focus-within { border-color: var(--ouro); }
 .nc-campo input, .nc-campo textarea { flex: 1; min-width: 0; border: 0; outline: 0; background: none; padding: 5px 8px; resize: none; }
 .nc-campo button { border: 1px solid transparent; border-radius: 4px; background: none; color: var(--mut); padding: 1px 5px; font: 600 11.5px var(--mono); }
-.nc-campo button.on { border-color: var(--ouro); color: var(--ouro2); background: rgba(200, 150, 46, .14); }
+.nc-campo button.on { border-color: var(--ouro); color: var(--ouro2); background: rgba(var(--nous-acc-rgb), .14); }
 .nc-res-arq { display: flex; align-items: center; gap: 6px; padding: 4px 13px; font-weight: 500; cursor: pointer; }
 .nc-res-arq small { color: var(--mut2); font-weight: 400; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nc-res-lin { padding: 2px 13px 2px 34px; font: 12px/1.55 var(--mono); color: #bdb3a1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
 .nc-res-arq:hover, .nc-res-lin:hover { background: var(--alto); }
-.nc-res-lin mark { background: rgba(200, 150, 46, .35); color: var(--txt); border-radius: 2px; }
+.nc-res-lin mark { background: rgba(var(--nous-acc-rgb), .35); color: var(--txt); border-radius: 2px; }
 .nc-vazio { padding: 8px 13px; color: var(--mut2); font-size: 12.5px; }
 .nc-git-ramo { padding: 0 13px 8px; color: var(--mut); font-size: 12.5px; display: flex; gap: 6px; align-items: center; }
 .nc-git-acoes { display: flex; gap: 6px; padding: 0 13px 13px; }
@@ -107,7 +110,7 @@ input, textarea, select { font: inherit; color: var(--txt); }
 .nc-aba.sujo .x:hover::before { content: none; }
 .nc-aba em { font-style: normal; color: var(--mut2); font-size: 11.5px; }
 #nc-trilho { flex: none; display: flex; align-items: center; gap: 4px; height: 26px; padding: 0 13px; color: var(--mut2); font-size: 12px; border-bottom: 1px solid var(--linha); }
-#nc-aviso-disco { flex: none; display: flex; align-items: center; gap: 13px; padding: 6px 13px; background: rgba(200, 150, 46, .12); color: var(--ouro2); font-size: 12.5px; }
+#nc-aviso-disco { flex: none; display: flex; align-items: center; gap: 13px; padding: 6px 13px; background: rgba(var(--nous-acc-rgb), .12); color: var(--ouro2); font-size: 12.5px; }
 #nc-editor, #nc-diff { flex: 1; min-height: 0; }
 #nc-boas { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 21px; color: var(--mut); }
 #nc-boas img { width: 89px; height: 89px; opacity: .55; }
@@ -128,7 +131,7 @@ input, textarea, select { font: inherit; color: var(--txt); }
 #nc-ag-opcoes { display: flex; align-items: center; gap: 8px; padding: 6px 13px; border-bottom: 1px solid var(--linha); font-size: 12px; color: var(--mut); }
 #nc-ag-opcoes select { background: none; border: 0; color: var(--mut); font-size: 12px; max-width: 170px; }
 .nc-modo { display: inline-flex; align-items: center; gap: 6px; border: 0; background: none; color: var(--mut); font-size: 12px; padding: 2px 0; margin-left: auto; }
-.nc-modo .sw { width: 26px; height: 15px; border-radius: 8px; background: rgba(231, 192, 105, .15); position: relative; }
+.nc-modo .sw { width: 26px; height: 15px; border-radius: 8px; background: rgba(var(--nous-acc-rgb), .15); position: relative; }
 .nc-modo .sw::after { content: ""; position: absolute; left: 2px; top: 2px; width: 11px; height: 11px; border-radius: 50%; background: var(--mut); transition: transform .2s; }
 .nc-modo[aria-checked="true"] .sw { background: var(--ouro); }
 .nc-modo[aria-checked="true"] .sw::after { transform: translateX(11px); background: #fff; }
@@ -142,11 +145,11 @@ input, textarea, select { font: inherit; color: var(--txt); }
 .nc-nota { color: var(--mut); font-size: 12.5px; margin: 6px 0; white-space: pre-wrap; }
 .nc-perigo { color: var(--vermelho); font-size: 12.5px; font-weight: 600; margin: 6px 0; }
 /* avisos do Nous no meio da conversa: se destacam do texto solto do modelo */
-.nc-aviso { color: var(--txt); margin: 8px 0; padding: 7px 10px; border-radius: 0 8px 8px 0; border-left: 3px solid var(--ouro); background: rgba(200, 150, 46, .1); }
+.nc-aviso { color: var(--txt); margin: 8px 0; padding: 7px 10px; border-radius: 0 8px 8px 0; border-left: 3px solid var(--ouro); background: rgba(var(--nous-acc-rgb), .1); }
 .nc-aviso b { display: block; font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--ouro2); }
 .nc-aviso.bloqueada { border-left-color: var(--vermelho); background: rgba(226, 154, 138, .1); }
 .nc-aviso.bloqueada b { color: var(--vermelho); }
-.nc-passos { border-left: 2px solid rgba(200, 150, 46, .35); padding: 2px 0 2px 11px; margin: 6px 0 6px 4px; }
+.nc-passos { border-left: 2px solid rgba(var(--nous-acc-rgb), .35); padding: 2px 0 2px 11px; margin: 6px 0 6px 4px; }
 .nc-passo { position: relative; font-size: 12.5px; color: #b5ab98; padding: 2px 0; }
 .nc-passo::before { content: ""; position: absolute; left: -16px; top: 9px; width: 7px; height: 7px; border-radius: 50%; background: var(--noite2); border: 2px solid var(--ouro); }
 .nc-passo.ok::before { background: var(--ouro); }
@@ -210,12 +213,12 @@ input, textarea, select { font: inherit; color: var(--txt); }
 #nc-paleta .lista { overflow-y: auto; }
 .nc-op { display: flex; align-items: center; gap: 8px; padding: 6px 15px; cursor: pointer; }
 .nc-op small { color: var(--mut2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.nc-op.on { background: rgba(200, 150, 46, .16); }
+.nc-op.on { background: rgba(var(--nous-acc-rgb), .16); }
 .nc-op b { font-weight: 500; } .nc-op mark { background: none; color: var(--ouro2); font-weight: 600; }
 
 #nc-menu { position: fixed; z-index: 60; min-width: 200px; padding: 4px; background: var(--alto); border: 1px solid var(--linha2); border-radius: 8px; box-shadow: 0 13px 34px rgba(0, 0, 0, .45); }
 #nc-menu button { display: block; width: 100%; text-align: left; padding: 5px 12px; border: 0; border-radius: 5px; background: none; }
-#nc-menu button:hover { background: rgba(200, 150, 46, .16); }
+#nc-menu button:hover { background: rgba(var(--nous-acc-rgb), .16); }
 #nc-menu hr { border: 0; border-top: 1px solid var(--linha); margin: 4px 0; }
 
 #nc-dialogo { position: fixed; inset: 0; z-index: 70; display: flex; align-items: flex-start; justify-content: center; padding-top: 89px; background: rgba(0, 0, 0, .45); }
@@ -245,12 +248,12 @@ input, textarea, select { font: inherit; color: var(--txt); }
 #nc-agente.planejando #nc-ag-caixa > .caixa { border-color: var(--azul); }
 #nc-agente.planejando #nc-ag-dica::before { content: "Modo plano: o agente só investiga e propõe. "; color: var(--azul); }
 #nc-ag-ctx { display: flex; align-items: center; gap: 8px; padding: 5px 13px; border-bottom: 1px solid var(--linha); font-size: 11.5px; color: var(--mut2); }
-#nc-ag-ctx .barra { width: 60px; height: 4px; border-radius: 2px; background: rgba(231, 192, 105, .12); overflow: hidden; flex: none; }
+#nc-ag-ctx .barra { width: 60px; height: 4px; border-radius: 2px; background: rgba(var(--nous-acc-rgb), .12); overflow: hidden; flex: none; }
 #nc-ag-ctx .barra i { display: block; height: 100%; width: 0; background: var(--ouro); transition: width .4s; }
 #nc-ag-ctx .barra i.alto { background: #d9826d; }
 #nc-ag-ctx button { margin-left: auto; border: 0; background: none; color: var(--mut); font-size: 11.5px; padding: 0; }
 #nc-ag-ctx button:hover { color: var(--ouro2); }
-#nc-ag-obj { display: flex; align-items: baseline; gap: 8px; padding: 6px 13px; border-bottom: 1px solid var(--linha); background: rgba(200, 150, 46, .08); font-size: 12.5px; }
+#nc-ag-obj { display: flex; align-items: baseline; gap: 8px; padding: 6px 13px; border-bottom: 1px solid var(--linha); background: rgba(var(--nous-acc-rgb), .08); font-size: 12.5px; }
 #nc-ag-obj span { font-weight: 600; color: var(--ouro2); white-space: nowrap; }
 #nc-ag-obj span.ok { color: var(--verde); }
 #nc-ag-obj button { margin-left: auto; border: 0; background: none; color: var(--mut); font-size: 15px; line-height: 1; padding: 0 2px; }
@@ -349,7 +352,7 @@ input, textarea, select { font: inherit; color: var(--txt); }
 .nc-diag a { color: inherit; text-decoration: underline; cursor: pointer; }
 
 /* tarefa separada (copia do projeto) */
-#nc-ag-copia { margin: 8px 10px 0; padding: 8px 10px; border: 1px solid var(--ouro); border-radius: 8px; background: rgba(200, 150, 46, .08); font-size: 12.5px; color: var(--txt); }
+#nc-ag-copia { margin: 8px 10px 0; padding: 8px 10px; border: 1px solid var(--ouro); border-radius: 8px; background: rgba(var(--nous-acc-rgb), .08); font-size: 12.5px; color: var(--txt); }
 #nc-ag-copia b { display: block; color: var(--ouro2); margin-bottom: 2px; }
 #nc-ag-copia .bt { display: flex; gap: 6px; margin-top: 7px; flex-wrap: wrap; }
 .nc-cp-bt { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }

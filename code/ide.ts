@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { WebSocketServer, type WebSocket } from 'ws';
 import * as pty from '@lydell/node-pty';
 import * as F from './ferramentas.ts';
+import { FOLHA_PALETAS } from './aparencia.ts';
 
 const AQUI = path.dirname(fileURLToPath(import.meta.url));
 const NM = path.join(AQUI, 'node_modules');
@@ -29,6 +30,12 @@ const ESTATICOS: [string, string][] = [
 export function estatico(url: string, res: http.ServerResponse): boolean {
   let rota = url.split('?')[0];
   if (rota === '/' || rota === '/index.html') rota = '/ide/index.html';
+  /* as paletas de cores do Nous (branding/nous-paletas.css): so' esse arquivo da pasta */
+  if (rota === '/tema/nous-paletas.css' && fs.existsSync(FOLHA_PALETAS)) {
+    res.writeHead(200, { 'Content-Type': TIPOS['.css'], 'Cache-Control': 'no-cache' });
+    fs.createReadStream(FOLHA_PALETAS).pipe(res);
+    return true;
+  }
   for (const [pref, dir] of ESTATICOS) {
     if (!rota.startsWith(pref)) continue;
     const abs = path.resolve(dir, decodeURIComponent(rota.slice(pref.length)));

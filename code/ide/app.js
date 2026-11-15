@@ -35,7 +35,7 @@
   const ic = (n, cls) => '<svg class="ic ' + (cls || '') + '" viewBox="0 0 24 24" aria-hidden="true">' + SVG[n] + '</svg>';
 
   /* cor e sigla por extensao (a arvore fica legivel sem pacote de icones) */
-  const EXT = { js: ['JS', '#e7c069'], mjs: ['JS', '#e7c069'], cjs: ['JS', '#e7c069'], ts: ['TS', '#8fb8c9'], tsx: ['TX', '#8fb8c9'], jsx: ['JX', '#e7c069'],
+  const EXT = { js: ['JS', '#e6c36a'], mjs: ['JS', '#e6c36a'], cjs: ['JS', '#e6c36a'], ts: ['TS', '#8fb8c9'], tsx: ['TX', '#8fb8c9'], jsx: ['JX', '#e6c36a'],
     py: ['PY', '#8fb8c9'], json: ['{}', '#d9a066'], md: ['MD', '#b5c98a'], html: ['<>', '#e29a8a'], css: ['#', '#b39ddb'], scss: ['#', '#b39ddb'],
     ps1: ['PS', '#8fb8c9'], bat: ['BT', '#958a76'], vbs: ['VB', '#958a76'], sql: ['SQ', '#d9a066'], yml: ['YM', '#e29a8a'], yaml: ['YM', '#e29a8a'],
     svelte: ['SV', '#e29a8a'], vue: ['VU', '#8cc79a'], go: ['GO', '#8fb8c9'], rs: ['RS', '#d9a066'], java: ['JV', '#e29a8a'], cs: ['C#', '#8cc79a'],
@@ -43,7 +43,7 @@
   function marcaExt(nome) {
     const e = (nome.split('.').pop() || '').toLowerCase();
     const m = EXT[e];
-    return m ? '<span class="nc-ext" style="background:' + m[1] + '">' + m[0] + '</span>' : '<span class="nc-ext" style="background:#3a342b;color:#958a76">·</span>';
+    return m ? '<span class="nc-ext" style="background:' + m[1] + '">' + m[0] + '</span>' : '<span class="nc-ext" style="background:var(--alto2);color:var(--mut)">·</span>';
   }
 
   /* ------------------------------------------------------------ estado */
@@ -52,6 +52,74 @@
     vista: 'arquivos', git: null, sessao: null, rodandoCtrl: null, vivo: null, modelos: [], diag: {},
     ws: null, termId: null, term: null, fit: null, monaco: null, editor: null, diffEd: null, selArvore: null,
   };
+
+  /* ------------------------------------------------------------ paleta de cores */
+  /* A mesma escolhida no Nous (Aparencia), sempre na versao escura: o servico le'
+   * NousData/aparencia.json (GET /aparencia). Aplica ja' a ultima guardada (sem
+   * piscar) e confere ao abrir e quando a janela ganha foco. O editor e o terminal
+   * nao entendem var(): o tema deles e' montado das variaveis e refeito na troca. */
+  const cor = (v) => getComputedStyle(document.documentElement).getPropertyValue('--nous-' + v).trim();
+  function hex(c, reserva) {
+    c = (c || '').trim();
+    if (/^#[0-9a-f]{6}$/i.test(c)) return c.toLowerCase();
+    if (/^#[0-9a-f]{3}$/i.test(c)) return '#' + c.slice(1).split('').map((x) => x + x).join('').toLowerCase();
+    return reserva;
+  }
+  function mistura(a, b, t) {   /* a ate' b, t de 0 a 1 */
+    const pa = [1, 3, 5].map((i) => parseInt(a.slice(i, i + 2), 16)), pb = [1, 3, 5].map((i) => parseInt(b.slice(i, i + 2), 16));
+    return '#' + pa.map((v, i) => Math.round(v + (pb[i] - v) * t).toString(16).padStart(2, '0')).join('');
+  }
+  function coresPaleta() {
+    return { bg: hex(cor('bg'), '#141414'), lado: hex(cor('lado'), '#101010'), alto: hex(cor('alto'), '#1c1c1c'),
+      txt: hex(cor('txt'), '#dddddd'), mut: hex(cor('mut'), '#999999'), acc: hex(cor('acc'), '#aaaaaa'), at: hex(cor('acc-txt'), '#cccccc') };
+  }
+  function temaMonaco() {
+    const c = coresPaleta(), sem = (h) => h.slice(1);
+    return {
+      base: 'vs-dark', inherit: true,
+      rules: [
+        { token: 'comment', foreground: sem(mistura(c.mut, c.bg, 0.15)), fontStyle: 'italic' }, { token: 'keyword', foreground: sem(c.at) },
+        { token: 'string', foreground: 'b5c98a' }, { token: 'number', foreground: 'd9a066' }, { token: 'type', foreground: '8fb8c9' },
+        { token: 'delimiter', foreground: sem(mistura(c.txt, c.bg, 0.25)) }, { token: 'tag', foreground: 'e29a8a' }, { token: 'attribute.name', foreground: 'd9a066' },
+      ],
+      colors: {
+        'editor.background': c.bg, 'editor.foreground': c.txt, 'editorLineNumber.foreground': mistura(c.mut, c.bg, 0.4),
+        'editorLineNumber.activeForeground': c.acc, 'editor.selectionBackground': c.acc + '44', 'editor.inactiveSelectionBackground': c.acc + '22',
+        'editor.lineHighlightBackground': c.alto, 'editor.lineHighlightBorder': '#00000000', 'editorCursor.foreground': c.at,
+        'editorIndentGuide.background1': mistura(c.bg, c.txt, 0.08), 'editorIndentGuide.activeBackground1': mistura(c.bg, c.txt, 0.22),
+        'editorWidget.background': c.alto, 'editorWidget.border': c.acc + '55', 'editorSuggestWidget.selectedBackground': c.acc + '33',
+        'minimap.background': c.bg, 'scrollbarSlider.background': c.at + '22', 'scrollbarSlider.hoverBackground': c.at + '44',
+        'editor.findMatchHighlightBackground': c.acc + '33',
+        'diffEditor.insertedTextBackground': '#5fa36a30', 'diffEditor.removedTextBackground': '#c0573f30',
+        'diffEditor.insertedLineBackground': '#5fa36a18', 'diffEditor.removedLineBackground': '#c0573f18',
+      },
+    };
+  }
+  function temaTerminal() {
+    const c = coresPaleta();
+    return { background: c.lado, foreground: c.txt, cursor: c.at, cursorAccent: c.lado, selectionBackground: c.acc + '55',
+      black: c.alto, red: '#e29a8a', green: '#8cc79a', yellow: '#e5c07b', blue: '#8fb8c9', magenta: '#b39ddb', cyan: '#8fc9c0', white: c.txt,
+      brightBlack: mistura(c.mut, c.bg, 0.25), brightRed: '#f0b3a6', brightGreen: '#a8dbb3', brightYellow: '#f2d48f', brightBlue: '#acd0de',
+      brightMagenta: '#cbb8ec', brightCyan: '#a8ddd5', brightWhite: '#f5efe3' };
+  }
+  function retematizar() {
+    if (st.monaco) { st.monaco.editor.defineTheme('nous', temaMonaco()); st.monaco.editor.setTheme('nous'); }
+    if (st.term) st.term.options.theme = temaTerminal();
+  }
+  function aplicarPaleta(id) {
+    id = typeof id === 'string' && /^[a-z0-9-]{1,32}$/.test(id) ? id : 'ouro';
+    const antes = document.documentElement.getAttribute('data-nous-paleta') || 'ouro';
+    if (id === 'ouro') document.documentElement.removeAttribute('data-nous-paleta');
+    else document.documentElement.setAttribute('data-nous-paleta', id);
+    try { localStorage.setItem('nous-paleta', id); } catch { /* sem armazenamento: so' nao lembra */ }
+    if (antes !== id) retematizar();
+  }
+  function conferirPaleta() {
+    fetch('/aparencia', { cache: 'no-store' }).then((r) => r.json()).then((j) => aplicarPaleta(j.paleta)).catch(() => { /* fica a ultima */ });
+  }
+  try { aplicarPaleta(localStorage.getItem('nous-paleta') || 'ouro'); } catch { aplicarPaleta('ouro'); }
+  conferirPaleta();
+  window.addEventListener('focus', conferirPaleta);
 
   function toast(texto, erro) {
     let t = $('#nc-toast');
@@ -403,24 +471,7 @@
   /* ============================================================ editor e abas */
   function criarEditor() {
     const m = st.monaco;
-    m.editor.defineTheme('nous', {
-      base: 'vs-dark', inherit: true,
-      rules: [
-        { token: 'comment', foreground: '7d7363', fontStyle: 'italic' }, { token: 'keyword', foreground: 'e7c069' },
-        { token: 'string', foreground: 'b5c98a' }, { token: 'number', foreground: 'd9a066' }, { token: 'type', foreground: '8fb8c9' },
-        { token: 'delimiter', foreground: 'a89f8c' }, { token: 'tag', foreground: 'e29a8a' }, { token: 'attribute.name', foreground: 'd9a066' },
-      ],
-      colors: {
-        'editor.background': '#141210', 'editor.foreground': '#ddd5c6', 'editorLineNumber.foreground': '#5c5446',
-        'editorLineNumber.activeForeground': '#c8962e', 'editor.selectionBackground': '#c8962e44', 'editor.inactiveSelectionBackground': '#c8962e22',
-        'editor.lineHighlightBackground': '#1c1916', 'editor.lineHighlightBorder': '#00000000', 'editorCursor.foreground': '#e7c069',
-        'editorIndentGuide.background1': '#2a2520', 'editorIndentGuide.activeBackground1': '#4a4134', 'editorWidget.background': '#1c1916',
-        'editorWidget.border': '#c8962e55', 'editorSuggestWidget.selectedBackground': '#c8962e33', 'minimap.background': '#141210',
-        'scrollbarSlider.background': '#e7c06922', 'scrollbarSlider.hoverBackground': '#e7c06944', 'editor.findMatchHighlightBackground': '#c8962e33',
-        'diffEditor.insertedTextBackground': '#5fa36a30', 'diffEditor.removedTextBackground': '#c0573f30',
-        'diffEditor.insertedLineBackground': '#5fa36a18', 'diffEditor.removedLineBackground': '#c0573f18',
-      },
-    });
+    m.editor.defineTheme('nous', temaMonaco());   /* cores da paleta (ver paleta de cores, no comeco) */
     st.editor = m.editor.create($('#nc-editor'), {
       theme: 'nous', automaticLayout: false, fontFamily: '"Cascadia Code", "Cascadia Mono", Consolas, monospace', fontSize: 13.5,
       fontLigatures: true, minimap: { enabled: true, scale: 1 }, smoothScrolling: true, cursorSmoothCaretAnimation: 'on',
@@ -785,9 +836,7 @@
     if (!st.term) {
       st.term = new window.Terminal({
         fontFamily: '"Cascadia Mono", "Cascadia Code", Consolas, monospace', fontSize: 13, cursorBlink: true, scrollback: 5000, allowProposedApi: true,
-        theme: { background: '#100e0c', foreground: '#ddd5c6', cursor: '#e7c069', cursorAccent: '#100e0c', selectionBackground: '#c8962e55',
-          black: '#1c1916', red: '#e29a8a', green: '#8cc79a', yellow: '#e7c069', blue: '#8fb8c9', magenta: '#b39ddb', cyan: '#8fc9c0', white: '#ddd5c6',
-          brightBlack: '#6f6656', brightRed: '#f0b3a6', brightGreen: '#a8dbb3', brightYellow: '#f2d48f', brightBlue: '#acd0de', brightMagenta: '#cbb8ec', brightCyan: '#a8ddd5', brightWhite: '#f5efe3' },
+        theme: temaTerminal(),
       });
       st.fit = new window.FitAddon.FitAddon();
       st.term.loadAddon(st.fit);

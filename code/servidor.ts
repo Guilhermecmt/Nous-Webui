@@ -57,6 +57,7 @@ import * as R from './lembretes.ts';
 import * as TA from './tarefas.ts';
 import { skills } from './contexto.ts';
 import * as IDE from './ide.ts';
+import { paletaEscolhida } from './aparencia.ts';
 
 const PORTA = Number(process.env.NOUS_CODE_PORT || 8998);
 const VERSAO = '0.3.0';
@@ -242,6 +243,8 @@ async function rota(req: http.IncomingMessage, res: http.ServerResponse) {
   const r = req.method + ' ' + url.pathname;
 
   if (r === 'GET /health') return json(req, res, 200, { ok: true, versao: VERSAO, modelo: MODELO_PADRAO, lsp: L.disponiveis() });
+  /* paleta de cores escolhida no Nous (NousData/aparencia.json; quem grava e' o monitor) */
+  if (r === 'GET /aparencia') return json(req, res, 200, { paleta: paletaEscolhida(path.dirname(DADOS)) });
 
   /* ---- IDE: arquivos, busca, git, janela ---- */
   if (url.pathname.startsWith('/fs/') || url.pathname.startsWith('/git/')) {
