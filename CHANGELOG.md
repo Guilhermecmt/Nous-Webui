@@ -2,6 +2,23 @@
 
 ## [Não lançado]
 ### Adicionado
+- **O Nous virou um programa: janela própria, fora do navegador** (`Nous.exe`,
+  `janela/`). Abre numa janela do Windows com o nome e o ícone do Nous na barra de
+  tarefas e no Alt+Tab, separada do Chrome e do Edge (perfil em
+  `NousData\janela`). Usa o motor do Edge que já vem no Windows 11 (WebView2).
+  - Uma janela só: abrir de novo traz a que está aberta para a frente.
+  - A tela de carregamento aparece dentro da janela, e a barra de título segue a
+    cor da tela (paleta, claro ou escuro).
+  - Lembra tamanho e posição.
+  - Fechar a janela não desliga o Nous (lembretes, Telegram e celular seguem);
+    "Parar Nous" desliga e fecha.
+  - Sites de fora abrem no seu navegador. O Nous Code abre na janela própria dele.
+  - O instalador compila o `Nous.exe` na própria máquina, com o compilador que
+    já vem no Windows, e o atalho "Nous" passa a abrir a janela. O atualizador
+    recompila quando o código dela muda. Sem WebView2 ou se a compilação falhar,
+    tudo continua abrindo no navegador (`NOUS_JANELA=0` também volta ao
+    navegador). As DLLs do SDK do WebView2 (Microsoft, licença BSD) estão em
+    `janela/lib`.
 - **Paletas de cores** (painel **Seu Nous › Aparência** e a lição "Escolha as
   cores" dos Primeiros passos). São sete: Ouro (a de sempre, padrão), Pitaya,
   Maracujá, Melancia, Ametista e Sol, Céu e Flamingo e Mata, cada uma com claro e
