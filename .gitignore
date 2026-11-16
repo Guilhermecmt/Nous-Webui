@@ -68,3 +68,8 @@ node_modules/
 motor/bin/
 motor/bin.tmp/
 /bin/
+
+# Nous.exe compilado na maquina (launchers/janela-nous.ps1)
+janela/bin/
+# ...mas as DLLs do WebView2 da janela entram (a regra Lib/ acima as pegaria no Windows)
+!janela/lib/

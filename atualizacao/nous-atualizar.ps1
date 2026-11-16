@@ -230,7 +230,8 @@ function Test-NousSaudavel {
 function Stop-Nous {
     if ($ModoTeste) { Log "(teste) pularia: parar o Nous"; return }
     $s = Join-Path $AppDir "launchers\stop-nous.ps1"
-    if (Test-Path -LiteralPath $s) { & powershell -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File $s | Out-Null }
+    # -ManterJanela: a janela do Nous (Nous.exe) fica aberta e se recarrega quando o servidor volta
+    if (Test-Path -LiteralPath $s) { & powershell -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File $s -ManterJanela | Out-Null }
     Start-Sleep -Seconds 2
 }
 function Start-Nous {
@@ -403,6 +404,17 @@ function Invoke-Aplicar {
                 Set-Estado @{ mensagem = "Baixando o motor de IA (llama.cpp, ~40 MB)..." }
                 if (Install-LlamaServer -AppDir $AppDir) { Log "llama-server $((Get-LlamaPin $AppDir).tag) instalado" }
                 else { Log "llama-server nao instalado: $script:LlamaErro (o motor usa o Ollama)" }
+            }
+        }
+        # Janela propria (Nous.exe): recompila se o codigo dela mudou. Com a janela
+        # aberta, o .exe antigo e' renomeado (o Windows deixa) e o novo vale na proxima.
+        $libJanela = Join-Path $AppDir "launchers\janela-nous.ps1"
+        if (Test-Path -LiteralPath $libJanela) {
+            . $libJanela
+            if ((Test-WebView2) -and -not (Test-JanelaAtual $AppDir)) {
+                Set-Estado @{ mensagem = "Preparando a janela do Nous..." }
+                if (Build-NousJanela -AppDir $AppDir) { Log "janela do Nous (Nous.exe) compilada" }
+                else { Log "janela do Nous nao compilou: $script:JanelaErro (o Nous abre no navegador)" }
             }
         }
         $lockNovo = Get-FileHash -LiteralPath (Join-Path $AppDir "code\package-lock.json") -ErrorAction SilentlyContinue

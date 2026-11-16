@@ -35,6 +35,9 @@ $cfgPath   = Join-Path $DataDir "atualizacao-config.json"
 $estPath   = Join-Path $DataDir "atualizacao-estado.json"
 $atualizar = Join-Path $AppDir "atualizacao\nous-atualizar.ps1"
 $icoPath   = Join-Path $AppDir "branding\assets\nous.ico"
+# Janela propria (Nous.exe): "Abrir o Nous" abre nela quando existe
+$libJanela = Join-Path $launchers "janela-nous.ps1"
+if (Test-Path $libJanela) { . $libJanela }
 $pt = [Globalization.CultureInfo]::GetCultureInfo("pt-BR")
 
 # --- uma bandeja por vez ----------------------------------------------------
@@ -156,7 +159,10 @@ $iMem    = Add-Item "" $null $false
 $iModelo = Add-Item "" $null $false
 Add-Sep
 $iAbrir = Add-Item "Abrir o Nous" {
-    if ($S.rodando) { Start-Process "http://localhost:$PortaNous" } else { Start-Oculto "nous-hidden.vbs" }
+    if ($S.rodando) {
+        $abriu = (Get-Command Open-NousJanela -ErrorAction SilentlyContinue) -and (Open-NousJanela $AppDir)
+        if (-not $abriu) { Start-Process "http://localhost:$PortaNous" }
+    } else { Start-Oculto "nous-hidden.vbs" }
 }
 $iAbrir.Font = New-Object Drawing.Font($iAbrir.Font, [Drawing.FontStyle]::Bold)
 $iLiga = Add-Item "Iniciar o Nous" {

@@ -8,9 +8,21 @@
   (nous-motor, 8989) com os llama-server dele. Antes so' a 8080
   era fechada e os outros processos Python ficavam para tras. O Ollama nao e'
   tocado (outros programas podem usa-lo); "Parar modelos" no painel libera a GPU.
+  As janelas do Nous (Nous.exe) fecham junto, menos com -ManterJanela (o atualizador
+  reinicia o servidor e a janela aberta se recarrega sozinha).
 #>
+param([switch]$ManterJanela)
 $ErrorActionPreference = "SilentlyContinue"
 $venv = Join-Path $env:USERPROFILE "open-webui"
+
+# Janelas do Nous: fecha pedindo (guarda tamanho e posicao); a que nao fechar, cai junto.
+if (-not $ManterJanela) {
+    $exeJanela = Join-Path (Split-Path $PSScriptRoot -Parent) "janela\bin\Nous.exe"
+    $janelas = @(Get-Process -Name Nous -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $exeJanela })
+    foreach ($j in $janelas) { $null = $j.CloseMainWindow() }
+    if ($janelas.Count) { Start-Sleep -Milliseconds 1500 }
+    foreach ($j in $janelas) { if (-not $j.HasExited) { Stop-Process -Id $j.Id -Force -ErrorAction SilentlyContinue } }
+}
 
 # O python.exe de um venv no Windows e' so' um redirecionador: o processo real
 # roda o Python base e so' e' achado pela porta. Por isso: caminho + portas.

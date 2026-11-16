@@ -146,6 +146,18 @@ if ($py) {
     }
 }
 
+# Janela propria (Nous.exe): compila numa pasta temporaria com o csc.exe do Windows e
+# confere para onde cada endereco vai. Nao abre janela.
+$cscJanela = Join-Path $env:WINDIR "Microsoft.NET\Framework64\v4.0.30319\csc.exe"
+if ((Test-Path (Join-Path $root "janela\testes\testar-janela.ps1")) -and (Test-Path $cscJanela)) {
+    Write-Host "== Janela do Nous (Nous.exe)" -ForegroundColor Cyan
+    $old = $ErrorActionPreference; $ErrorActionPreference = "Continue"
+    $out = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $root "janela\testes\testar-janela.ps1") 2>&1 | Out-String
+    $ok = $LASTEXITCODE -eq 0
+    $ErrorActionPreference = $old
+    if (-not $ok) { Write-Host $out; Bad "janela/testes: Nous.exe nao compilou ou errou um destino" }
+}
+
 $node = Get-Command node -ErrorAction SilentlyContinue
 if ($node) {
     Write-Host "== JavaScript" -ForegroundColor Cyan

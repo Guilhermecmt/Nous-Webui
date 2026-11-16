@@ -130,13 +130,22 @@ function New-NousShortcut([string]$folder, [string]$name = "Nous", [string]$vbsN
         $lnkPath = Join-Path $folder "$name.lnk"
         $ws  = New-Object -ComObject WScript.Shell
         $lnk = $ws.CreateShortcut($lnkPath)
-        # SEMPRE via .vbs: ele le o start-nous.ps1 ao vivo (sem janela), entao o
-        # atalho nunca fica preso numa versao congelada como acontecia com o .exe.
+        # Via .vbs: ele le o start-nous.ps1 ao vivo (sem janela), entao o atalho
+        # nunca fica preso numa versao congelada como acontecia com o .exe do ps2exe.
+        # O atalho "Nous" vai direto no Nous.exe (janela propria) quando ele existe:
+        # o Nous.exe nao embute nada, ele mesmo chama o nous-hidden.vbs se precisar.
         $vbs = Join-Path $REPO "launchers\$vbsName"
-        $lnk.TargetPath = "wscript.exe"
-        $lnk.Arguments  = "`"$vbs`""
-        $lnk.WorkingDirectory = (Join-Path $REPO "launchers")
+        $janela = Join-Path $REPO "janela\bin\Nous.exe"
         $ico = Join-Path $REPO "branding\assets\nous.ico"
+        if ($vbsName -eq "nous-hidden.vbs" -and (Test-Path $janela)) {
+            $lnk.TargetPath = $janela
+            $lnk.Arguments  = ""
+            $lnk.WorkingDirectory = (Split-Path $janela)
+        } else {
+            $lnk.TargetPath = "wscript.exe"
+            $lnk.Arguments  = "`"$vbs`""
+            $lnk.WorkingDirectory = (Join-Path $REPO "launchers")
+        }
         if (Test-Path $ico) { $lnk.IconLocation = "$ico,0" }
         $lnk.Save()
         return [bool](Test-Path $lnkPath)
@@ -503,6 +512,19 @@ foreach ($oldExe in "Nous.exe", "Parar Nous.exe") {
     if (Test-Path $ep) { Remove-Item $ep -Force -ErrorAction SilentlyContinue }
 }
 Ok "launcher via .vbs (sempre a versao atual, sem codigo congelado)"
+
+# Janela propria (Nous.exe, janela\Nous.cs): compilada AQUI com o csc.exe do .NET
+# Framework 4.8 (ja' vem no Windows) e o WebView2 (vem no Windows 11). Ela so' mostra
+# a janela: quem liga o Nous continua sendo o start-nous.ps1, lido ao vivo. Sem
+# WebView2 ou sem compilar, tudo segue abrindo no navegador, como antes.
+. (Join-Path $REPO "launchers\janela-nous.ps1")
+if (-not (Test-WebView2)) {
+    Info "sem o WebView2 neste Windows: o Nous abre no navegador (instale o 'Microsoft Edge WebView2 Runtime' e rode o instalador de novo para ter a janela propria)"
+} elseif ((Test-JanelaAtual $REPO) -or (Build-NousJanela -AppDir $REPO)) {
+    Ok "janela propria do Nous (Nous.exe): abre fora do navegador, com nome e icone proprios"
+} else {
+    Info "nao consegui preparar a janela propria ($script:JanelaErro); o Nous abre no navegador"
+}
 
 # Recria os atalhos (apontando p/ o .vbs, que le sempre o start-nous.ps1 atual) e VERIFICA.
 $desktopOk = New-NousShortcut ([Environment]::GetFolderPath("Desktop"))

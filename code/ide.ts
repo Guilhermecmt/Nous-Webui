@@ -215,8 +215,15 @@ export function urlJanela(porta: number, pasta?: string, tarefa?: string, sessao
   return `http://127.0.0.1:${porta}/` + (q.size ? '?' + q.toString() : '');
 }
 
+/* A janela do proprio Nous (Nous.exe, janela/Nous.cs), quando foi compilada nesta maquina. */
+export const JANELA_NOUS = path.join(AQUI, '..', 'janela', 'bin', 'Nous.exe');
+
 export function abrirJanela(porta: number, pasta?: string, tarefa?: string, sessao?: string) {
   const url = urlJanela(porta, pasta, tarefa, sessao);
+  if (process.env.NOUS_JANELA !== '0' && fs.existsSync(JANELA_NOUS)) {
+    spawn(JANELA_NOUS, ['--code', url], { detached: true, stdio: 'ignore' }).unref();
+    return url;
+  }
   const cands = [
     path.join(process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)', 'Microsoft', 'Edge', 'Application', 'msedge.exe'),
     path.join(process.env.ProgramFiles || 'C:\\Program Files', 'Microsoft', 'Edge', 'Application', 'msedge.exe'),

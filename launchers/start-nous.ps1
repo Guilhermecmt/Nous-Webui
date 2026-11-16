@@ -17,6 +17,9 @@ $url  = "http://localhost:8080"
 # O ambiente do servidor mora em nous-env.ps1: o atualizador do Open WebUI usa o
 # mesmo, para o banco migrado nascer com os mesmos padroes do Nous.
 . (Join-Path $PSScriptRoot "nous-env.ps1")
+# Janela propria (Nous.exe): abre nela em vez do navegador, quando existe
+. (Join-Path $PSScriptRoot "janela-nous.ps1")
+$appDir = Split-Path $PSScriptRoot
 $manifestModel = Set-NousEnv
 
 function Test-Up {
@@ -436,15 +439,23 @@ if (-not $motorModo) {
 Start-Monitor
 Start-Bandeja
 
-# Ja esta rodando? Garante funcoes nativas e abre o navegador.
-if (Test-Up) { Register-All; if ($env:NOUS_SEM_NAVEGADOR -ne "1") { Start-Process $url }; return }
+# Ja esta rodando? Garante funcoes nativas e abre a janela do Nous (ou o navegador).
+if (Test-Up) {
+    Register-All
+    if ($env:NOUS_SEM_NAVEGADOR -ne "1" -and -not (Open-NousJanela $appDir)) { Start-Process $url }
+    return
+}
 
 # O servidor NAO esta no ar: abre JA a tela de carregamento (o usuario ve o logo
 # do Nous e uma barra de progresso na hora). Ela mesma checa o servidor e abre o
 # Nous sozinha quando estiver pronto. Sem isto, o navegador so' abriria 1-2 min
 # depois - tempo em que a pessoa acha que travou e clica varias vezes.
+# Com a janela propria, a tela de carregamento aparece dentro dela (--sem-iniciar:
+# quem esta ligando o Nous e' este script).
 $loading = Join-Path $PSScriptRoot "loading.html"
-if ((Test-Path $loading) -and $env:NOUS_SEM_NAVEGADOR -ne "1") { Start-Process $loading }
+if ($env:NOUS_SEM_NAVEGADOR -ne "1" -and -not (Open-NousJanela $appDir @("--sem-iniciar"))) {
+    if (Test-Path $loading) { Start-Process $loading }
+}
 
 # Um clique anterior ja esta subindo o servidor: fica so' a tela de carregamento.
 # Sem esta trava, cada clique subia OUTRO servidor contra o mesmo webui.db.
