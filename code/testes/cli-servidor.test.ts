@@ -8,7 +8,7 @@ import path from 'node:path';
 import type { ChildProcess } from 'node:child_process';
 import { Cliente, ErroApi, garantirServico, lerToken } from '../cli/cliente.ts';
 import { lerArgs } from '../cli/args.ts';
-import { imprimir, politicaImprimir } from '../cli/principal.ts';
+import { imprimir, politicaImprimir, prefsDe } from '../cli/principal.ts';
 import { Repl } from '../cli/repl.ts';
 import { Renderizador, criarEstilo } from '../cli/tela.ts';
 import { executarTurno } from '../cli/turno.ts';
@@ -321,6 +321,16 @@ test('o alcance do servico decide a pasta: a pasta do usuario e recusada, e --al
   const id = await r2.garantirSessao();
   assert.equal((await cli.pedir('GET', '/sessao?id=' + id)).alcance, 'usuario');
   assert.equal((await cli.pedir('GET', '/ajustes')).alcance, 'projeto', 'a opcao vale para a conversa; o padrao geral nao muda');
+});
+
+test('o `nous` sem opcoes abre na pasta do usuario: o padrao do terminal e o computador inteiro', async () => {
+  const repl = new Repl({ pasta: srv.casa, cliente: cli, io: new IoFalso(), est, prefs: prefsDe(lerArgs([])) });
+  await repl.carregarPadroes();
+  const id = await repl.garantirSessao();
+  const s = await cli.pedir('GET', '/sessao?id=' + id);
+  assert.equal(s.alcance, 'computador');
+  assert.equal(path.resolve(s.pasta), path.resolve(srv.casa));
+  assert.equal(s.modo, (await cli.pedir('GET', '/ajustes')).modo, 'o modo continua o padrao (pede antes de mudar)');
 });
 
 test('/contexto, /novo, /conversas, /mudancas, /desfazer, /exportar', async () => {

@@ -2,6 +2,17 @@
 
 ## [Não lançado]
 ### Adicionado
+- **`nous` no terminal sem escolher pasta, com a cara do Nous.**
+  - Como no Claude Code, o agente enxerga o computador inteiro a partir de onde
+    você está, e pede antes de mudar qualquer coisa no modo padrão. Antes, a
+    pasta de usuário era recusada. `--alcance` e `/alcance` continuam valendo; a
+    janela do Nous Code segue o padrão dos ajustes.
+  - A abertura mostra a coruja do Nous desenhada em braille, a partir da própria
+    logo (`branding/gerar_coruja_terminal.py` → `code/cli/coruja.ts`), num degradê
+    com as cores da paleta escolhida, com modelo, pasta e alcance ao lado.
+  - Enquanto o agente trabalha, os olhos da coruja olham para os lados e piscam
+    (`◉▼◉`), no lugar do pontinho girando. O prompt `❯` também fica na cor da
+    paleta.
 - **O Nous virou um programa: janela própria, fora do navegador** (`Nous.exe`,
   `janela/`). Abre numa janela do Windows com o nome e o ícone do Nous na barra de
   tarefas e no Alt+Tab, separada do Chrome e do Edge (perfil em

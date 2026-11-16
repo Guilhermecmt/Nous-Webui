@@ -1,13 +1,63 @@
 // O que o terminal desenha: cores, linhas de ferramenta, diff, rodape e o
 // Renderizador, que transforma os eventos do agente em texto.
 import type { Evento } from './cliente.ts';
+import { CORUJA } from './coruja.ts';
 
-export type Estilo = Record<'dim' | 'bold' | 'italic' | 'red' | 'green' | 'yellow' | 'blue' | 'cyan' | 'magenta' | 'gray' | 'inv', (s: string) => string>;
+/* As duas cores da marca: a de texto da paleta escolhida no Nous (alto do degrade da
+ * coruja) e a de destaque (baixo), as duas da versao escura. Sem paleta: magenta. */
+export type CoresMarca = { clara: string; escura: string };
 
-export function criarEstilo(cor: boolean): Estilo {
+export type Estilo = Record<'dim' | 'bold' | 'italic' | 'red' | 'green' | 'yellow' | 'blue' | 'cyan' | 'magenta' | 'gray' | 'inv', (s: string) => string> & {
+  cor: boolean;
+  marca: (s: string) => string;                   // cor do Nous (prompt, olhos, titulo)
+  rgb: (hex: string, s: string) => string;        // cor exata (#rrggbb), so' com cor ligada
+  cores?: CoresMarca;
+};
+
+function rgbDe(hex: string): [number, number, number] | null {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex || '');
+  if (!m) return null;
+  const n = parseInt(m[1], 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+export function criarEstilo(cor: boolean, cores?: CoresMarca): Estilo {
   const f = (a: number, b: number) => (s: string) => (cor ? `\x1b[${a}m${s}\x1b[${b}m` : s);
+  const rgb = (hex: string, s: string) => {
+    const c = cor ? rgbDe(hex) : null;
+    return c ? `\x1b[38;2;${c[0]};${c[1]};${c[2]}m${s}\x1b[39m` : s;
+  };
+  const magenta = f(35, 39);
+  const valido = cores && rgbDe(cores.clara) && rgbDe(cores.escura) ? cores : undefined;
   return { dim: f(2, 22), bold: f(1, 22), italic: f(3, 23), red: f(31, 39), green: f(32, 39), yellow: f(33, 39), blue: f(34, 39),
-    cyan: f(36, 39), magenta: f(35, 39), gray: f(90, 39), inv: f(7, 27) };
+    cyan: f(36, 39), magenta, gray: f(90, 39), inv: f(7, 27), cor, rgb, cores: valido,
+    marca: valido ? (s: string) => rgb(valido.clara, s) : magenta };
+}
+
+/* ------------------------------------------------------------ abertura */
+/* Cor entre a e b (t de 0 a 1), em #rrggbb. */
+export function misturar(a: string, b: string, t: number): string {
+  const x = rgbDe(a), y = rgbDe(b);
+  if (!x || !y) return a;
+  return '#' + x.map((v, i) => Math.round(v + (y[i] - v) * t).toString(16).padStart(2, '0')).join('');
+}
+
+/* A abertura do `nous`: a coruja em braille (degrade da paleta) e, ao lado, o painel.
+ * Sem cor ou em terminal estreito, so' o painel. */
+export function abertura(est: Estilo, painel: string[], largura: number): string[] {
+  const larg = Math.max(...CORUJA.map((l) => l.length));
+  if (!est.cor || largura < larg + 6 + Math.max(...painel.map((l) => semAnsi(l).length))) return painel.map((l) => ' ' + l);
+  const { clara, escura } = est.cores ?? { clara: '#e0a0ff', escura: '#b060d0' };
+  const n = Math.max(CORUJA.length, painel.length);
+  const topo = Math.max(0, Math.floor((CORUJA.length - painel.length) / 2));
+  const out: string[] = [];
+  for (let i = 0; i < n; i++) {
+    const c = CORUJA[i] ?? '';
+    const pintada = c ? est.rgb(misturar(clara, escura, i / Math.max(1, CORUJA.length - 1)), c) : '';
+    const p = painel[i - topo] ?? '';
+    out.push('  ' + pintada + ' '.repeat(larg - c.length) + '    ' + p);
+  }
+  return out;
 }
 
 /* Cor so' quando a saida e' um terminal e a pessoa nao pediu sem cor (NO_COLOR). */
@@ -115,7 +165,11 @@ export function rodape(i: InfoRodape, est: Estilo): string {
 }
 
 /* ------------------------------------------------------------ giro */
-const QUADROS = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+/* Os olhos da coruja enquanto o agente trabalha: olha para os lados e pisca
+ * (um quadro a cada 90 ms; a volta inteira leva uns 4 s). */
+const repetir = (q: string, n: number) => Array<string>(n).fill(q);
+export const QUADROS = [...repetir('◉▼◉', 12), ...repetir('◐▼◐', 6), ...repetir('◉▼◉', 5), ...repetir('◑▼◑', 6),
+  ...repetir('◉▼◉', 10), ...repetir('─▼─', 2), ...repetir('◉▼◉', 4)];
 export class Giro {
   private timer: NodeJS.Timeout | null = null;
   private i = 0;
@@ -139,7 +193,7 @@ export class Giro {
   mudar(texto: string) { this.texto = texto; }
   private pintar() {
     const seg = Math.floor((Date.now() - this.ini) / 1000);
-    this.escrever('\r\x1b[2K' + this.est.magenta(QUADROS[this.i++ % QUADROS.length]) + ' ' + this.est.dim(this.texto + (seg >= 3 ? ' ' + seg + ' s' : '')));
+    this.escrever('\r\x1b[2K' + this.est.marca(QUADROS[this.i++ % QUADROS.length]) + ' ' + this.est.dim(this.texto + (seg >= 3 ? ' ' + seg + ' s' : '')));
   }
   parar() {
     if (this.timer) { clearInterval(this.timer); this.timer = null; this.escrever('\r\x1b[2K'); }

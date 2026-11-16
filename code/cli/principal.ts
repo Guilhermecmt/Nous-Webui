@@ -8,6 +8,21 @@ import { IoImprimir, IoTerminal, type Io } from './io.ts';
 import { Repl } from './repl.ts';
 import { Renderizador, corLigada, criarEstilo } from './tela.ts';
 import { executarTurno, type RespostaPedido } from './turno.ts';
+import { coresMarca } from '../aparencia.ts';
+
+/* No terminal, como no Claude Code: sem escolher pasta, o agente enxerga o computador
+ * inteiro a partir de onde voce esta' (e pede antes de mudar qualquer coisa, no modo
+ * padrao). --alcance e /alcance mudam; a janela do Nous Code segue o padrao dos ajustes. */
+export const ALCANCE_TERMINAL = 'computador';
+
+export function prefsDe(o: Opcoes) {
+  return { modelo: o.modelo, raciocinio: o.esforco, modo: o.modo, alcance: o.alcance ?? ALCANCE_TERMINAL };
+}
+
+/* As cores do terminal seguem a paleta escolhida no Nous. */
+function estiloDe(tty: boolean | undefined) {
+  return criarEstilo(corLigada(tty), coresMarca(path.dirname(pastaDados())));
+}
 
 export function versaoTexto(): string {
   let nous = '', codigo = '';
@@ -47,8 +62,8 @@ function lerEntrada(temPedido: boolean): Promise<string> {
 
 /* Um pedido, a resposta final no stdout, a atividade no stderr. */
 export async function imprimir(o: Opcoes, pedido: string, cliente: Cliente, pasta: string, io: Io = new IoImprimir()): Promise<number> {
-  const est = criarEstilo(corLigada(process.stderr.isTTY));
-  const repl = new Repl({ pasta, cliente, io, est, prefs: { modelo: o.modelo, raciocinio: o.esforco, modo: o.modo, alcance: o.alcance } });
+  const est = estiloDe(process.stderr.isTTY);
+  const repl = new Repl({ pasta, cliente, io, est, prefs: prefsDe(o) });
   let id: string;
   try {
     if (o.continuar && await repl.abrirUltima()) id = repl.sessao!;
@@ -90,8 +105,8 @@ export async function principal(argv: string[]): Promise<number> {
   if (naoInterativo) return imprimir(o, pedido, cliente, pasta);
 
   const io = new IoTerminal(path.join(pastaDados(), 'cli-historico'));
-  const repl = new Repl({ pasta, cliente, io, continuar: o.continuar, pedidoInicial: pedido || undefined,
-    prefs: { modelo: o.modelo, raciocinio: o.esforco, modo: o.modo, alcance: o.alcance } });
+  const repl = new Repl({ pasta, cliente, io, est: estiloDe(process.stdout.isTTY), continuar: o.continuar, pedidoInicial: pedido || undefined,
+    prefs: prefsDe(o) });
   try { return await repl.rodar(); }
   catch (e) {
     if (e instanceof ErroApi || e instanceof Error) process.stderr.write('nous: ' + e.message + '\n');

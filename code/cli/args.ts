@@ -28,7 +28,7 @@ Opções:
   -m, --model <nome>         modelo (veja /model dentro da conversa)
       --effort <nível>       raciocínio: auto, desligado, baixo, medio, alto (ou off, low, medium, high)
       --modo <modo>          permissões: leitura, perguntar, editar, total
-      --alcance <alcance>    projeto, usuario ou computador
+      --alcance <alcance>    projeto, usuario ou computador (no terminal o padrão é o computador inteiro)
   -c, --continuar            retoma a última conversa desta pasta
   -C, --pasta <pasta>        trabalha em outra pasta
   -v, --versao               mostra a versão

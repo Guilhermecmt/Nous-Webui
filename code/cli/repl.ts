@@ -9,7 +9,7 @@ import {
   normalizarAlcance, normalizarEsforco, normalizarModo, type Comando,
 } from './comandos.ts';
 import { completarLinha } from './completar.ts';
-import { Renderizador, criarEstilo, fmtGb, fmtIdade, fmtTokens, formatarDiff, mdLinha, rodape, faseObjetivo, type Estilo } from './tela.ts';
+import { Renderizador, abertura, criarEstilo, fmtGb, fmtIdade, fmtTokens, formatarDiff, mdLinha, rodape, faseObjetivo, type Estilo } from './tela.ts';
 import { executarTurno, type OpcTurno } from './turno.ts';
 
 type Modelo = { nome: string; gb: number; ferramentas: boolean; pensa: boolean; provedor?: string };
@@ -420,7 +420,7 @@ export class Repl {
     const desde = vozes.length > 2 ? vozes[vozes.length - 2] : 0;
     if (desde > 0) this.nota('  … ' + (vozes.length - 2) + ' pedidos anteriores');
     for (const e of evs.slice(desde)) {
-      if (e.t === 'voce') this.linha('\n' + this.est.bold(this.est.magenta('❯ ')) + String(e.texto).split('\n')[0].slice(0, 200));
+      if (e.t === 'voce') this.linha('\n' + this.est.bold(this.est.marca('❯ ')) + String(e.texto).split('\n')[0].slice(0, 200));
       else if (e.t === 'resposta') for (const l of String(e.texto).split('\n')) this.linha(mdLinha(l, this.est));
       else if (e.t === 'ferramenta') this.linha(this.est.dim('  ● ' + e.resumo));
     }
@@ -563,20 +563,31 @@ export class Repl {
   }
 
   /* ------------------------------------------------------------ laco */
-  private cabecalho() {
+  /* A abertura: a coruja do Nous (na cor da paleta) e, ao lado, o que vale nesta conversa. */
+  painel(): string[] {
     const e = this.est;
     const a = this.atual();
+    const rot = (r: Record<string, string>, v: string) => r[v] || v;
+    return [
+      e.bold(e.marca('N O U S')) + e.dim('   agente no seu computador' + (this.versao ? '  ·  Nous Code ' + this.versao : '')),
+      '',
+      e.dim('modelo   ') + a.modelo + e.dim('  ·  raciocínio ' + rot(ROTULO_ESFORCO, a.raciocinio)),
+      e.dim('pasta    ') + this.pasta,
+      e.dim('alcance  ') + rot(ROTULO_ALCANCE, a.alcance) + e.dim('  ·  ' + rot(ROTULO_MODO, a.modo)),
+      '',
+      e.dim('/ajuda comandos  ·  @arquivo anexa  ·  Esc interrompe  ·  Ctrl+C duas vezes sai'),
+    ];
+  }
+
+  private cabecalho() {
     this.linha();
-    this.linha(' ' + e.bold(e.magenta('Nous')) + e.dim(' no terminal' + (this.versao ? '  ·  Nous Code ' + this.versao : '')));
-    this.linha(' ' + e.dim('pasta  ') + this.pasta);
-    this.linha(' ' + e.dim('modelo ') + a.modelo + e.dim(' · raciocínio ' + (ROTULO_ESFORCO[a.raciocinio] || a.raciocinio) + ' · modo ' + a.modo + ' · alcance ' + a.alcance));
-    this.linha(' ' + e.dim('/ajuda lista os comandos · @arquivo anexa · Esc interrompe · Ctrl+C duas vezes sai'));
+    for (const l of abertura(this.est, this.painel(), this.io.largura())) this.linha(l);
     this.linha();
   }
 
   private promptTexto() {
     const plano = this.info?.planejando ? this.est.cyan('plano ') : '';
-    return plano + this.est.bold(this.est.magenta('❯')) + ' ';
+    return plano + this.est.bold(this.est.marca('❯')) + ' ';
   }
 
   /* Uma linha lida: comando, skill desconhecida ou pedido. */
