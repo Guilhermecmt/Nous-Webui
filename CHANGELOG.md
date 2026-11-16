@@ -9,10 +9,11 @@
     janela do Nous Code segue o padrão dos ajustes.
   - A abertura mostra a coruja do Nous desenhada em braille, a partir da própria
     logo (`branding/gerar_coruja_terminal.py` → `code/cli/coruja.ts`), num degradê
-    com as cores da paleta escolhida, com modelo, pasta e alcance ao lado.
-  - Enquanto o agente trabalha, os olhos da coruja olham para os lados e piscam
-    (`◉▼◉`), no lugar do pontinho girando. O prompt `❯` também fica na cor da
-    paleta.
+    dourado (a coruja é dourada em qualquer paleta, como o ícone), com modelo,
+    pasta e alcance ao lado.
+  - Enquanto o agente trabalha, os olhos dourados da coruja olham para os lados e
+    piscam (`◉▼◉`), no lugar do pontinho girando. O prompt `❯` fica na cor da
+    paleta escolhida.
 - **O Nous virou um programa: janela própria, fora do navegador** (`Nous.exe`,
   `janela/`). Abre numa janela do Windows com o nome e o ícone do Nous na barra de
   tarefas e no Alt+Tab, separada do Chrome e do Edge (perfil em

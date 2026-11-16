@@ -3,13 +3,17 @@
 import type { Evento } from './cliente.ts';
 import { CORUJA } from './coruja.ts';
 
-/* As duas cores da marca: a de texto da paleta escolhida no Nous (alto do degrade da
- * coruja) e a de destaque (baixo), as duas da versao escura. Sem paleta: magenta. */
+/* As duas cores da paleta escolhida no Nous (versao escura): a de texto e a de
+ * destaque. Pintam o prompt e os detalhes; sem paleta, magenta. */
 export type CoresMarca = { clara: string; escura: string };
+
+/* A coruja e' dourada em qualquer paleta, como o icone: degrade do ouro claro ao ouro. */
+export const OURO_CORUJA: CoresMarca = { clara: '#f6d67a', escura: '#c8962e' };
 
 export type Estilo = Record<'dim' | 'bold' | 'italic' | 'red' | 'green' | 'yellow' | 'blue' | 'cyan' | 'magenta' | 'gray' | 'inv', (s: string) => string> & {
   cor: boolean;
-  marca: (s: string) => string;                   // cor do Nous (prompt, olhos, titulo)
+  marca: (s: string) => string;                   // cor da paleta (prompt, detalhes)
+  coruja: (s: string) => string;                  // dourado da coruja (desenho, olhos, titulo)
   rgb: (hex: string, s: string) => string;        // cor exata (#rrggbb), so' com cor ligada
   cores?: CoresMarca;
 };
@@ -31,7 +35,8 @@ export function criarEstilo(cor: boolean, cores?: CoresMarca): Estilo {
   const valido = cores && rgbDe(cores.clara) && rgbDe(cores.escura) ? cores : undefined;
   return { dim: f(2, 22), bold: f(1, 22), italic: f(3, 23), red: f(31, 39), green: f(32, 39), yellow: f(33, 39), blue: f(34, 39),
     cyan: f(36, 39), magenta, gray: f(90, 39), inv: f(7, 27), cor, rgb, cores: valido,
-    marca: valido ? (s: string) => rgb(valido.clara, s) : magenta };
+    marca: valido ? (s: string) => rgb(valido.clara, s) : magenta,
+    coruja: (s: string) => rgb(OURO_CORUJA.clara, s) };
 }
 
 /* ------------------------------------------------------------ abertura */
@@ -42,12 +47,12 @@ export function misturar(a: string, b: string, t: number): string {
   return '#' + x.map((v, i) => Math.round(v + (y[i] - v) * t).toString(16).padStart(2, '0')).join('');
 }
 
-/* A abertura do `nous`: a coruja em braille (degrade da paleta) e, ao lado, o painel.
+/* A abertura do `nous`: a coruja em braille (degrade dourado) e, ao lado, o painel.
  * Sem cor ou em terminal estreito, so' o painel. */
 export function abertura(est: Estilo, painel: string[], largura: number): string[] {
   const larg = Math.max(...CORUJA.map((l) => l.length));
   if (!est.cor || largura < larg + 6 + Math.max(...painel.map((l) => semAnsi(l).length))) return painel.map((l) => ' ' + l);
-  const { clara, escura } = est.cores ?? { clara: '#e0a0ff', escura: '#b060d0' };
+  const { clara, escura } = OURO_CORUJA;   // dourada em qualquer paleta, como o icone
   const n = Math.max(CORUJA.length, painel.length);
   const topo = Math.max(0, Math.floor((CORUJA.length - painel.length) / 2));
   const out: string[] = [];
@@ -193,7 +198,7 @@ export class Giro {
   mudar(texto: string) { this.texto = texto; }
   private pintar() {
     const seg = Math.floor((Date.now() - this.ini) / 1000);
-    this.escrever('\r\x1b[2K' + this.est.marca(QUADROS[this.i++ % QUADROS.length]) + ' ' + this.est.dim(this.texto + (seg >= 3 ? ' ' + seg + ' s' : '')));
+    this.escrever('\r\x1b[2K' + this.est.coruja(QUADROS[this.i++ % QUADROS.length]) + ' ' + this.est.dim(this.texto + (seg >= 3 ? ' ' + seg + ' s' : '')));
   }
   parar() {
     if (this.timer) { clearInterval(this.timer); this.timer = null; this.escrever('\r\x1b[2K'); }

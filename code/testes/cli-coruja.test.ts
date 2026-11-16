@@ -27,14 +27,15 @@ test('misturar faz o degrade entre duas cores', () => {
   assert.equal(misturar('#ffc04d', '#f5a623', 0.5), '#fab338');
 });
 
-test('abertura: a coruja em degrade com o painel ao lado', () => {
+test('abertura: a coruja dourada (em qualquer paleta) com o painel ao lado', () => {
   const ls = abertura(criarEstilo(true, CORES), PAINEL, 120);
   assert.equal(ls.length, Math.max(CORUJA.length, PAINEL.length));
   const limpas = ls.map(semAnsi);
   assert.ok(limpas.some((l) => l.includes('N O U S')));
   assert.ok(limpas.some((l) => /[\u2801-\u28ff]/.test(l)), 'tem o desenho em braille');
-  assert.ok(ls[0].includes('\x1b[38;2;255;192;77m'), 'topo na cor clara');
-  assert.ok(ls[CORUJA.length - 1].includes('\x1b[38;2;245;166;35m'), 'pe na cor de destaque');
+  // dourada em qualquer paleta, como o icone: ouro claro no topo, ouro no pe
+  assert.ok(ls[0].includes('\x1b[38;2;246;214;122m'), 'topo em ouro claro');
+  assert.ok(ls[CORUJA.length - 1].includes('\x1b[38;2;200;150;46m'), 'pe em ouro');
   // o painel fica no meio da altura da coruja
   const iTitulo = limpas.findIndex((l) => l.includes('N O U S'));
   assert.equal(iTitulo, Math.floor((CORUJA.length - PAINEL.length) / 2));
@@ -46,6 +47,7 @@ test('abertura: terminal estreito ou sem cor mostra so o painel', () => {
 });
 
 test('os olhos da coruja no lugar do giro: olham para os lados e piscam', () => {
+  assert.equal(criarEstilo(true, CORES).coruja('◉▼◉'), '\x1b[38;2;246;214;122m◉▼◉\x1b[39m', 'olhos dourados mesmo na Maracuja');
   assert.ok(QUADROS.every((q) => q.length === 3 && q[1] === '▼'));
   for (const q of ['◉▼◉', '◐▼◐', '◑▼◑', '─▼─']) assert.ok(QUADROS.includes(q), q);
   assert.ok(QUADROS.filter((q) => q === '─▼─').length <= 3, 'a piscada e rapida');

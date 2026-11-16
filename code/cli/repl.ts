@@ -569,7 +569,7 @@ export class Repl {
     const a = this.atual();
     const rot = (r: Record<string, string>, v: string) => r[v] || v;
     return [
-      e.bold(e.marca('N O U S')) + e.dim('   agente no seu computador' + (this.versao ? '  ·  Nous Code ' + this.versao : '')),
+      e.bold(e.coruja('N O U S')) + e.dim('   agente no seu computador' + (this.versao ? '  ·  Nous Code ' + this.versao : '')),
       '',
       e.dim('modelo   ') + a.modelo + e.dim('  ·  raciocínio ' + rot(ROTULO_ESFORCO, a.raciocinio)),
       e.dim('pasta    ') + this.pasta,
