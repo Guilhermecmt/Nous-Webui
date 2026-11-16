@@ -130,7 +130,8 @@ if ($py) {
 
     # Paletas e icone (branding/testes: so' biblioteca padrao + Pillow). A escolha da
     # paleta no monitor (monitor/testes/test_aparencia.py) roda junto com "Monitor e Loja".
-    foreach ($par in @(@("branding/testes", "Paletas e icone", "PIL"))) {
+    # (a virgula mantem a lista de listas: @(@(...)) com um item so' o PowerShell achata)
+    foreach ($par in @(,@("branding/testes", "Paletas e icone", "PIL"))) {
         if (Test-Path (Join-Path $root $par[0])) {
             & $py.Source -c "import $($par[2])" 2>$null
             if ($LASTEXITCODE -eq 0) {
